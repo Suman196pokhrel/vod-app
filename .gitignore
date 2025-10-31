@@ -1,0 +1,75 @@
+# *******************************************************
+# **************FRONTEND IGNORES************************* 
+# *******************************************************
+
+# dependencies
+app/node_modules
+app/.pnp
+app/.pnp.*
+app/.yarn/*
+app/!.yarn/patches
+app/!.yarn/plugins
+app/!.yarn/releases
+app/!.yarn/versions
+
+
+# next.js
+app/.next/
+app/out/
+
+# production
+app/build
+
+# misc
+app/.DS_Store
+app/*.pem
+
+# debug
+app/npm-debug.log*
+app/yarn-debug.log*
+app/yarn-error.log*
+app/.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+app/.vercel
+
+# typescript
+app/*.tsbuildinfo
+app/next-env.d.ts
+
+# *******************************************************
+# *****************BACKEND IGNORES***********************
+# *******************************************************
+
+backend/.venv
+backend/__pycache__
+backend/*.pyc
+backend/.pytest_cache
+
+
+# *******************************************************
+# *****************ENV FILES*****************************
+# *******************************************************
+.env
+*.env
+.env.*
+*.local
+
+
+# *******************************************************
+# *****************DOCKER IGNORES************************
+# *******************************************************
+infra/minio-data
+infra/pgdata
+infra/*.log
+
+
+# *******************************************************
+# *************MEDIA / GENERATED IGNORES*****************
+# *******************************************************
+uploads/
+storage/
+tmp
