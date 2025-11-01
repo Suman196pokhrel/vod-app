@@ -1,4 +1,6 @@
 import React from "react"
+import HomeNavbar from "./home/_components/HomeNavbar"
+import HomeCarousel from "./home/_components/HomeCarousel"
 
 type ProtectedLayoutProps = {
     children: React.ReactNode
@@ -8,10 +10,10 @@ type ProtectedLayoutProps = {
 
 const ProtectedLayout = ({children}:ProtectedLayoutProps) => {
   return (
-    <div>
-        <div>NAVBAR</div>
-        <div>SIDEBAR</div>
-        <div>{children}</div>
+    <div className="w-full border px-10">
+        <HomeNavbar />
+        <HomeCarousel />
+          {children}
     </div>
   )
 }
