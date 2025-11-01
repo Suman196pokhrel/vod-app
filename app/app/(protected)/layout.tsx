@@ -10,7 +10,7 @@ type ProtectedLayoutProps = {
 
 const ProtectedLayout = ({children}:ProtectedLayoutProps) => {
   return (
-    <div className="w-full border px-10">
+    <div className="w-full border ">
         <HomeNavbar />
           {children}
     </div>

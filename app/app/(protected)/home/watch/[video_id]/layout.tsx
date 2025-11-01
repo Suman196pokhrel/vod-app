@@ -7,7 +7,6 @@ interface VideoPageLayoutProps {
 const VideoPageLayout = ({children}:VideoPageLayoutProps) => {
   return (
     <div>
-        <h2>VideoPageLayout</h2>
         {children}
     </div>
   )

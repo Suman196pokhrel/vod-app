@@ -18,7 +18,7 @@ const HomeNavbar = () => {
         {/* Left: Logo */}
         <div className="flex items-center flex-1">
           <Link href="/home" className="flex items-center">
-            <h1 className="text-4xl font-extrabold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            <h1 className="text-5xl font-extrabold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               VOD
             </h1>
           </Link>
