@@ -5,31 +5,34 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock } from "lucide-react"
 import Image from 'next/image'
-
-interface VideoCardProps {
-  title: string
-  thumbnail: string
-  duration: string
-  views: string
-  category: string
-  isNew?: boolean
-}
+import { useRouter } from 'next/navigation'
+import { Video } from './VideoGrid'
 
 const VideoCard = ({ 
+  id,
   title = "Stranger Things: Season 4",
   thumbnail = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
   duration = "2h 15m",
   views = "12.5M",
   category = "Sci-Fi Thriller",
   isNew = true
-}: Partial<VideoCardProps>) => {
+}: Partial<Video>) => {
+  const router = useRouter()
   const [isHovered, setIsHovered] = useState(false)
+  
+  const handleClick = () => {
+    // handles clicks on feed video cards
+    if (id) {
+      router.push(`/home/watch/${id}`)
+    }
+  }
 
   return (
     <Card 
       className="group relative border-none bg-transparent transition-all duration-300 cursor-pointer p-0 pb-3"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={handleClick}
     >
       <CardContent className="p-0">
         {/* Thumbnail Container */}
@@ -43,7 +46,7 @@ const VideoCard = ({
           />
           
           {/* Subtle Gradient Overlay */}
-          <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
           
           {/* Duration Badge */}
           <Badge 

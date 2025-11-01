@@ -12,7 +12,6 @@ const ProtectedLayout = ({children}:ProtectedLayoutProps) => {
   return (
     <div className="w-full border px-10">
         <HomeNavbar />
-        <HomeCarousel />
           {children}
     </div>
   )

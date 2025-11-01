@@ -1,15 +1,16 @@
-import React from 'react'
-import VideoGrid from './_components/VideoGrid'
+import React from "react";
+import VideoGrid from "./_components/VideoGrid";
+import HomeCarousel from "./_components/HomeCarousel";
 
 const Home = () => {
   return (
-    <div className="flex flex-col w-full items-start py-2">
-        <div className='w-full'>
-          {/* # Mock  */}
-            <VideoGrid />
-        </div>
-    </div>
-  )
-}
+    <div className="flex flex-col w-full items-center justify-center py-2 mt-10">
+      <HomeCarousel />
 
-export default Home
+        <VideoGrid />
+
+    </div>
+  );
+};
+
+export default Home;
