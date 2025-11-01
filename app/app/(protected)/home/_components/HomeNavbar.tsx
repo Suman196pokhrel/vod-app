@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { AvatarDropDown } from "./AvatarDropDown";
 
 const HomeNavbar = () => {
   return (
@@ -20,13 +21,7 @@ const HomeNavbar = () => {
       </div>
 
       <div className="flex-1 items-center justify-end flex">
-        <Button className="w-fit" variant={"outline"}>
-          <Avatar>
-            <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
-            <AvatarFallback>CN</AvatarFallback>
-          </Avatar>
-         
-        </Button>
+        <AvatarDropDown />
       </div>
     </div>
   );
