@@ -51,7 +51,7 @@ const MoodSelectorCompact = () => {
   const currentMoodVideos = moodContent[selectedMood] || []
 
   return (
-    <Card className="bg-gradient-to-br from-primary/5 to-background">
+    <Card className="bg-linear-to-br from-primary/5 to-background">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Sparkles className="h-5 w-5 text-primary" />
@@ -84,7 +84,7 @@ const MoodSelectorCompact = () => {
               className="flex gap-2 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
               onClick={() => router.push(`/home/watch/${video.id}`)}
             >
-              <div className="relative w-20 aspect-video rounded overflow-hidden flex-shrink-0">
+              <div className="relative w-20 aspect-video rounded overflow-hidden shrink-0">
                 <Image
                   src={video.thumbnail}
                   alt={video.title}

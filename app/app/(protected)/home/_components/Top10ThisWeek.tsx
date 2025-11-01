@@ -75,14 +75,14 @@ const Top10ThisWeek = () => {
                 </div>
               </div>
               {/* Thumbnail */}
-              <div className="relative aspect-[2/3] mt-8">
+              <div className="relative aspect-2/3 mt-8">
                 <Image
                   src={item.thumbnail}
                   alt={item.title}
                   fill
                   className="object-cover"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
               <div className="p-2 bg-background">
                 <p className="text-sm font-semibold line-clamp-1">{item.title}</p>

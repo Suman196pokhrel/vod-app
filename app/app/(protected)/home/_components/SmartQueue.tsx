@@ -57,12 +57,12 @@ const SmartQueue = () => {
             onClick={() => router.push(`/home/watch/${item.id}`)}
           >
             {/* Position Number */}
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
               <span className="text-sm font-bold text-primary">{index + 1}</span>
             </div>
 
             {/* Thumbnail */}
-            <div className="relative w-24 aspect-video rounded overflow-hidden flex-shrink-0">
+            <div className="relative w-24 aspect-video rounded overflow-hidden shrink-0">
               <Image
                 src={item.thumbnail}
                 alt={item.title}

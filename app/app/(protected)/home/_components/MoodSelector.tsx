@@ -72,7 +72,7 @@ const MoodSelector = () => {
     <Card className="mb-8 overflow-hidden">
       <CardContent className="p-0">
         {/* Mood Selector Pills */}
-        <div className="p-4 bg-gradient-to-r from-primary/5 to-background border-b">
+        <div className="p-4 bg-linear-to-r from-primary/5 to-background border-b">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="h-4 w-4 text-primary" />
             <h3 className="font-semibold text-sm">What's your mood?</h3>
@@ -83,9 +83,9 @@ const MoodSelector = () => {
                 <button
                   key={mood.name}
                   onClick={() => setSelectedMood(mood.name)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full font-medium text-sm transition-all ${
+                  className={`shrink-0 px-4 py-2 rounded-full font-medium text-sm transition-all ${
                     selectedMood === mood.name
-                      ? `bg-gradient-to-r ${mood.gradient} border-2 border-primary/30 scale-105`
+                      ? `bg-linear-to-r ${mood.gradient} border-2 border-primary/30 scale-105`
                       : 'bg-muted hover:bg-muted/80 border-2 border-transparent'
                   }`}
                 >
@@ -105,7 +105,7 @@ const MoodSelector = () => {
               {currentMoodVideos.map((video) => (
                 <div
                   key={video.id}
-                  className="flex-shrink-0 w-56 cursor-pointer group"
+                  className="shrink-0 w-56 cursor-pointer group"
                   onClick={() => router.push(`/home/watch/${video.id}`)}
                 >
                   <div className="relative aspect-video rounded-lg overflow-hidden mb-2">
@@ -115,7 +115,7 @@ const MoodSelector = () => {
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-110"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <h4 className="font-semibold text-sm line-clamp-1 mb-1">{video.title}</h4>
                   <p className="text-xs text-muted-foreground">{video.category}</p>

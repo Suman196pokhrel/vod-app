@@ -25,7 +25,7 @@ const AIWatchTimeBanner = () => {
   const recommendation = getRecommendation()
 
   return (
-    <Alert className="mb-6 bg-gradient-to-r from-primary/10 to-background border-primary/20">
+    <Alert className="mb-6 bg-linear-to-r from-primary/10 to-background border-primary/20">
       <Sparkles className="h-4 w-4 text-primary" />
       <AlertDescription className="flex items-center justify-between">
         <span className="text-sm">

@@ -50,7 +50,7 @@ const ContentJourney = () => {
   const totalHours = categories.reduce((acc, cat) => acc + cat.hours, 0)
 
   return (
-    <Card className="bg-gradient-to-br from-primary/5 to-background">
+    <Card className="bg-linear-to-br from-primary/5 to-background">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <BookOpen className="h-5 w-5 text-primary" />

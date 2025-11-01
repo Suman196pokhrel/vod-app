@@ -73,11 +73,11 @@ const QuickAccessSidebar = () => {
               setIsOpen(false)
             }}
           >
-            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
               <span className="text-xs font-bold text-primary">{index + 1}</span>
             </div>
 
-            <div className="relative w-20 aspect-video rounded overflow-hidden flex-shrink-0">
+            <div className="relative w-20 aspect-video rounded overflow-hidden shrink-0">
               <Image src={item.thumbnail} alt={item.title} fill className="object-cover" />
             </div>
 
