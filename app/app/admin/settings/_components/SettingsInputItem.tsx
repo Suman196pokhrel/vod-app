@@ -11,7 +11,7 @@ interface SettingInputItemProps {
   placeholder?: string;
 }
 
-export function SettingInputItem({
+export function SettingsInputItem({
   id,
   label,
   type = "text",

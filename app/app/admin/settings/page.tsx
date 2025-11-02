@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Save, Video, Upload, Shield, Bell, Play, Database } from "lucide-react";
-import { SettingSwitchItem } from "../_components/SettingsSwitchItem";
+import { SettingSwitchItem } from "./_components/SettingsSwitchItem";
 
-import { SettingsSection } from "../_components/SettingsSection";
-import { SettingInputItem } from "../_components/SettingsInputItem";
-import { SettingSelectItem } from "../_components/SettingsSelectItem";
+import { SettingsSection } from "./_components/SettingsSection";
+import { SettingsInputItem } from "./_components/SettingsInputItem";
+import { SettingSelectItem } from "./_components/SettingsSelectItem";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -75,7 +75,7 @@ export default function SettingsPage() {
           description="Configure upload limits and file format restrictions"
         >
           <div className="grid grid-cols-2 gap-4">
-            <SettingInputItem
+            <SettingsInputItem
               id="maxFileSize"
               label="Max File Size"
               type="number"
@@ -83,7 +83,7 @@ export default function SettingsPage() {
               onChange={(value) => setSettings({ ...settings, maxFileSize: value })}
               suffix="GB"
             />
-            <SettingInputItem
+            <SettingsInputItem
               id="maxDuration"
               label="Max Video Duration"
               type="number"
@@ -93,7 +93,7 @@ export default function SettingsPage() {
             />
           </div>
           
-          <SettingInputItem
+          <SettingsInputItem
             id="allowedFormats"
             label="Allowed Video Formats"
             value={settings.allowedFormats}
@@ -192,7 +192,7 @@ export default function SettingsPage() {
             }
           />
 
-          <SettingInputItem
+          <SettingsInputItem
             id="bufferSize"
             label="Buffer Size"
             type="number"
@@ -209,7 +209,7 @@ export default function SettingsPage() {
           title="Storage Management"
           description="Manage storage limits and data retention"
         >
-          <SettingInputItem
+          <SettingsInputItem
             id="storageLimit"
             label="Total Storage Limit"
             type="number"
