@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreVertical, Edit, Ban, CheckCircle, Trash2, Eye } from "lucide-react";
-import { RoleBadge } from "./RoleBadge";
+import { RoleBadge } from "../../_components/RoleBadge";
 import { StatusBadge } from "./StatusBadge";
 
 export interface User {

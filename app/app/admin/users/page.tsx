@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Users, TrendingUp, Clock, Activity } from "lucide-react";
-import { StatCard } from "../_components/StatCard";
-import { UserFilters } from "../_components/UserFilters";
-import { UserTableRow, User } from "../_components/UserTableRow";
+import { StatCard } from "./_components/StatCard";
+import { UserFilters } from "./_components/UserFilters";
+import { UserTableRow, User } from "./_components/UserTableRow";
 
 // Mock user data with business metrics
 const mockUsers: User[] = [

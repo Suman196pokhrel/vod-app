@@ -1,6 +1,6 @@
 // app/admin/page.tsx
 import React from 'react'
-import StatsCards from './_components/StatsCards'
+import StatsCards from './users/_components/StatsCards'
 import RecentActivity from './_components/RecentActivity'
 import PopularVideos from './_components/PopularVideos'
 import UserGrowthChart from './_components/UserGrowthChart'
