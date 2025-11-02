@@ -11,6 +11,7 @@ import ContentJourney from "./_components/ContentJourney";
 import QuickAccessSidebar from "./_components/QuickAccessSidebar";
 import MoodSelectorCompact from "./_components/MoodSelectorCompact";
 import MoodSelector from "./_components/MoodSelector";
+import { DevelopmentHero } from "./_components/DevelopmentHero";
 
 
 
@@ -54,6 +55,11 @@ const newReleases = [
 export default function HomePage() {
   return (
     <div className="min-h-screen">
+      <div className="w-11/12 m-auto mt-5">
+      <DevelopmentHero />
+
+      </div>
+     
       <HeroSection />
 
       <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8  relative z-10">
@@ -95,6 +101,8 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+       
 
       {/* Floating Widget */}
       <QuickAccessSidebar />
