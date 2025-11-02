@@ -112,7 +112,8 @@ export function VibeLogo({
     <div className={`flex items-center gap-1 ${className}`}>
       <svg
         width={currentSize.height}
-        height={currentSize.height}
+        // height={currentSize.height}
+        height={50}
         viewBox="0 0 100 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -179,7 +180,7 @@ export function VibeLogo({
       </svg>
       
       <span className={`font-bold ${currentSize.fontSize} bg-linear-to-r from-purple-600 via-indigo-600 to-blue-600 bg-clip-text text-transparent`}>
-        vibe
+        VOD
       </span>
     </div>
   );
