@@ -4,17 +4,9 @@ from fastapi import FastAPI
 from api.routes import health
 
 
-
-
-
 # Appsetup
 app = FastAPI()
 app.include_router(health.healthRouter)
-
-
-
-
-
 
 
 # Default route
