@@ -1,16 +1,17 @@
 // app/(protected)/home/_components/HomeNavbar.tsx
-"use client"
+"use client";
 
-import React, { useState } from 'react'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, Bell, X } from "lucide-react"
-import { AvatarDropDown } from "./AvatarDropDown"
-import Link from 'next/link'
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search, Bell, X } from "lucide-react";
+import { AvatarDropDown } from "./AvatarDropDown";
+import Link from "next/link";
+import { VibeLogo } from "@/components/logos/VibeLogo";
 
 const HomeNavbar = () => {
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [hasNotifications, setHasNotifications] = useState(true)
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [hasNotifications, setHasNotifications] = useState(true);
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
@@ -18,9 +19,10 @@ const HomeNavbar = () => {
         {/* Left: Logo */}
         <div className="flex items-center flex-1">
           <Link href="/home" className="flex items-center">
-            <h1 className="text-5xl font-extrabold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            {/* <h1 className="text-5xl font-extrabold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               VOD
-            </h1>
+            </h1> */}
+            <VibeLogo variant="full" size="xl" />
           </Link>
         </div>
 
@@ -68,7 +70,11 @@ const HomeNavbar = () => {
           </Button>
 
           {/* Notifications */}
-          <Button size="icon" variant="ghost" className="h-9 w-9 relative hidden sm:flex">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-9 w-9 relative hidden sm:flex"
+          >
             <Bell className="h-4 w-4" />
             {hasNotifications && (
               <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
@@ -100,7 +106,7 @@ const HomeNavbar = () => {
         </div>
       )}
     </nav>
-  )
-}
+  );
+};
 
-export default HomeNavbar
+export default HomeNavbar;
