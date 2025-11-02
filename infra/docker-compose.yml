@@ -29,6 +29,8 @@ services:
       - db
     networks:
       - backend_net
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin 
 
   # app:
   #   build: ../backend
@@ -44,3 +46,4 @@ networks:
 
 volumes:
   postgres_data:
+  pgadmin_data:
