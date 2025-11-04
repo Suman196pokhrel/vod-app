@@ -1,7 +1,7 @@
 # Alembic  and SQL Alclemy use these schemas to map to DB tables
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
-from backend.app.core.database import Base
+from app.core.database import Base
 import uuid
 
 

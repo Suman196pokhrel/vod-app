@@ -3,12 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Database
 from app.models import User
-from backend.app.core.database import engine, Base
+from app.core.database import engine, Base
 
 
 # Routers 
-from apis.routes.health import healthRouter
-from apis.routes.auth import authRouter
+from app.apis.routes.health import healthRouter
+from app.apis.routes.auth import auth_router
 
 
 """
@@ -55,7 +55,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(healthRouter)
-app.include_router(authRouter)
+app.include_router(auth_router)
 
 
 
