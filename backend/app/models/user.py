@@ -1,5 +1,6 @@
 # Alembic  and SQL Alclemy use these schemas to map to DB tables
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
 import uuid
@@ -36,6 +37,11 @@ class User(Base):
     # Timestamps - automatically managed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+
+    # Not a column but , python convenience 
+    videos = relationship("Video", back_populates="user")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, username={self.username})>"

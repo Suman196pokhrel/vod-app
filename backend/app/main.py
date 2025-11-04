@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Database
-from app.models import User
+from app.models import User, Video
 from app.core.database import engine, Base
 
 
@@ -31,6 +31,7 @@ APPLICATION SETUP EXPLANATION:
    - Configure origins based on your frontend URL
 """
 
+# Create / Ignore tables on startup
 Base.metadata.create_all(bind=engine)
 
 

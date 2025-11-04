@@ -26,7 +26,7 @@ class Video(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(),onupdate=func.now())
 
     # foreign key Column
-    user_id = Column(String(100), ForeignKey("users_id"), nullable=False, index=True)
+    user_id = Column(String(100), ForeignKey("users.id"), nullable=False, index=True)
     
     # Not a column but , python convenience, this allows us to use this property to directly access respective user for associated with this video
     user = relationship("User", back_populates="videos")
