@@ -7,9 +7,7 @@ from app.core.database import engine, Base
 
 
 # Routers 
-from app.apis.routes.health import healthRouter
-from app.apis.routes.auth import auth_router
-
+from app.apis.routes import auth_router, healthRouter, video_router
 
 """
 APPLICATION SETUP EXPLANATION:
@@ -57,6 +55,8 @@ app.add_middleware(
 # Include routers
 app.include_router(healthRouter)
 app.include_router(auth_router)
+app.include_router(video_router)
+
 
 
 
