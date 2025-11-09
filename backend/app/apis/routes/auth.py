@@ -5,7 +5,7 @@ from pydantic import EmailStr
 
 from app.core.database import get_db
 from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, RefreshTokenRequest,UserResponse, AccessTokenResponse, ResendVerificationRequest
-from app.services.user_service import create_user, authenticate_user, refresh_access_token, revoke_refresh_token
+from app.services import create_user, authenticate_user, refresh_access_token, revoke_refresh_token
 from app.services.verification_service import verify_email_token, resend_verification_email
 
 
@@ -34,9 +34,6 @@ auth_router = APIRouter(
 )
 
 
-
-
-
 @auth_router.post(
         "/signup",
         response_model=UserResponse,
@@ -51,10 +48,6 @@ def signup(
     return user
 
 
-
-
-
-
 @auth_router.post(
     "/signin",
     response_model=TokenResponse,
@@ -63,10 +56,6 @@ def signup(
 )
 def signin(user_data:UserLoginRequest, db:Session=Depends(get_db)):
     return authenticate_user(user_data, db)
-
-
-
-
 
 
 @auth_router.post(
@@ -83,9 +72,6 @@ def refresh(
     return refresh_access_token(token_data.refresh_token, db)
 
 
-
-
-
 @auth_router.post(
     "/logout",
     status_code=status.HTTP_200_OK,
@@ -98,7 +84,6 @@ async def logout(
 ) -> dict:
 
     return revoke_refresh_token(token_data.refresh_token, db)
-
 
 
 @auth_router.get(
@@ -117,7 +102,6 @@ async def verify_email(
     User clicks link in email: /verify-email?token=xyz
     """
     return verify_email_token(token, db)
-
 
 
 @auth_router.post(
