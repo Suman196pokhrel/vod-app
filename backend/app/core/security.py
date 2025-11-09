@@ -8,40 +8,74 @@ from typing import Optional
 
 
 """
-SECURITY LAYER EXPLANATION:
+Security utilities for password hashing and verification.
 
-1. Password Hashing (bcrypt):
-   - NEVER store plain passwords in database
-   - bcrypt is a one-way hash - can't reverse it
-   - When user logs in, we hash their input and compare hashes
+Why we use bcrypt:
+- Industry standard for password hashing
+- Automatically handles salting (random data added to password)
+- Computationally expensive (slow by design to prevent brute force)
+- Future-proof: can increase rounds as computers get faster
 
-2. JWT Tokens:
-   - After login, we give user a token
-   - Token contains user_id (encrypted)
-   - Frontend sends this token with each request
-   - We verify token to authenticate requests
+Never store plain passwords! Always hash them.
 """
 
 # Password hashing context using bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-# JWT Configuration
-# MUST change in production
-SECRET_KEY = "your-secret-key-change-this-in-production"  
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-
-
 
 def hash_password(password:str)->str:
+    """
+    Hash a plain password using bcrypt.
+    
+    Args:
+        password: Plain text password from user
+        
+    Returns:
+        Hashed password string (safe to store in database)
+        
+    Example:
+        hashed = hash_password("mySecretPass123")
+        # Returns something like: $2b$12$randomsaltandhashedpassword...
+    """
     return pwd_context.hash(password)
 
 
 
-def verify_password(plain_password:str, hashed_password:str)->str:
+def verify_password(plain_password:str, hashed_password:str)->bool:
+    """
+    Verify a password against its hash.
+    
+    Args:
+        plain_password: Password entered by user during login
+        hashed_password: Hashed password from database
+        
+    Returns:
+        True if password matches, False otherwise
+        
+    Example:
+        is_valid = verify_password("mySecretPass123", user.hashed_password)
+        if is_valid:
+            # Login successful
+    """
     return pwd_context.verify(plain_password, hashed_password)
+
+
+
+# Optional: Check if a hash needs to be updated (if we increase bcrypt rounds later)
+def needs_update(hashed_password: str) -> bool:
+    """
+    Check if a password hash needs to be updated.
+    
+    Useful if you increase bcrypt rounds in the future.
+    During login, if this returns True, rehash the password.
+    
+    Returns:
+        True if hash should be updated, False otherwise
+    """
+    return pwd_context.needs_update(hashed_password)
+
+
 
 
 
