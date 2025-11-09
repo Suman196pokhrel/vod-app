@@ -4,9 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.schemas.user import UserCreate, UserLogin, TokenResponse, UserResponse
+from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, UserResponse
 from app.services.user_service import create_user, authenticate_user
-from backend.app.models.users import User
+from app.models.users import User
 
 
 """
@@ -35,105 +35,70 @@ auth_router = APIRouter(
 
 
 @auth_router.post(
-    "/signup",
-    response_model=UserResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Register a new user"
-)
+        "/signup",
+        response_model=UserResponse,
+        status_code=status.HTTP_201_CREATED,
+        summary="Register a new user"
+        )
 def signup(
-    user_data: UserCreate,
-    db: Session = Depends(get_db)
+    user_data:UserSignUpRequest,
+    db:Session = Depends(get_db)
 ):
-    """
-    Create a new user account.
-    
-    **Request Body:**
-    - email: Valid email address (must be unique)
-    - username: Username (3-50 chars, must be unique)
-    - password: Password (min 8 chars)
-    
-    **Returns:**
-    - User data (without password)
-    
-    **Errors:**
-    - 400: Email or username already registered
-    """
-    user = create_user(db, user_data)
+    user = create_user(user_data, db)
     return user
+
 
 
 @auth_router.post(
     "/signin",
     response_model=TokenResponse,
-    summary="Login to get access token"
+    status_code=status.HTTP_200_OK,
+    summary="Login to get JWT tokens"
 )
-def signin(
-    login_data: UserLogin,
-    db: Session = Depends(get_db)
-):
-    """
-    Authenticate user and get access token.
+def signin(user_data:UserLoginRequest, db:Session=Depends(get_db)):
+    return authenticate_user(user_data, db)
+
+# @auth_router.get(
+#     "/me",
+#     response_model=UserResponse,
+#     summary="Get current user profile"
+# )
+# def get_my_profile(
+#     current_user: User = Depends(get_current_user)
+# ):
+#     """
+#     Get the profile of the currently authenticated user.
     
-    **Request Body:**
-    - email_or_username: Email or username
-    - password: User's password
+#     **Authentication Required:**
+#     Include JWT token in Authorization header
     
-    **Returns:**
-    - access_token: JWT token for authentication
-    - token_type: "bearer"
-    - user: User data
+#     **Returns:**
+#     - User profile data
     
-    **How to use the token:**
-    Include in requests as: `Authorization: Bearer <access_token>`
-    
-    **Errors:**
-    - 401: Invalid credentials
-    - 403: Account inactive
-    """
-    return authenticate_user(db, login_data)
+#     **Errors:**
+#     - 401: Invalid or expired token
+#     - 403: Inactive user
+#     """
+#     return current_user
 
 
-@auth_router.get(
-    "/me",
-    response_model=UserResponse,
-    summary="Get current user profile"
-)
-def get_my_profile(
+# # Test endpoint to verify authentication
+# @auth_router.get(
+#     "/protected",
+#     summary="Test protected endpoint"
+# )
+# def protected_route(
     current_user: User = Depends(get_current_user)
-):
-    """
-    Get the profile of the currently authenticated user.
+# ):
+#     """
+#     A test endpoint that requires authentication.
     
-    **Authentication Required:**
-    Include JWT token in Authorization header
+#     Use this to test if your JWT token is working correctly.
     
-    **Returns:**
-    - User profile data
-    
-    **Errors:**
-    - 401: Invalid or expired token
-    - 403: Inactive user
-    """
-    return current_user
-
-
-# Test endpoint to verify authentication
-@auth_router.get(
-    "/protected",
-    summary="Test protected endpoint"
-)
-def protected_route(
-    current_user: User = Depends(get_current_user)
-):
-    """
-    A test endpoint that requires authentication.
-    
-    Use this to test if your JWT token is working correctly.
-    
-    **Returns:**
-    - Message with authenticated user's username
-    """
-    return {
-        "message": f"Hello {current_user.username}! This is a protected route.",
-        "user_id": current_user.id
-    }
+#     **Returns:**
+#     - Message with authenticated user's username
+#     """
+#     return {
+#         "message": f"Hello {current_user.username}! This is a protected route.",
+#         "user_id": current_user.id
+#     }
