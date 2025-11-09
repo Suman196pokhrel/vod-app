@@ -15,6 +15,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
@@ -99,7 +100,9 @@ export default function ForgotPasswordPage() {
                   autoFocus
                 />
                 {error ? (
-                  <p className="text-sm text-red-600 mt-1">{error}</p>
+                  <FieldError>
+                    <p className="text-sm text-red-600 mt-1">{error}</p>
+                  </FieldError>
                 ) : (
                   <FieldDescription>
                     Enter the email associated with your account

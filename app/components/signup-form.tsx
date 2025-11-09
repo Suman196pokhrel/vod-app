@@ -10,6 +10,7 @@ import {
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -162,7 +163,9 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 className={errors.userName ? 'border-red-500' : ''}
               />
               {errors.userName && (
-                <p className="text-sm text-red-600 mt-1">{errors.userName}</p>
+                <FieldError>
+                  <p className="text-sm text-red-600 mt-1">{errors.userName}</p>
+                </FieldError>
               )}
             </Field>
 
@@ -179,7 +182,9 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 className={errors.email ? 'border-red-500' : ''}
               />
               {errors.email ? (
-                <p className="text-sm text-red-600 mt-1">{errors.email}</p>
+                <FieldError>
+                  <p className="text-sm text-red-600 mt-1">{errors.email}</p>
+                </FieldError>
               ) : (
                 <FieldDescription>
                   We&apos;ll use this to contact you. We will not share your email
@@ -200,7 +205,9 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 className={errors.password ? 'border-red-500' : ''}
               />
               {errors.password ? (
-                <p className="text-sm text-red-600 mt-1">{errors.password}</p>
+                <FieldError>
+                  <p className="text-sm text-red-600 mt-1">{errors.password}</p>
+                </FieldError>
               ) : (
                 <FieldDescription>
                   Must be at least 8 characters long.
@@ -222,9 +229,11 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                 className={errors.confirmPassword ? 'border-red-500' : ''}
               />
               {errors.confirmPassword ? (
-                <p className="text-sm text-red-600 mt-1">
+                <FieldError>
+                  <p className="text-sm text-red-600 mt-1">
                   {errors.confirmPassword}
                 </p>
+                </FieldError>
               ) : (
                 <FieldDescription>Please confirm your password.</FieldDescription>
               )}

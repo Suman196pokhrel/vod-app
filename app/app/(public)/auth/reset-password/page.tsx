@@ -3,7 +3,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -12,168 +16,110 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import { authAPI } from '@/lib/apis/auth.api';
+import { Form } from '@/components/ui/form';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle2, Key, Lock, Mail } from 'lucide-react';
+
+import {
+  EmailFormField,
+  OTPFormField,
+  PasswordFormField,
+} from '../_components/FormFields';
+import { SuccessCard } from '../_components/SuccessCard';
+import { authAPI } from '@/lib/apis/auth.api';
+import {
+  resetPasswordSchema,
+  type ResetPasswordFormValues,
+} from '@/lib/schemas/auth.schema';
 
 export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailFromUrl = searchParams.get('email') || '';
 
-  const [email, setEmail] = useState(emailFromUrl);
-  const [code, setCode] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const [errors, setErrors] = useState({
-    email: '',
-    code: '',
-    password: '',
-    confirmPassword: '',
+  // Initialize form with Zod schema
+  const form = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      email: emailFromUrl,
+      code: '',
+      password: '',
+      confirmPassword: '',
+    },
   });
 
+  // Update email if URL param changes
   useEffect(() => {
     if (emailFromUrl) {
-      setEmail(emailFromUrl);
+      form.setValue('email', emailFromUrl);
     }
-  }, [emailFromUrl]);
+  }, [emailFromUrl, form]);
 
-  // Validation
-  const validateForm = (): boolean => {
-    const newErrors = {
-      email: '',
-      code: '',
-      password: '',
-      confirmPassword: '',
-    };
-    let isValid = true;
-
-    // Email validation
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-      isValid = false;
-    }
-
-    // Code validation (6 digits)
-    if (!code.trim()) {
-      newErrors.code = 'Reset code is required';
-      isValid = false;
-    } else if (!/^\d{6}$/.test(code)) {
-      newErrors.code = 'Code must be exactly 6 digits';
-      isValid = false;
-    }
-
-    // Password validation
-    if (!password) {
-      newErrors.password = 'Password is required';
-      isValid = false;
-    } else if (password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-      isValid = false;
-    }
-
-    // Confirm password validation
-    if (!confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-      isValid = false;
-    } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-      isValid = false;
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Clear errors
-    setErrors({
-      email: '',
-      code: '',
-      password: '',
-      confirmPassword: '',
-    });
-
-    // Validate
-    if (!validateForm()) {
-      toast.error('Please fix the errors in the form');
-      return;
-    }
-
+  // Handle form submission
+  const onSubmit = async (values: ResetPasswordFormValues) => {
     setIsLoading(true);
 
     try {
-      await authAPI.resetPassword(email, code, password);
+      await authAPI.resetPassword(values.email, values.code, values.password);
       setIsSuccess(true);
       toast.success('Password reset successfully!');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 'Failed to reset password';
+      const errorMessage =
+        error.response?.data?.detail || 'Failed to reset password';
       toast.error(errorMessage);
-      
-      // Handle specific errors
-      if (errorMessage.includes('code')) {
-        setErrors(prev => ({ ...prev, code: 'Invalid or expired code' }));
+
+      // Set specific field errors
+      if (errorMessage.toLowerCase().includes('code')) {
+        form.setError('code', {
+          type: 'manual',
+          message: 'Invalid or expired code',
+        });
+      } else if (errorMessage.toLowerCase().includes('email')) {
+        form.setError('email', {
+          type: 'manual',
+          message: 'Email not found',
+        });
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle OTP input (only allow digits, max 6)
-  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-    if (value.length <= 6) {
-      setCode(value);
+  // Handle resend code
+  const handleResendCode = async () => {
+    const email = form.getValues('email');
+
+    if (!email) {
+      toast.error('Please enter your email first');
+      return;
+    }
+
+    try {
+      await authAPI.forgotPassword(email);
+      toast.success('New code sent to your email!');
+    } catch (error) {
+      toast.error('Failed to resend code');
     }
   };
 
-  // Success State
+  // Show success state
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
-        <Card className="w-full max-w-md shadow-lg">
-          <CardHeader className="text-center space-y-2">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 className="h-10 w-10 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl">Password Reset!</CardTitle>
-            <CardDescription className="text-base">
-              Your password has been successfully reset
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
-              <p className="text-sm text-green-800">
-                ✓ You can now log in with your new password
-              </p>
-            </div>
-
-            <Button className="w-full" asChild>
-              <Link href="/auth/sign-in">
-                Go to Login
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <SuccessCard
+        title="Password Reset!"
+        description="Your password has been successfully reset"
+        message="You can now log in with your new password"
+        buttonText="Go to Login"
+        buttonHref="/auth/sign-in"
+      />
     );
   }
 
-  // Form State
+  // Show form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-2">
           <div className="flex items-center gap-2">
@@ -190,143 +136,71 @@ export default function ResetPasswordPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <FieldGroup>
-              {/* Email Field */}
-              <Field>
-                <FieldLabel htmlFor="email">
-                  <Mail className="inline h-4 w-4 mr-1" />
-                  Email Address
-                </FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                  className={errors.email ? 'border-red-500' : ''}
-                />
-                {errors.email && (
-                  <p className="text-sm text-red-600 mt-1">{errors.email}</p>
-                )}
-              </Field>
 
-              {/* 6-Digit Code Field */}
-              <Field>
-                <FieldLabel htmlFor="code">
-                  <Key className="inline h-4 w-4 mr-1" />
-                  6-Digit Code
-                </FieldLabel>
-                <Input
-                  id="code"
-                  type="text"
-                  placeholder="123456"
-                  value={code}
-                  onChange={handleCodeChange}
-                  disabled={isLoading}
-                  className={`text-center text-2xl tracking-widest font-mono ${
-                    errors.code ? 'border-red-500' : ''
-                  }`}
-                  maxLength={6}
-                  autoComplete="off"
-                />
-                {errors.code ? (
-                  <p className="text-sm text-red-600 mt-1">{errors.code}</p>
-                ) : (
-                  <FieldDescription>
-                    Enter the code sent to your email
-                  </FieldDescription>
-                )}
-              </Field>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Email Field */}
+              <EmailFormField
+                control={form.control}
+                name="email"
+                disabled={isLoading}
+              />
+
+              {/* OTP Code Field */}
+              <OTPFormField
+                control={form.control}
+                name="code"
+                disabled={isLoading}
+              />
 
               {/* New Password Field */}
-              <Field>
-                <FieldLabel htmlFor="password">
-                  <Lock className="inline h-4 w-4 mr-1" />
-                  New Password
-                </FieldLabel>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter new password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  className={errors.password ? 'border-red-500' : ''}
-                />
-                {errors.password ? (
-                  <p className="text-sm text-red-600 mt-1">{errors.password}</p>
-                ) : (
-                  <FieldDescription>
-                    Must be at least 8 characters long
-                  </FieldDescription>
-                )}
-              </Field>
+              <PasswordFormField
+                control={form.control}
+                name="password"
+                disabled={isLoading}
+                label="New Password"
+                description="Must be at least 8 characters long"
+                placeholder="Enter new password"
+              />
 
               {/* Confirm Password Field */}
-              <Field>
-                <FieldLabel htmlFor="confirm-password">
-                  <Lock className="inline h-4 w-4 mr-1" />
-                  Confirm New Password
-                </FieldLabel>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={isLoading}
-                  className={errors.confirmPassword ? 'border-red-500' : ''}
-                />
-                {errors.confirmPassword ? (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.confirmPassword}
-                  </p>
-                ) : (
-                  <FieldDescription>Re-enter your new password</FieldDescription>
-                )}
-              </Field>
+              <PasswordFormField
+                control={form.control}
+                name="confirmPassword"
+                disabled={isLoading}
+                label="Confirm New Password"
+                description="Re-enter your new password"
+                placeholder="Confirm new password"
+              />
 
               {/* Submit Button */}
-              <Field>
-                <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? (
-                    <>
-                      <span className="mr-2">⏳</span>
-                      Resetting Password...
-                    </>
-                  ) : (
-                    'Reset Password'
-                  )}
-                </Button>
-              </Field>
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? (
+                  <>
+                    <span className="mr-2">⏳</span>
+                    Resetting Password...
+                  </>
+                ) : (
+                  'Reset Password'
+                )}
+              </Button>
 
               {/* Resend Code */}
-              <FieldDescription className="text-center">
+              <p className="text-center text-sm text-muted-foreground">
                 Didn&apos;t receive the code?{' '}
-                <button
+                <Button
                   type="button"
-                  onClick={async () => {
-                    if (!email) {
-                      toast.error('Please enter your email');
-                      return;
-                    }
-                    try {
-                      await authAPI.forgotPassword(email);
-                      toast.success('New code sent!');
-                    } catch (error) {
-                      toast.error('Failed to resend code');
-                    }
-                  }}
-                  className="text-blue-600 hover:underline font-medium"
+                  variant="link"
+                  onClick={handleResendCode}
                   disabled={isLoading}
+                  className="p-0 h-auto font-medium"
                 >
                   Resend Code
-                </button>
-              </FieldDescription>
+                </Button>
+              </p>
 
+              {/* Divider */}
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
@@ -338,14 +212,15 @@ export default function ResetPasswordPage() {
                 </div>
               </div>
 
+              {/* Back to Login */}
               <Button variant="outline" className="w-full" asChild>
                 <Link href="/auth/sign-in">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Login
                 </Link>
               </Button>
-            </FieldGroup>
-          </form>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
