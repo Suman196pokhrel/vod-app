@@ -2,13 +2,13 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta, timezone  
 import hashlib
 from app.models import User,RefreshToken
-from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, UserResponse
+from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, RefreshTokenRequest, AccessTokenResponse,UserResponse
 from app.core.security import hash_password, verify_password
 from app.core.config import get_settings
-from app.core.jwt import create_access_token, create_refresh_token, hash_token
+from app.core.jwt import create_access_token, create_refresh_token, hash_token, decode_token,verify_token
 
 
 """
@@ -94,7 +94,6 @@ def create_user(user_data:UserSignUpRequest, db:Session)->User:
         )
     
 
-
 def authenticate_user(user_data:UserLoginRequest, db:Session)->TokenResponse:
     # find the user in db
     user = db.query(User).filter(User.email == user_data.email).first()
@@ -178,17 +177,174 @@ def authenticate_user(user_data:UserLoginRequest, db:Session)->TokenResponse:
         user=user_response
     )
 
-def get_user_by_id():
-    pass
+
+def refresh_access_token(refresh_token:RefreshTokenRequest, db:Session)->AccessTokenResponse:
+    """
+    Create a new access token using a valid refresh token.
+    
+    This function:
+    - Verifies the refresh token JWT
+    - Checks token is not revoked in database
+    - Checks token is not expired
+    - Gets user from database
+    - Creates new access token
+    
+    Args:
+        refresh_token: JWT refresh token from client
+        db: Database session
+        
+    Returns:
+        AccessTokenResponse: Contains new access_token
+        
+    Raises:
+        HTTPException 401: If token is invalid, revoked, or expired
+        HTTPException 404: If user not found
+        
+    Example:
+        response = refresh_access_token(token, db)
+        # response.access_token = "eyJnew..."
+    """
 
 
-def get_user_by_email():
-    pass
+    # verify and decode the refresh token
+    payload = verify_token(refresh_token, expected_type="refresh")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+    
+    # Extract user_id from token payload
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    
+    # hash the refresh token to lookup in database
+    token_hash = hash_token(refresh_token)
 
 
-def get_user_by_username():
-    pass
+    # lookup in db for token
+    token_record = db.query(RefreshToken).filter(RefreshToken.user_id == user_id, RefreshToken.token_hash == token_hash).first()
 
 
+    if not token_record:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token not found"
+        )
+    
+    # check if token is revoked
+    if token_record.is_revoked:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked"
+        )
+    
+
+    # check if token is expired (db level check)
+    if token_record.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired"
+        )
+    
+
+    # Get user from db
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Check if user is still active
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is disabled"
+        )
+    
+
+    # Create new access token
+    new_access_token = create_access_token({
+        "user_id": user.id,
+        "email": user.email,
+        "role": user.role.value
+    })
+
+    return AccessTokenResponse(
+        access_token= new_access_token,
+        token_type="bearer"
+    )
 
 
+def revoke_refresh_token(refresh_token: str, db: Session) -> dict:
+    """
+    Revoke a refresh token (logout).
+    
+    This function:
+    - Decodes the refresh token to get user_id
+    - Hashes the token
+    - Finds it in database
+    - Sets is_revoked = True
+    
+    Args:
+        refresh_token: JWT refresh token to revoke
+        db: Database session
+        
+    Returns:
+        dict: Success message
+        
+    Raises:
+        HTTPException 401: If token is invalid
+        
+    Example:
+        result = revoke_refresh_token(token, db)
+        # result = {"message": "Logged out successfully"}
+    """
+    
+    # 1. Decode token to get user_id (don't need full verification)
+    payload = decode_token(refresh_token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+    
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    
+    # 2. Hash the token
+    token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+    
+    # 3. Find token in database
+    token_record = db.query(RefreshToken).filter(
+        RefreshToken.user_id == user_id,
+        RefreshToken.token_hash == token_hash
+    ).first()
+    
+    if not token_record:
+        # Token not found, but we still return success (idempotent)
+        # User might be trying to logout with already-deleted token
+        return {"message": "Logged out successfully"}
+    
+    # 4. Revoke the token
+    token_record.is_revoked = True
+    
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to logout. Please try again."
+        )
+    
+    return {"message": "Logged out successfully"}
