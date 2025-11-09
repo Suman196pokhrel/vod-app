@@ -18,21 +18,37 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useAuthStore } from "@/lib/store"
+import { stat } from "fs"
+import { useState } from "react"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter()
+  const login = useAuthStore((state)=>state.signin)
 
-  const handleSubmit = (e:React.FormEvent)=>{
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e:React.FormEvent)=>{
     e.preventDefault()
+    setError('')
+    setLoading(true)
 
-    console.log("LOGIN SUCCESS")
-
-    toast.success("Logged in successfully")
-    router.push("/home")
-
+    try{
+      await login(email, password);
+      toast.success("Logged in successfully")
+      router.push("/home")
+    }catch (err: any){
+      setError(err.message);
+      toast.error(err.message)
+    }finally{
+      setLoading(false)
+    }
   }
 
 
@@ -52,6 +68,8 @@ export function LoginForm({
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input
+                value={email}
+                onChange={(e)=>setEmail(e.target.value)}
                   id="email"
                   type="email"
                   placeholder="m@example.com"
@@ -68,11 +86,11 @@ export function LoginForm({
                     Forgot your password?
                   </a>
                 </div>
-                <Input id="password" type="password" required />
+                <Input id="password" type="password" required value={password} onChange={(e)=>setPassword(e.target.value)} />
               </Field>
               <Field>
                 <Button type="submit">Login</Button>
-                <Button variant="outline" type="button">
+                <Button variant="outline" type="submit">
                   Login with Google
                 </Button>
                 <FieldDescription className="text-center">
