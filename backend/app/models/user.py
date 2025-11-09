@@ -3,6 +3,8 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
+from app.models import UserRole
+from enum import Enum
 import uuid
 
 
@@ -11,37 +13,57 @@ class User(Base):
     """
     User table model.
     
-    This class defines the structure of the 'users' table in database.
-    Each attribute becomes a column in the table.
+    Stores user credentials, profile info, and role for authorization.
     
-    Why we use this:
-    - SQLAlchemy ORM (Object-Relational Mapping) lets us work with Python objects
-      instead of writing raw SQL queries
-    - The Base class (from database.py) tracks all models and helps create tables
+    Fields explained:
+    - id: UUID primary key (more secure than sequential integers)
+    - email: Unique identifier for login
+    - username: Display name, also unique
+    - hashed_password: Never store plain passwords! Only bcrypt hashes
+    - role: Determines what user can do (USER vs ADMIN)
+    - is_active: Soft delete / account suspension
+    - is_verified: Email verification status (for future email confirmation)
+    - created_at: When account was created
+    - updated_at: Last modification time
     """
+
     __tablename__ = "users"
 
 
     #primary id
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
 
-    # User credentials and info
+
+    # Authentication credentials - used for login
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)  
     
-    # User status
+    # Authorization - determines permissions
+    # Indexed for faster role-based queries
+    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False, index=True)
+
+    # Account status flags
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)  
     
-    # Timestamps - automatically managed
+    # Timestamps - automatically managed by postgresql
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-
-
-    # Not a column but , python convenience 
+    # Relationships (not actual DB columns, just Python convenience)
+    # Uncomment when you create Video model
     videos = relationship("Video", back_populates="user")
     
     def __repr__(self):
-        return f"<User(id={self.id}, email={self.email}, username={self.username})>"
+        return f"<User(id={self.id}, email={self.email}, role={self.role})>"
+    
+  
+
+    def is_admin(self) -> bool:
+        """
+        Convenience method to check if user is an admin.
+        
+        Usage: if current_user.is_admin(): ...
+        """
+        return self.role == UserRole.ADMIN
