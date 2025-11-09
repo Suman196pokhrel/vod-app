@@ -4,9 +4,30 @@ from sqlalchemy.orm import Session
 from pydantic import EmailStr
 
 from app.core.database import get_db
-from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, RefreshTokenRequest,UserResponse, AccessTokenResponse, ResendVerificationRequest
-from app.services import create_user, authenticate_user, refresh_access_token, revoke_refresh_token
-from app.services.verification_service import verify_email_token, resend_verification_email
+from app.schemas.user import (
+    UserSignUpRequest, 
+    UserLoginRequest, 
+    TokenResponse, 
+    RefreshTokenRequest,
+    UserResponse, 
+    AccessTokenResponse, 
+    ResendVerificationRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest
+)
+from app.services import (
+    create_user, 
+    authenticate_user, 
+    refresh_access_token, 
+    revoke_refresh_token,
+    request_password_reset,
+    reset_password
+    
+)
+from app.services.verification_service import (
+    verify_email_token, 
+    resend_verification_email
+)
 
 
 """
@@ -118,3 +139,45 @@ async def resend_verification(
     Resend verification email.
     """
     return resend_verification_email(request.email, db)
+
+
+
+
+@auth_router.post(
+    "/forgot-password",
+    status_code=status.HTTP_200_OK,
+    summary="Request password reset",
+    description="Send password reset link to user's email"
+)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Request password reset.
+    
+    Sends an email with a password reset link.
+    For security, always returns success even if email doesn't exist.
+    """
+    return request_password_reset(request.email, db)
+
+
+
+@auth_router.post(
+    "/reset-password",
+    status_code=status.HTTP_200_OK,
+    summary="Reset password",
+    description="Reset password using 6-digit code from email"
+)
+async def reset_password_endpoint(
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Reset password using 6-digit code.
+    
+    - Provide: email, 6-digit code, new password
+    - Verifies code is valid, not expired, not used
+    - Updates password and logs out from all devices
+    """
+    return reset_password(request.email, request.code, request.new_password, db)

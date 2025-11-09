@@ -78,15 +78,21 @@ class ForgotPasswordRequest(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    """Schema for resetting password with token."""
-    token: str = Field(..., description="Password reset token from email")
+    """Schema for resetting password with 6-digit code."""
+    email: EmailStr = Field(..., description="Email address")
+    code: str = Field(
+        ..., 
+        min_length=6, 
+        max_length=6,
+        pattern="^[0-9]{6}$",  
+        description="6-digit reset code from email"
+    )
     new_password: str = Field(
         ..., 
         min_length=8, 
         max_length=100,
         description="New password (min 8 characters)"
     )
-
 
 
 ################--RESPONSE SCHEMAS--##################################

@@ -107,20 +107,16 @@ def send_verification_email(to_email: str, username: str, token: str):
         raise
 
 
-def send_password_reset_email(to_email: str, username: str, reset_token: str):
+def send_password_reset_email(to_email: str, username: str, reset_code: str):
     """
-    Send password reset link to user.
+    Send 6-digit password reset code to user.
     
     Args:
-        to_email: User's email address
-        username: User's username (for personalization)
-        reset_token: Password reset token
+        to_email: User's email
+        username: User's username
+        reset_code: 6-digit OTP code
     """
     
-    # Create reset link
-    reset_link = f"{settings.frontend_url}/reset-password?token={reset_token}"
-    
-    # Email content
     subject = "Reset Your Password - VOD Platform"
     
     html_content = f"""
@@ -133,10 +129,21 @@ def send_password_reset_email(to_email: str, username: str, reset_token: str):
             .header {{ background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
                       color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
             .content {{ background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }}
-            .button {{ display: inline-block; padding: 15px 30px; background: #f5576c; 
-                      color: white; text-decoration: none; border-radius: 5px; 
-                      font-weight: bold; margin: 20px 0; }}
-            .button:hover {{ background: #e04658; }}
+            .code-box {{ 
+                background: white; 
+                border: 2px dashed #f5576c; 
+                padding: 30px; 
+                text-align: center; 
+                margin: 25px 0;
+                border-radius: 10px;
+            }}
+            .code {{ 
+                font-size: 48px; 
+                font-weight: bold; 
+                letter-spacing: 10px; 
+                color: #f5576c;
+                font-family: 'Courier New', monospace;
+            }}
             .warning {{ background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; 
                        margin: 20px 0; border-radius: 5px; }}
             .footer {{ text-align: center; margin-top: 20px; color: #666; font-size: 12px; }}
@@ -150,27 +157,29 @@ def send_password_reset_email(to_email: str, username: str, reset_token: str):
             <div class="content">
                 <p>Hi <strong>{username}</strong>,</p>
                 
-                <p>We received a request to reset your password for your VOD Platform account.</p>
+                <p>We received a request to reset your password. Use the code below to reset your password:</p>
                 
-                <p>Click the button below to set a new password:</p>
-                
-                <div style="text-align: center;">
-                    <a href="{reset_link}" class="button">
-                        Reset Password
-                    </a>
+                <div class="code-box">
+                    <div style="color: #666; font-size: 14px; margin-bottom: 10px;">
+                        YOUR RESET CODE
+                    </div>
+                    <div class="code">{reset_code}</div>
+                    <div style="color: #666; font-size: 12px; margin-top: 10px;">
+                        Valid for 1 hour
+                    </div>
                 </div>
                 
-                <p>Or copy and paste this link into your browser:</p>
-                <p style="background: #e9e9e9; padding: 10px; border-radius: 5px; word-break: break-all;">
-                    {reset_link}
+                <p style="text-align: center; color: #666;">
+                    Enter this code along with your email and new password on the reset page.
                 </p>
                 
                 <div class="warning">
                     <strong>⚠️ Security Notice:</strong>
                     <ul style="margin: 10px 0;">
-                        <li>This link expires in <strong>1 hour</strong></li>
-                        <li>For security, you'll be logged out from all devices after reset</li>
-                        <li>If you didn't request this, ignore this email - your password is safe</li>
+                        <li>This code expires in <strong>1 hour</strong></li>
+                        <li>You'll be logged out from all devices after reset</li>
+                        <li>If you didn't request this, ignore this email</li>
+                        <li><strong>Never share this code with anyone</strong></li>
                     </ul>
                 </div>
                 
@@ -178,31 +187,28 @@ def send_password_reset_email(to_email: str, username: str, reset_token: str):
             </div>
             <div class="footer">
                 <p>This is an automated email. Please do not reply.</p>
-                <p>If you didn't request a password reset, please ignore this email.</p>
+                <p>If you didn't request a password reset, you can safely ignore this email.</p>
             </div>
         </div>
     </body>
     </html>
     """
     
-    # Create message
+    # Create and send message (same as before)
     message = MIMEMultipart("alternative")
     message["Subject"] = subject
     message["From"] = settings.from_email
     message["To"] = to_email
     
-    # Attach HTML
     html_part = MIMEText(html_content, "html")
     message.attach(html_part)
     
-    # Send email
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
             server.starttls()
             server.login(settings.smtp_user, settings.smtp_password)
             server.send_message(message)
-            print(f"✅ Password reset email sent to {to_email}")
-            
+            print(f"✅ Password reset code sent to {to_email}")
     except Exception as e:
-        print(f"❌ Failed to send password reset email to {to_email}: {e}")
+        print(f"❌ Failed to send password reset code: {e}")
         raise

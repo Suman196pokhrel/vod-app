@@ -13,7 +13,17 @@ from app.models.tokens import RefreshToken
 from app.services.email_service import send_password_reset_email
 from app.core.security import hash_password
 import uuid
+import random
 
+
+def generate_otp() -> str:
+    """
+    Generate a random 6-digit OTP.
+    
+    Returns:
+        String of 6 digits (e.g., "842719")
+    """
+    return str(random.randint(100000, 999999))
 
 def request_password_reset(email: str, db: Session) -> dict:
     """
@@ -53,13 +63,13 @@ def request_password_reset(email: str, db: Session) -> dict:
         )
     
     # Generate reset token
-    reset_token = str(uuid.uuid4())
+    reset_code = generate_otp()
     token_expires = datetime.now(timezone.utc) + timedelta(hours=1)  # 1 hour expiry
     
     # Store token in database
     reset_token_record = PasswordResetToken(
         user_id=user.id,
-        token=reset_token,
+        token=reset_code,
         expires_at=token_expires,
         used=False
     )
@@ -78,65 +88,62 @@ def request_password_reset(email: str, db: Session) -> dict:
     }
 
 
-def reset_password(token: str, new_password: str, db: Session) -> dict:
+def reset_password(email: str, code: str, new_password: str, db: Session) -> dict:
     """
-    Reset user's password using token.
+    Reset password using email and 6-digit code.
     
     Args:
-        token: Password reset token from email
-        new_password: New password (plain text, will be hashed)
+        email: User's email address
+        code: 6-digit reset code from email
+        new_password: New password
         db: Database session
         
     Returns:
         dict with success message
-        
-    Raises:
-        HTTPException 400: Token invalid, expired, or already used
     """
     
-    # Find token in database
+    # Find user by email
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email or reset code"
+        )
+    
+    # Find token for this user and code
     token_record = db.query(PasswordResetToken).filter(
-        PasswordResetToken.token == token
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.token == code  
     ).first()
     
     if not token_record:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired password reset link"
+            detail="Invalid or expired reset code"
         )
     
     # Check if already used
     if token_record.used:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This password reset link has already been used"
+            detail="This reset code has already been used"
         )
     
     # Check if expired
     if token_record.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password reset link has expired. Please request a new one."
-        )
-    
-    # Get user
-    user = db.query(User).filter(User.id == token_record.user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            detail="Reset code has expired. Please request a new one."
         )
     
     # Hash new password
     hashed_password = hash_password(new_password)
     
-    # Update user's password
+    # Update password
     user.hashed_password = hashed_password
-    
-    # Mark token as used
     token_record.used = True
     
-    # Security: Invalidate all refresh tokens (logout from all devices)
+    # Invalidate all refresh tokens (logout from all devices)
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.id,
         RefreshToken.is_revoked == False
