@@ -16,15 +16,31 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Shield } from "lucide-react"
 import Link from "next/link"
+import { useAuthStore } from "@/lib/store"
+import { toast } from "sonner"
+import { useState } from "react"
 
 export function AvatarDropDown() {
   const router = useRouter()
+  const logout = useAuthStore((state)=> state.logout)
+    const [loading, setLoading] = useState(false)
+
+
 
   // Mock: Check if user is admin (in real app, get this from auth)
   const isAdmin = true // Change this based on  auth logic later on
 
-  const handleLogout = () => {
-    router.push("/")
+  const handleLogout = async() => {
+    setLoading(true)
+    try{
+      await logout();
+      router.push("/")
+      
+    }catch (err:any){
+      console.log("Error")
+    }finally{
+      setLoading(false)
+    }
   }
 
   return (

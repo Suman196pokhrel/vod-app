@@ -9,9 +9,11 @@ import { AvatarDropDown } from "./AvatarDropDown";
 import Link from "next/link";
 import { VibeLogo } from "@/components/logos/VibeLogo";
 
+
 const HomeNavbar = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(true);
+
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
