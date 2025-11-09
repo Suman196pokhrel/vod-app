@@ -142,6 +142,13 @@ def authenticate_user(user_data:UserLoginRequest, db:Session)->TokenResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
         )
+    
+    # Check if email is verified
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before logging in. Check your inbox."
+        )
 
     # Check if user is active
     if not user.is_active:
