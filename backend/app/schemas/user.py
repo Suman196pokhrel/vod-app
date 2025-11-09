@@ -64,6 +64,14 @@ class RefreshTokenRequest(BaseModel):
 
 
 
+class ResendVerificationRequest(BaseModel):
+    """
+    Schema for resending verification email.
+    """
+    email: EmailStr = Field(..., description="Email address to resend verification to")
+
+
+
 ################--RESPONSE SCHEMAS--##################################
 
 class UserResponse(UserBase):

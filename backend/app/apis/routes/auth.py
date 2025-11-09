@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from pydantic import EmailStr
 
 from app.core.database import get_db
-from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, RefreshTokenRequest,UserResponse, AccessTokenResponse
+from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, RefreshTokenRequest,UserResponse, AccessTokenResponse, ResendVerificationRequest
 from app.services.user_service import create_user, authenticate_user, refresh_access_token, revoke_refresh_token
 from app.services.verification_service import verify_email_token, resend_verification_email
 
@@ -127,15 +127,10 @@ async def verify_email(
     description="Resend verification email if user didn't receive it"
 )
 async def resend_verification(
-    email: EmailStr,  # Just email in body
+    request: ResendVerificationRequest, 
     db: Session = Depends(get_db)
 ) -> dict:
     """
     Resend verification email.
-    
-    Useful if:
-    - User didn't receive email
-    - Link expired
-    - Email went to spam
     """
-    return resend_verification_email(email, db)
+    return resend_verification_email(request.email, db)
