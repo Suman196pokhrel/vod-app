@@ -149,7 +149,7 @@ async def resend_verification(
     summary="Request password reset",
     description="Send password reset link to user's email"
 )
-async def forgot_password(
+def forgot_password(
     request: ForgotPasswordRequest,
     db: Session = Depends(get_db)
 ) -> dict:
@@ -169,7 +169,7 @@ async def forgot_password(
     summary="Reset password",
     description="Reset password using 6-digit code from email"
 )
-async def reset_password_endpoint(
+def reset_password_endpoint(
     request: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ) -> dict:

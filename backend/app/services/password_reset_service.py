@@ -78,7 +78,7 @@ def request_password_reset(email: str, db: Session) -> dict:
     
     # Send reset email
     try:
-        send_password_reset_email(user.email, user.username, reset_token)
+        send_password_reset_email(user.email, user.username, reset_code)
     except Exception as e:
         print(f"Warning: Failed to send password reset email: {e}")
         # Log error but don't fail the request
