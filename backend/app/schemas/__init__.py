@@ -1,8 +1,10 @@
 from app.schemas.user import (
-    UserCreate,
-    UserLogin,
+    UserSignUpRequest,
+    UserLoginRequest,
+    RefreshTokenRequest,
     UserResponse,
     TokenResponse,
+    AccessTokenResponse,
     TokenData
 )
 
@@ -18,10 +20,12 @@ from app.schemas.video import (
 # This defines what gets exported when someone does from app.schemas import *.
 
 __all__ = [
-    "UserCreate",
-    "UserLogin", 
+    "UserSignUpRequest",
+    "UserLoginRequest", 
+    "RefreshTokenRequest",
     "UserResponse",
     "TokenResponse",
+    "AccessTokenResponse",
     "TokenData",
     "VideoCreate",
     "VideoUpdate",
