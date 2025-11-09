@@ -61,60 +61,6 @@ def verify_password(plain_password:str, hashed_password:str)->bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-
-# Optional: Check if a hash needs to be updated (if we increase bcrypt rounds later)
-def needs_update(hashed_password: str) -> bool:
-    """
-    Check if a password hash needs to be updated.
-    
-    Useful if you increase bcrypt rounds in the future.
-    During login, if this returns True, rehash the password.
-    
-    Returns:
-        True if hash should be updated, False otherwise
-    """
-    return pwd_context.needs_update(hashed_password)
-
-
-
-
-
-def create_access_token(data:dict, expires_delta:Optional[timedelta]= None)->str:
-    """
-    Create a JWT access token.
-    
-    Args:
-        data: Dictionary to encode in token (usually {"user_id": "123"})
-        expires_delta: Optional custom expiration time
-        
-    Returns:
-        Encoded JWT token string
-        
-    How it works:
-        1. Copy the data
-        2. Add expiration time
-        3. Encode with SECRET_KEY
-        4. Return token string
-    """
-
-    to_encode = data.copy()
-
-    # set expiration time
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    to_encode.update({"exp":expire})
-
-    # encode and return
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-
-
-def decode_access_token(token:str)-> Optional[dict]:
     """
     Decode and verify a JWT token.
     

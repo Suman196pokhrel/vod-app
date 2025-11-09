@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from app.core.config import get_settings
+import hashlib
 
 settings = get_settings()
 
@@ -178,6 +179,24 @@ def verify_token(token:str, expected_type:str="access")->Optional[Dict[str,Any]]
         return None
     
     return payload
+
+
+def hash_token(token: str) -> str:
+    """
+    Hash a token using SHA-256.
+    
+    Used for storing refresh tokens securely in the database.
+    We use SHA-256 instead of bcrypt because:
+    - Tokens are already random and unpredictable
+    - We just need to verify "same token" not "slow brute force"
+    
+    Args:
+        token: Raw token string
+        
+    Returns:
+        Hex string of SHA-256 hash
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def get_token_expiry(token:str)->Optional[datetime]:
