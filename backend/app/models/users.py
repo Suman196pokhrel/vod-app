@@ -1,9 +1,10 @@
 # Alembic  and SQL Alclemy use these schemas to map to DB tables
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy import Enum as SQLEnum  
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
-from app.models import UserRole
+from app.models.enums import UserRole
 from enum import Enum
 import uuid
 
@@ -41,8 +42,12 @@ class User(Base):
     
     # Authorization - determines permissions
     # Indexed for faster role-based queries
-    role = Column(Enum(UserRole), default=UserRole.USER, nullable=False, index=True)
-
+    role = Column(
+        SQLEnum(UserRole),
+        server_default="USER",  # ← String value, set at DB level
+        nullable=False,
+        index=True
+    )
     # Account status flags
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)  

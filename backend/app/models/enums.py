@@ -12,7 +12,7 @@ Why we use enums:
 import enum
 
 
-class UserRole('str', enum.Enum):
+class UserRole(str, enum.Enum):
     """
         User role types in the system.
 
