@@ -4,12 +4,13 @@ from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta, timezone  
 import hashlib
-from app.models import User,RefreshToken
+from app.models import User,RefreshToken, EmailVerificationToken
 from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, RefreshTokenRequest, AccessTokenResponse,UserResponse
 from app.core.security import hash_password, verify_password
 from app.core.config import get_settings
 from app.core.jwt import create_access_token, create_refresh_token, hash_token, decode_token,verify_token
-
+from app.services.email_service import send_verification_email
+import uuid
 
 """
 WHY A SERVICE LAYER?
@@ -83,6 +84,35 @@ def create_user(user_data:UserSignUpRequest, db:Session)->User:
         db.commit()
         # Refresh to get id, created_at from database
         db.refresh(new_user)
+
+        # Generate a verification Token
+        verification_token = str(uuid.uuid4())
+        token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+
+        # store token in database
+        email_token = EmailVerificationToken(
+            user_id=new_user.id,
+            token = verification_token,
+            expires_at = token_expires,
+            used=False
+        )
+
+        db.add(email_token)
+        db.commit()
+
+
+        # Send verification email
+        try:
+            send_verification_email(
+                to_email=new_user.email,
+                username=new_user.username,
+                token=verification_token
+            )
+        except Exception as e:
+            # Log error but don't fail signup
+            print(f"Warning: Failed to send verification email: {e}")
+            # In production, queue for retry
+        
         return new_user
     
     except IntegrityError:
