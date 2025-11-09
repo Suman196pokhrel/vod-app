@@ -1,10 +1,12 @@
 # API routes for authentication (signup, signin, profile)
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+from pydantic import EmailStr
 
 from app.core.database import get_db
 from app.schemas.user import UserSignUpRequest, UserLoginRequest, TokenResponse, RefreshTokenRequest,UserResponse, AccessTokenResponse
 from app.services.user_service import create_user, authenticate_user, refresh_access_token, revoke_refresh_token
+from app.services.verification_service import verify_email_token, resend_verification_email
 
 
 """
@@ -97,3 +99,43 @@ async def logout(
 
     return revoke_refresh_token(token_data.refresh_token, db)
 
+
+
+@auth_router.get(
+    "/verify-email",
+    status_code=status.HTTP_200_OK,
+    summary="Verify email address",
+    description="Verify user's email using token from email link"
+)
+async def verify_email(
+    token: str,  # Query parameter from URL
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Verify email address.
+    
+    User clicks link in email: /verify-email?token=xyz
+    """
+    return verify_email_token(token, db)
+
+
+
+@auth_router.post(
+    "/resend-verification",
+    status_code=status.HTTP_200_OK,
+    summary="Resend verification email",
+    description="Resend verification email if user didn't receive it"
+)
+async def resend_verification(
+    email: EmailStr,  # Just email in body
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    Resend verification email.
+    
+    Useful if:
+    - User didn't receive email
+    - Link expired
+    - Email went to spam
+    """
+    return resend_verification_email(email, db)
