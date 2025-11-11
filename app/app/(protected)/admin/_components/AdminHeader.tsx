@@ -23,14 +23,14 @@ const AdminHeader = () => {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           <Button size="icon" variant="ghost" className="h-9 w-9 relative">
             <Bell className="h-4 w-4" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
           </Button>
 
           <AvatarDropDown />
-        </div>
+        </div> */}
       </div>
     </header>
   )
