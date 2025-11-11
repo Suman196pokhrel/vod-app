@@ -113,11 +113,6 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,  
             detail="Email not verified"
         )
-    
-    if user.is_suspended:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account suspended"
-        )
+
     
     return user
