@@ -1,4 +1,5 @@
 import axios from "axios"
+import { shouldAttemptTokenRefresh } from "../utils/tokenManager";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -49,22 +50,22 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 and we haven't retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Only attempt for specific conditions
+    if (error.response?.status === 401 && 
+      !originalRequest._retry &&
+      shouldAttemptTokenRefresh(error)
+    ) {
       originalRequest._retry = true;
 
       try {
-        // Try to refresh the token
         const { useAuthStore } = await import("@/lib/store");
         const newAccessToken = await useAuthStore.getState().refreshToken();
         
-        // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, redirect to login
         if (typeof window !== "undefined") {
-          window.location.href = "/signin";
+          window.location.href = "/auth/signin";
         }
         return Promise.reject(refreshError);
       }

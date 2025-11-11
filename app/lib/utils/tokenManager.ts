@@ -26,3 +26,31 @@ export const tokenManager = {
 
     getRefreshToken: ()=>localStorage.getItem(REFRESH_KEY)
 }
+
+
+
+// Helper function to determine if we should attempt token refresh
+export function shouldAttemptTokenRefresh(error: any): boolean {
+  const detail = error.response?.data?.detail;
+  
+  // Only refresh for expired tokens
+  if (detail === "Token expired") {
+    return true;
+  }
+  
+  // Don't refresh for these cases:
+  const noRefreshMessages = [
+    "Invalid token",
+    "User not found", 
+    "Invalid credentials",
+    "Email not verified",
+    "Account suspended"
+  ];
+  
+  if (noRefreshMessages.includes(detail)) {
+    return false;
+  }
+  
+  // Default: try refresh (for backward compatibility)
+  return true;
+}
