@@ -46,32 +46,32 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
 
-//   async (error) => {
-//     const originalRequest = error.config;
+  async (error) => {
+    const originalRequest = error.config;
 
-//     // If 401 and we haven't retried yet
-//     if (error.response?.status === 401 && !originalRequest._retry) {
-//       originalRequest._retry = true;
+    // If 401 and we haven't retried yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
 
-//       try {
-//         // Try to refresh the token
-//         const { useAuthStore } = await import("@/lib/store");
-//         const newAccessToken = await useAuthStore.getState().refreshToken();
+      try {
+        // Try to refresh the token
+        const { useAuthStore } = await import("@/lib/store");
+        const newAccessToken = await useAuthStore.getState().refreshToken();
         
-//         // Retry original request with new token
-//         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-//         return api(originalRequest);
-//       } catch (refreshError) {
-//         // Refresh failed, redirect to login
-//         if (typeof window !== "undefined") {
-//           window.location.href = "/signin";
-//         }
-//         return Promise.reject(refreshError);
-//       }
-//     }
+        // Retry original request with new token
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed, redirect to login
+        if (typeof window !== "undefined") {
+          window.location.href = "/signin";
+        }
+        return Promise.reject(refreshError);
+      }
+    }
 
-//     return Promise.reject(error);
-//   }
+    return Promise.reject(error);
+  }
 );
 
 export default api
