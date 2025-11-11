@@ -5,9 +5,9 @@ const REFRESH_KEY='refresh_token'
 
 
 export const tokenManager = {
-    getTokens:()=>({
-        accessToken: localStorage.getItem(TOKEN_KEY),
-        refreshToken: localStorage.getItem(REFRESH_KEY)
+    getTokens:async ()=>({
+        accessToken: await localStorage.getItem(TOKEN_KEY),
+        refreshToken: await localStorage.getItem(REFRESH_KEY)
     }),
 
 
