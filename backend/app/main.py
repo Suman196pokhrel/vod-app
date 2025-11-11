@@ -7,7 +7,7 @@ from app.core.database import engine, Base
 
 
 # Routers 
-from app.apis.routes import auth_router, healthRouter, video_router
+from app.apis.routes import auth_router, healthRouter, video_router, user_router
 
 """
 APPLICATION SETUP EXPLANATION:
@@ -44,7 +44,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     # In production, replace with  frontend URL
-    allow_origins=["*"],  
+    allow_origins=[
+        "http://localhost:3000",  # Your Next.js dev server
+        "http://127.0.0.1:3000",  # Alternative localhost
+    ],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -56,6 +59,7 @@ app.add_middleware(
 app.include_router(healthRouter)
 app.include_router(auth_router)
 app.include_router(video_router)
+app.include_router(user_router)
 
 
 
