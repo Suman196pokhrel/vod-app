@@ -1,6 +1,6 @@
 // app/admin/videos/upload/page.tsx
 import React from 'react'
-import UploadForm from '../_components/UploadForm'
+import UploadForm from '../_components/uploadForm/UploadForm'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
