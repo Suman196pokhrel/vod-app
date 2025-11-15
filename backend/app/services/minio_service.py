@@ -1,0 +1,134 @@
+from minio import Minio
+from minio.error import S3Error
+from app.core.config import get_settings
+from fastapi import UploadFile
+import uuid
+from typing import Optional
+from datetime import timedelta
+
+
+
+settings = get_settings()
+
+
+class MinIOService:
+    def __init__(self):
+        self.client = Minio(
+            settings.minio_endpoint,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            secure=settings.minio_secure
+        )
+        self._ensure_buckets_exists()
+
+    
+    def _ensure_buckets_exists(self):
+        """
+            Create buckets if they don't exists
+        """
+        buckets = [
+            settings.minio_bucket_videos,
+            settings.minio_bucket_thumbnails
+        ]
+
+        for bucket in buckets:
+            try:
+                if not self.client.bucket_exists(bucket):
+                    self.client.make_bucket(bucket)
+                    print(f"✅ Created Bucket: {bucket}")
+                else:
+                    print(f"✅ Bucket already exists : {bucket}")
+            except S3Error as e:
+                print(f"❌ Error with bucket {bucket}: {e}")
+    
+    async def upload_video(
+            self,
+            file: UploadFile,
+            user_id: str
+    )->str:
+        """ Upload video file to MinIO"""
+        try:
+            # Generate uniquq filename
+            file_extension = file.filename.split(".")[-1]
+            unique_filename = f"user-{user_id}/{uuid.uuid4()}.{file_extension}"
+
+
+            # Upload file
+            self.client.put_object(
+                bucket_name=settings.minio_bucket_videos,
+                object_name=unique_filename,
+                data=file.file,
+                length=-1, # for unknown length, minIo will handle it
+                part_size=10*1024*1024,   # 10MB
+                content_type=file.content_type
+            )
+
+            return unique_filename
+        
+        except S3Error as e:
+            raise Exception(f"Failed to upload video : {str(e)}")
+        
+    async def upload_thumbnail(
+            self,
+            file:UploadFile,
+            user_id:str
+    )->str:
+        """
+            Upload thumbnail to MinIO
+        """
+        try:
+            file_extension = file.filename.split('.')[-1]
+            unique_filename = f"user-{user_id}/{uuid.uuid4()}.{file_extension}"
+            
+            self.client.put_object(
+                bucket_name=settings.minio_bucket_thumbnails,
+                object_name=unique_filename,
+                data=file.file,
+                length=-1,
+                part_size=10*1024*1024,
+                content_type=file.content_type
+            )
+            
+            return unique_filename
+        except S3Error as e:
+            raise Exception(f"Failed to upload thumbnail: {str(e)}")
+             
+    def get_video_url(self, object_name: str, expires: timedelta = timedelta(hours=1)) -> str:
+        """Generate presigned URL for private video access"""
+        try:
+            url = self.client.presigned_get_object(
+                bucket_name=settings.minio_bucket_videos,
+                object_name=object_name,
+                expires=expires
+            )
+            return url
+        except S3Error as e:
+            raise Exception(f"Failed to generate video URL: {str(e)}")    
+
+    def get_thumbnail_url(self, object_name: str) -> str:
+        """Generate public thumbnail URL"""
+        # Since thumbnails are public, we can use direct URL
+        return f"http://{settings.minio_endpoint}/{settings.minio_bucket_thumbnails}/{object_name}"
+    
+    def delete_video(self, object_name: str):
+        """Delete video from MinIO"""
+        try:
+            self.client.remove_object(
+                bucket_name=settings.minio_bucket_videos,
+                object_name=object_name
+            )
+        except S3Error as e:
+            raise Exception(f"Failed to delete video: {str(e)}")
+    
+    def delete_thumbnail(self, object_name: str):
+        """Delete thumbnail from MinIO"""
+        try:
+            self.client.remove_object(
+                bucket_name=settings.minio_bucket_thumbnails,
+                object_name=object_name
+            )
+        except S3Error as e:
+            raise Exception(f"Failed to delete thumbnail: {str(e)}")
+
+# Singleton instance
+minio_service = MinIOService()
