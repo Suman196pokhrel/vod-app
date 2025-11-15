@@ -1,13 +1,28 @@
+# /app/schemas/videos.py 
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 
 # ============== INPUT SCHEMAS ==============
 
+class VideoMetadata(BaseModel):
+    """Metadata sent from frontend along with files"""
+    title: str = Field(..., min_length=5, max_length=200)
+    description: str = Field(..., min_length=10, max_length=2000)
+    category: str
+    duration: Optional[str] = None
+    ageRating: Optional[str] = None
+    director: Optional[str] = Field(None, max_length=200)
+    cast: Optional[str] = Field(None, max_length=500)
+    releaseDate: Optional[str] = None
+    status: str = Field(default="draft")  # draft, published, scheduled
+    tags: Optional[List[str]] = None
+
+
 # req obj schema for creating a new video
 class VideoCreate(BaseModel):
-    """Schema for creating a new video"""
+    """Schema for creating a new video - Internal use after files are uploaded"""
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=5000)
     video_url: str = Field(..., max_length=500)
@@ -25,19 +40,14 @@ class VideoUpdate(BaseModel):
     is_public: Optional[bool] = None
 
 
-
 # ============== OUTPUT SCHEMAS ==============
-
 
 class UserBrief(BaseModel):
     """Lightweight user info for nested responses"""
     id: str
     username: str
     
-
-    # These allow the pydantic schemas to accept attributes from similar sqlalchemy models
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class VideoResponse(BaseModel):
@@ -55,11 +65,8 @@ class VideoResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
     user_id: str
-    # Optional: include user info
-    # user: Optional[UserBrief] = None
     
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class VideoList(BaseModel):
@@ -71,7 +78,6 @@ class VideoList(BaseModel):
     views_count: int
     created_at: datetime
     user_id: str
-    # Optional: truncated description
     description: Optional[str] = Field(None, max_length=100)
     
     model_config = ConfigDict(from_attributes=True)
