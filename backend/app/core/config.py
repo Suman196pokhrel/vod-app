@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     smtp_password: str
     from_email: str
     frontend_url: str = "http://localhost:3000"
+
+    # MinIO Settings
+    minio_endpoint: str 
+    minio_access_key: str  
+    minio_secret_key: str  
+    minio_bucket_videos: str
+    minio_bucket_thumbnails: str
+    minio_secure: bool = False  # True in production with HTTPS
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
