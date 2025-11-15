@@ -12,6 +12,9 @@ interface VideoUploadZoneProps {
   setVideoFile: (file: File | null) => void
 }
 
+
+
+
 const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
   const [uploadProgress, setUploadProgress] = React.useState(0)
 
@@ -19,21 +22,21 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
     if (acceptedFiles.length > 0) {
       setVideoFile(acceptedFiles[0])
       // Simulate upload progress
-      let progress = 0
-      const interval = setInterval(() => {
-        progress += 10
-        setUploadProgress(progress)
-        if (progress >= 100) {
-          clearInterval(interval)
-        }
-      }, 200)
+      // let progress = 0
+      // const interval = setInterval(() => {
+      //   progress += 10
+      //   setUploadProgress(progress)
+      //   if (progress >= 100) {
+      //     clearInterval(interval)
+      //   }
+      // }, 200)
     }
   }, [setVideoFile])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      'video/*': ['.mp4', '.mov', '.avi', '.mkv']
+      'video/*': ['.mp4']
     },
     maxFiles: 1,
     maxSize: 5 * 1024 * 1024 * 1024 // 5GB
@@ -73,7 +76,7 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
           </Button>
         </div>
 
-        {uploadProgress < 100 && (
+        {/* {uploadProgress < 100 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Uploading...</span>
@@ -81,7 +84,7 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
             </div>
             <Progress value={uploadProgress} />
           </div>
-        )}
+        )} */}
       </div>
     )
   }
@@ -99,6 +102,8 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
       `}
     >
       <input {...getInputProps()} />
+
+
       <div className="flex flex-col items-center gap-4">
         <div className="p-4 rounded-full bg-primary/10">
           <Upload className="h-8 w-8 text-primary" />
@@ -108,7 +113,7 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
             {isDragActive ? 'Drop video here' : 'Drag & drop video file'}
           </p>
           <p className="text-sm text-muted-foreground">
-            or click to browse (MP4, MOV, AVI, MKV - Max 5GB)
+            or click to browse (MP4)
           </p>
         </div>
         <Button type="button" variant="secondary">
@@ -116,6 +121,8 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
           Choose Video File
         </Button>
       </div>
+    
+    
     </div>
   )
 }
