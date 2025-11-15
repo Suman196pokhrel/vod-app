@@ -32,18 +32,33 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin 
 
-  # app:
-  #   build: ../backend
-  #   depends_on:
-  #     - db
-  #   networks:
-  #     - backend_net
-  #   environment:
-  #     DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  minio:
+    image: minio/minio:latest
+    container_name: vod_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - backend_net  # Changed from vod_network to backend_net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]  # Better healthcheck
+      interval: 30s
+      timeout: 20s
+      retries: 3
 
 networks:
   backend_net:
+    driver: bridge
 
 volumes:
   postgres_data:
   pgadmin_data:
+  minio_data:
+    driver: local
