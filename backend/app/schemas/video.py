@@ -1,6 +1,6 @@
 # /app/schemas/videos.py 
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 
 
@@ -20,7 +20,6 @@ class VideoMetadata(BaseModel):
     tags: Optional[List[str]] = None
 
 
-# req obj schema for creating a new video
 class VideoCreate(BaseModel):
     """Schema for creating a new video - Internal use after files are uploaded"""
     title: str = Field(..., min_length=1, max_length=200)
@@ -31,7 +30,6 @@ class VideoCreate(BaseModel):
     is_public: bool = Field(default=True)
 
 
-# req to update video data
 class VideoUpdate(BaseModel):
     """Schema for updating video metadata - all fields optional"""
     title: Optional[str] = Field(None, min_length=1, max_length=200)
@@ -55,9 +53,15 @@ class VideoResponse(BaseModel):
     id: str
     title: str
     description: Optional[str]
+    category: str
     video_url: str
     thumbnail_url: Optional[str]
     duration: Optional[int]
+    age_rating: Optional[str]
+    release_date: Optional[date]
+    director: Optional[str]
+    cast: Optional[str]
+    tags: Optional[List[str]]
     views_count: int
     likes_count: int
     is_public: bool
@@ -73,11 +77,14 @@ class VideoList(BaseModel):
     """Lightweight video info for listing multiple videos"""
     id: str
     title: str
+    category: str
     thumbnail_url: Optional[str]
     duration: Optional[int]
+    age_rating: Optional[str]
     views_count: int
     created_at: datetime
     user_id: str
     description: Optional[str] = Field(None, max_length=100)
+    tags: Optional[List[str]] = None
     
     model_config = ConfigDict(from_attributes=True)

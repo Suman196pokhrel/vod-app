@@ -8,6 +8,7 @@ from app.services.minio_service import minio_service
 from fastapi import HTTPException, UploadFile
 from typing import Optional, List
 import json
+from datetime import datetime
 
 
 class VideoService:
@@ -51,23 +52,33 @@ class VideoService:
             if thumbnail_file:
                 thumbnail_path = await minio_service.upload_thumbnail(thumbnail_file, user_id)
             
-            # 4. Generate URLs
-            video_url = minio_service.get_video_url(video_path)
-            thumbnail_url = minio_service.get_thumbnail_url(thumbnail_path) if thumbnail_path else None
-            
-            # 5. Parse duration (convert "2h 30m" to minutes)
+            # 4. Parse duration (convert "2h 30m" to minutes)
             duration_minutes = self._parse_duration(metadata.duration) if metadata.duration else None
+            
+            # 5. Parse release date
+            release_date = None
+            if metadata.releaseDate:
+                try:
+                    release_date = datetime.fromisoformat(metadata.releaseDate.replace('Z', '+00:00')).date()
+                except:
+                    release_date = None
             
             # 6. Determine is_public based on status
             is_public = metadata.status == "published"
             
-            # 7. Create database record
+            # 7. Create database record with ALL fields
             db_video = Video(
                 title=metadata.title,
                 description=metadata.description,
-                video_url=video_path,  # Store MinIO path, not full URL
-                thumbnail_url=thumbnail_path,  # Store MinIO path
+                category=metadata.category,
+                video_url=video_path,
+                thumbnail_url=thumbnail_path,
                 duration=duration_minutes,
+                age_rating=metadata.ageRating,
+                release_date=release_date,
+                director=metadata.director,
+                cast=metadata.cast,
+                tags=metadata.tags if metadata.tags else [],
                 is_public=is_public,
                 status=metadata.status,
                 user_id=user_id,
@@ -176,9 +187,6 @@ class VideoService:
                 status_code=400,
                 detail=f"Invalid video format. Allowed: MP4, MOV, WebM"
             )
-        
-        # Note: file.size might not be available in all cases
-        # For production, you'd want to check size during upload
     
     def _validate_thumbnail_file(self, file: UploadFile):
         """Validate thumbnail file type"""
@@ -220,7 +228,7 @@ class VideoService:
 video_service = VideoService()
 
 
-# Helper function for backwards compatibility with your existing code
+# Helper function for backwards compatibility
 def create_video(db: Session, video_data: VideoCreate, user_id: str) -> Video:
     """
     Legacy function - creates video with URLs already provided
@@ -229,11 +237,13 @@ def create_video(db: Session, video_data: VideoCreate, user_id: str) -> Video:
     db_video = Video(
         title=video_data.title,
         description=video_data.description,
+        category="uncategorized",  # Default category
         video_url=video_data.video_url,
         thumbnail_url=video_data.thumbnail_url,
         duration=video_data.duration,
         is_public=video_data.is_public,
-        user_id=user_id
+        user_id=user_id,
+        tags=[]
     )
     
     db.add(db_video)
