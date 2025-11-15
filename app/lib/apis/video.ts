@@ -41,9 +41,8 @@ export const uploadVideo = async ({
     
     // Add files
     formData.append('video', videoFile)
-    if (thumbnailFile) {
-      formData.append('thumbnail', thumbnailFile)
-    }
+    formData.append('thumbnail', thumbnailFile)
+    
     
     // Add metadata as JSON string
     formData.append('data', JSON.stringify({
