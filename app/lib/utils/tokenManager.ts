@@ -31,7 +31,7 @@ export const tokenManager = {
 
 // Helper function to determine if we should attempt token refresh
 export function shouldAttemptTokenRefresh(error: any): boolean {
-  const detail = error.response?.data?.detail;
+  const detail = error.response?.data?.detail.toLowerCase();
   
   // Only refresh for expired tokens
   if (detail === "Token expired") {
@@ -40,13 +40,12 @@ export function shouldAttemptTokenRefresh(error: any): boolean {
   
   // Don't refresh for these cases:
   const noRefreshMessages = [
-    "Invalid token",
-    "User not found", 
-    "Invalid credentials",
-    "Email not verified",
-    "Account suspended"
+    "invalid token",
+    "user not found", 
+    "invalid credentials",
+    "email not verified",
+    "account suspended"
   ];
-  
   if (noRefreshMessages.includes(detail)) {
     return false;
   }

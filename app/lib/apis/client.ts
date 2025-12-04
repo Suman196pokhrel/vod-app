@@ -50,6 +50,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+
     // Only attempt for specific conditions
     if (error.response?.status === 401 && 
       !originalRequest._retry &&
@@ -65,7 +66,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         if (typeof window !== "undefined") {
-          window.location.href = "/auth/signin";
+          window.location.href = "/auth/sign-in";
+
         }
         return Promise.reject(refreshError);
       }
