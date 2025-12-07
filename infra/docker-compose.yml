@@ -53,6 +53,43 @@ services:
       timeout: 20s
       retries: 3
 
+
+  redis:
+    image: redis:7-alpine
+    container_name: vod_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"      # host : container
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_dev_password}
+    
+    command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
+
+    networks:
+      - backend_net
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_dev_password", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: vod_redis_insight
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    networks:
+      - backend_net
+    depends_on:
+      - redis
+    volumes:
+      - redisinsight_data:/data
+
+
+
 networks:
   backend_net:
     driver: bridge
@@ -62,3 +99,4 @@ volumes:
   pgadmin_data:
   minio_data:
     driver: local
+  redisinsight_data:
