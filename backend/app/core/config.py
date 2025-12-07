@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     minio_bucket_videos: str
     minio_bucket_thumbnails: str
     minio_secure: bool = False  # True in production with HTTPS
+
+    # Redis Settings
+    redis_host: str
+    redis_port: int = 6739
+    redis_password:str
+    redis_db:int = 0
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
