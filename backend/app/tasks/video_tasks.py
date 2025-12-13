@@ -1,9 +1,17 @@
 from app.celery_app import celery_app
+from .dependencies import get_db_session, get_minio_client
+from app.models.videos import Video
+from app.core.config import get_settings
+import os
+import subprocess
+import json
 import time
 import logging
 
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
+
 
 @celery_app.task
 def test_task(name: str):
@@ -23,10 +31,64 @@ def prepare_video(self, video_id:str):
     - Return: video_id, file_path, metaadata
     """
 
+    logger.info(f"Starting prepare_video for video_id: {video_id}")
+
+    with get_db_session() as db:
+        video = db.query(Video).filter(Video.id == video_id).first()
+
+        if not video:
+            raise ValueError(f"Video not found : {video_id}")
+        
+        if video.processing_status != "uploaded":
+            raise ValueError(f"Video not ready for processing. Current status : {video.processing_status}")
+
+        # update status to proessing so that no other worker picks this up
+        video.processing_status = "processing"
+        db.commit()
+
+
+        # store what we need (we get this value here because we cannot use ORM object outside the session)
+        raw_video_path = video.raw_video_path
+
+    logger.info(f"Video validated. MinIo path: {raw_video_path}")
+    
+    # create a working dir for this video
+    work_dir_path = os.path.join(settings.processing_temp_dir , video_id)
+    os.makedirs(work_dir_path)
+
+    # Local path where raw video will be stored
+    # get the original extension of the video
+    original_extension = os.path.splitext(raw_video_path)[1]
+    local_video_path = os.path.join(work_dir_path,f"raw{original_extension}")
+
+    logger.info(f"Downloading video from minio to : {local_video_path}")
+
+        
     try:
-        pass
-    except Exception as exc:
-        pass
+        minio_client = get_minio_client()
+        bytes_downloaded = minio_client.download_video_to_file(video_id, local_video_path)
+        logger.info(f"Download complete: {bytes_downloaded / (1024*1024):.2f} MB")
+    except Exception as e:
+        logger.error(f"Download failed for {video_id}: {str(e)}")
+
+        # Check: Are we out of retries?
+        if self.request.retries >= self.max_retries:
+            # Final failure - update DB
+            with get_db_session() as db:
+                video = db.query(Video).filter(Video.id == video_id).first()
+                video.processing_status = "failed"
+                video.processing_error = f"Download failed after {self.max_retries} retries: {str(e)}"
+                db.commit()
+            raise  # Let Celery know it's a final failure
+        
+        # Not final - retry
+        raise self.retry(exc=e, countdown=60)  # Retry in 60 seconds
+
+
+
+
+
+
 
 
 
