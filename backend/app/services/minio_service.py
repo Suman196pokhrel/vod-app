@@ -131,5 +131,38 @@ class MinIOService:
         except S3Error as e:
             raise Exception(f"Failed to delete thumbnail: {str(e)}")
 
+    def download_video_to_file(self, object_name:str, local_path:str, chunk_size:int= 8*1024*1024):
+        """
+        Stream video from minIO directly to local file
+
+        Args:
+            object_name: Path in MinIO (e.g., "user-123/abc-def.mp4")
+            local_path: Where to save locally (e.g., "/tmp/vod_processing/abc/raw.mp4")
+            chunk_size: Download chunk size (default 8MB)
+    
+        Memory usage: Only chunk_size at a time, regardless of file size.
+        """
+
+        try:
+            response = self.client.get_object(
+                bucket_name=settings.minio_bucket_videos,
+                object_name=object_name
+            )
+
+            bytes_downloaded = 0
+
+            with open(local_path, 'wb') as f:
+                for chunk in response.stream(chunk_size):
+                    f.write(chunk)
+                    bytes_downloaded += len(chunk)
+
+            response.close()
+            response.release_conn()
+            return bytes_downloaded
+
+        except S3Error as e:
+            raise Exception(f"Failed to download video: {str(e)}")
+
+
 # Singleton instance
 minio_service = MinIOService()
