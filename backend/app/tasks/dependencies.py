@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 
 @contextmanager
-def get_session():
+def get_db_session():
     """
     Context manager for database sessions in Celery tasks.
     
