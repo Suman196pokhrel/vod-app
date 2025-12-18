@@ -144,6 +144,7 @@ class MinIOService:
         """
 
         try:
+            print(f"PRE VID DOWNLOAD LOG : object name: {object_name}")
             response = self.client.get_object(
                 bucket_name=settings.minio_bucket_videos,
                 object_name=object_name

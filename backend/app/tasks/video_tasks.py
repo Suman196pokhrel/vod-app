@@ -2,6 +2,7 @@ from app.celery_app import celery_app
 from .dependencies import get_db_session, get_minio_client
 from app.models.videos import Video
 from app.core.config import get_settings
+from app.services.ffmpeg_service import extract_metadata
 import os
 import subprocess
 import json
@@ -54,11 +55,13 @@ def prepare_video(self, video_id:str):
     
     # create a working dir for this video
     work_dir_path = os.path.join(settings.processing_temp_dir , video_id)
+    print(work_dir_path)
     os.makedirs(work_dir_path)
 
     # Local path where raw video will be stored
     # get the original extension of the video
     original_extension = os.path.splitext(raw_video_path)[1]
+    # minio_video_name = str(raw_video_path).split("/")[1]
     local_video_path = os.path.join(work_dir_path,f"raw{original_extension}")
 
     logger.info(f"Downloading video from minio to : {local_video_path}")
@@ -66,10 +69,10 @@ def prepare_video(self, video_id:str):
         
     try:
         minio_client = get_minio_client()
-        bytes_downloaded = minio_client.download_video_to_file(video_id, local_video_path)
+        bytes_downloaded = minio_client.download_video_to_file(raw_video_path, local_video_path)
         logger.info(f"Download complete: {bytes_downloaded / (1024*1024):.2f} MB")
     except Exception as e:
-        logger.error(f"Download failed for {video_id}: {str(e)}")
+        logger.error(f"Download failed for {raw_video_path}: {str(e)}")
 
         # Check: Are we out of retries?
         if self.request.retries >= self.max_retries:
@@ -85,7 +88,36 @@ def prepare_video(self, video_id:str):
         raise self.retry(exc=e, countdown=60)  # Retry in 60 seconds
 
 
+    try:
+        metadata = extract_metadata(local_video_path)
+        logger.info(f"Metadata extracted: {metadata.width}x{metadata.height},  {metadata.duration_seconds:2f}s")
 
+    except Exception as e:
+        logger.error(f"Metadata extraction failed for {video_id}: {str(e)}")
+
+
+        # No retry for metadata extraction if file is corrupt , retrying wont help
+        with get_db_session() as db:
+            video = db.query(Video).filter(Video.id == video_id).first()
+            video.processing_status = "failed"
+            video.processing_error=f"Metadata extraction failed : {str(e)}"
+            raise
+
+
+    # Update DB with metadata 
+    with get_db_session() as db:
+        video = db.query(Video).filter(Video.id == video_id).first()
+        video.processing_metadata = metadata.to_dict()
+        db.commit()
+
+    logger.info(f"prepare_video complete for {video_id}")
+
+    return {
+        "video_id": video_id,
+        "local_path":local_video_path,
+        "work_dir":work_dir_path,
+        "metadata":metadata.to_dict()
+    }
 
 
 

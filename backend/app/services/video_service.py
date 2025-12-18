@@ -52,8 +52,8 @@ class VideoService:
             if thumbnail_file:
                 thumbnail_path = await minio_service.upload_thumbnail(thumbnail_file, user_id)
             
-            # 4. Parse duration (convert "2h 30m" to minutes)
-            duration_minutes = self._parse_duration(metadata.duration) if metadata.duration else None
+            # # 4. Parse duration (convert "2h 30m" to minutes)
+            # duration_minutes = self._parse_duration(metadata.duration) if metadata.duration else None
             
             # 5. Parse release date
             release_date = None
@@ -71,9 +71,9 @@ class VideoService:
                 title=metadata.title,
                 description=metadata.description,
                 category=metadata.category,
-                video_url=video_path,
+                raw_video_path=video_path,
                 thumbnail_url=thumbnail_path,
-                duration=duration_minutes,
+                # duration=duration_minutes,
                 age_rating=metadata.ageRating,
                 release_date=release_date,
                 director=metadata.director,

@@ -1,9 +1,14 @@
 # This is the place that reads env vars and gives the app a clean settings object.
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
 class Settings(BaseSettings):
     database_url: str
+
+    # video processing settings
+    base_dir:str = str(Path(__file__).resolve().parent.parent)
+    processing_temp_dir: str = base_dir+ "/tmp" + "/video_processing"
 
 
     # JWT Settings

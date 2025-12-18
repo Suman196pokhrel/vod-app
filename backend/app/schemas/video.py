@@ -11,7 +11,6 @@ class VideoMetadata(BaseModel):
     title: str = Field(..., min_length=5, max_length=200)
     description: str = Field(..., min_length=10, max_length=2000)
     category: str
-    duration: Optional[str] = None
     ageRating: Optional[str] = None
     director: Optional[str] = Field(None, max_length=200)
     cast: Optional[str] = Field(None, max_length=500)
@@ -24,9 +23,9 @@ class VideoCreate(BaseModel):
     """Schema for creating a new video - Internal use after files are uploaded"""
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=5000)
-    video_url: str = Field(..., max_length=500)
+    raw_video_path: str = Field(..., max_length=500)
     thumbnail_url: Optional[str] = Field(None, max_length=500)
-    duration: Optional[int] = Field(None, gt=0)  
+    duration: Optional[int]
     is_public: bool = Field(default=True)
 
 
@@ -54,9 +53,8 @@ class VideoResponse(BaseModel):
     title: str
     description: Optional[str]
     category: str
-    video_url: str
+    raw_video_path: str
     thumbnail_url: Optional[str]
-    duration: Optional[int]
     age_rating: Optional[str]
     release_date: Optional[date]
     director: Optional[str]
@@ -79,7 +77,6 @@ class VideoList(BaseModel):
     title: str
     category: str
     thumbnail_url: Optional[str]
-    duration: Optional[int]
     age_rating: Optional[str]
     views_count: int
     created_at: datetime
