@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     database_url: str
 
     # video processing settings
-    base_dir:str = str(Path(__file__).resolve().parent.parent)
+    base_dir:str = str(Path(__file__).resolve().parent.parent.parent.parent)
     processing_temp_dir: str = base_dir+ "/tmp" + "/video_processing"
 
 
