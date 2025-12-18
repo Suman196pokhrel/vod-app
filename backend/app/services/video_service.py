@@ -9,7 +9,9 @@ from fastapi import HTTPException, UploadFile
 from typing import Optional, List
 import json
 from datetime import datetime
+import logging
 
+logger = logging.getLogger(__name__)
 
 class VideoService:
     """Business logic for video operations"""
@@ -23,7 +25,8 @@ class VideoService:
         user_id: str
     ) -> Video:
         """
-        Upload video and thumbnail to MinIO, then save metadata to PostgreSQL
+        Upload video and thumbnail to MinIO, then save metadata to PostgreSQL.
+        Implements proper rollback on failure.
         
         Args:
             db: Database session
@@ -34,46 +37,117 @@ class VideoService:
             
         Returns:
             Created Video object
+            
+        Raises:
+            HTTPException: On validation or processing errors
         """
         
+        logger.info("Starting video creation process")
+        logger.info(f"User ID: {user_id}")
+        logger.info(f"Video file: {video_file.filename if video_file else 'None'}")
+        logger.info(f"Thumbnail file: {thumbnail_file.filename if thumbnail_file else 'None'}")
+        
+        # Track uploaded files for rollback
+        video_path = None
+        thumbnail_path = None
+        db_committed = False
+        
         try:
-            # 1. Parse metadata from JSON string
-            metadata_dict = json.loads(metadata_json)
-            metadata = VideoMetadata(**metadata_dict)
+            # Step 1: Validate video file presence
+            logger.info("Step 1: Validating video file presence")
+            if not video_file:
+                logger.error("Video file validation failed: No file provided")
+                raise HTTPException(status_code=400, detail="Video file is required")
+            logger.info("Video file presence validated")
             
-            # 2. Validate file types
-            self._validate_video_file(video_file)
+            # Step 2: Parse and validate metadata
+            logger.info("Step 2: Parsing metadata JSON")
+            try:
+                metadata_dict = json.loads(metadata_json)
+                metadata = VideoMetadata(**metadata_dict)
+                logger.info(f"Metadata parsed successfully: title='{metadata.title}', category='{metadata.category}'")
+            except json.JSONDecodeError as e:
+                logger.error(f"Metadata parsing failed: Invalid JSON - {str(e)}")
+                raise HTTPException(status_code=400, detail="Invalid metadata JSON format")
+            except Exception as e:
+                logger.error(f"Metadata validation failed: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"Invalid metadata: {str(e)}")
+            
+            # Step 3: Validate file types
+            logger.info("Step 3: Validating file types")
+            try:
+                self._validate_video_file(video_file)
+                logger.info(f"Video file type validated: {video_file.content_type}")
+                
+                if thumbnail_file:
+                    self._validate_thumbnail_file(thumbnail_file)
+                    logger.info(f"Thumbnail file type validated: {thumbnail_file.content_type}")
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"File type validation failed: {str(e)}")
+                raise HTTPException(status_code=400, detail=f"File validation failed: {str(e)}")
+            
+            # Step 4: Upload video to MinIO
+            logger.info("Step 4: Uploading video to MinIO")
+            try:
+                video_path = await minio_service.upload_video(video_file, user_id)
+                logger.info(f"Video uploaded successfully to MinIO: {video_path}")
+            except Exception as e:
+                logger.error(f"Video upload to MinIO failed: {str(e)}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Failed to upload video to storage: {str(e)}"
+                )
+            
+            # Step 4.1: Verify video_path is not None
+            if not video_path:
+                logger.error("Critical error: video_path is None after successful upload")
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Video upload did not return a valid path"
+                )
+            
+            # Step 5: Upload thumbnail to MinIO (optional, non-critical)
             if thumbnail_file:
-                self._validate_thumbnail_file(thumbnail_file)
+                logger.info("Step 5: Uploading thumbnail to MinIO")
+                try:
+                    thumbnail_path = await minio_service.upload_thumbnail(thumbnail_file, user_id)
+                    logger.info(f"Thumbnail uploaded successfully to MinIO: {thumbnail_path}")
+                except Exception as e:
+                    logger.warning(f"Thumbnail upload failed (non-critical): {str(e)}")
+                    logger.warning("Continuing without thumbnail")
+                    thumbnail_path = None
+            else:
+                logger.info("Step 5: No thumbnail provided, skipping thumbnail upload")
             
-            # 3. Upload files to MinIO
-            video_path = await minio_service.upload_video(video_file, user_id)
-            thumbnail_path = None
-            if thumbnail_file:
-                thumbnail_path = await minio_service.upload_thumbnail(thumbnail_file, user_id)
-            
-            # # 4. Parse duration (convert "2h 30m" to minutes)
-            # duration_minutes = self._parse_duration(metadata.duration) if metadata.duration else None
-            
-            # 5. Parse release date
+            # Step 6: Parse release date
+            logger.info("Step 6: Processing release date")
             release_date = None
             if metadata.releaseDate:
                 try:
-                    release_date = datetime.fromisoformat(metadata.releaseDate.replace('Z', '+00:00')).date()
-                except:
+                    release_date = datetime.fromisoformat(
+                        metadata.releaseDate.replace('Z', '+00:00')
+                    ).date()
+                    logger.info(f"Release date parsed: {release_date}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse release date: {str(e)}")
+                    logger.warning("Continuing without release date")
                     release_date = None
+            else:
+                logger.info("No release date provided")
             
-            # 6. Determine is_public based on status
+            # Step 7: Prepare database record
+            logger.info("Step 7: Preparing database record")
             is_public = metadata.status == "published"
+            logger.info(f"Video visibility: {'public' if is_public else 'private'}")
             
-            # 7. Create database record with ALL fields
             db_video = Video(
                 title=metadata.title,
                 description=metadata.description,
                 category=metadata.category,
                 raw_video_path=video_path,
                 thumbnail_url=thumbnail_path,
-                # duration=duration_minutes,
                 age_rating=metadata.ageRating,
                 release_date=release_date,
                 director=metadata.director,
@@ -81,33 +155,134 @@ class VideoService:
                 tags=metadata.tags if metadata.tags else [],
                 is_public=is_public,
                 status=metadata.status,
+                processing_status="uploaded",
                 user_id=user_id,
                 views_count=0,
                 likes_count=0
             )
             
-            db.add(db_video)
-            db.commit()
-            db.refresh(db_video)
+            # Step 8: Insert into database
+            logger.info("Step 8: Inserting record into database")
+            try:
+                db.add(db_video)
+                db.commit()
+                db_committed = True
+                db.refresh(db_video)
+                logger.info(f"Database record created successfully: video_id={db_video.id}")
+            except Exception as e:
+                logger.error(f"Database insertion failed: {str(e)}")
+                db.rollback()
+                logger.info("Database transaction rolled back")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to save video metadata to database: {str(e)}"
+                )
+            
+            # Success
+            logger.info("Video creation process completed successfully")
+            logger.info(f"Video ID: {db_video.id}")
+            logger.info(f"Video path: {video_path}")
+            logger.info(f"Thumbnail path: {thumbnail_path if thumbnail_path else 'None'}")
             
             return db_video
             
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid metadata JSON")
+        except HTTPException:
+            # HTTPException is already logged and formatted, just re-raise
+            logger.error("Video creation failed with HTTPException")
+            raise
+            
         except Exception as e:
-            db.rollback()
-            # Clean up uploaded files if database operation fails
-            if 'video_path' in locals():
-                try:
-                    minio_service.delete_video(video_path)
-                except:
-                    pass
-            if 'thumbnail_path' in locals() and thumbnail_path:
-                try:
-                    minio_service.delete_thumbnail(thumbnail_path)
-                except:
-                    pass
-            raise HTTPException(status_code=500, detail=f"Failed to create video: {str(e)}")
+            # Unexpected error
+            logger.error(f"Unexpected error during video creation: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500, 
+                detail=f"An unexpected error occurred: {str(e)}"
+            )
+            
+        finally:
+            # Rollback logic: Clean up MinIO if database operation failed
+            if not db_committed:
+                logger.warning("Database commit did not complete, initiating MinIO cleanup")
+                
+                # Clean up video from MinIO
+                if video_path:
+                    logger.info(f"Attempting to delete video from MinIO: {video_path}")
+                    try:
+                        minio_service.delete_video(video_path)
+                        logger.info("Video deleted from MinIO successfully")
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup video from MinIO: {str(cleanup_error)}")
+                        logger.error("Manual cleanup may be required for video: {video_path}")
+                
+                # Clean up thumbnail from MinIO
+                if thumbnail_path:
+                    logger.info(f"Attempting to delete thumbnail from MinIO: {thumbnail_path}")
+                    try:
+                        minio_service.delete_thumbnail(thumbnail_path)
+                        logger.info("Thumbnail deleted from MinIO successfully")
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to cleanup thumbnail from MinIO: {str(cleanup_error)}")
+                        logger.error(f"Manual cleanup may be required for thumbnail: {thumbnail_path}")
+            else:
+                logger.info("Database commit successful, no cleanup required")
+    
+    def _validate_video_file(self, file: UploadFile):
+        """
+        Validate video file type
+        
+        Args:
+            file: Uploaded file to validate
+            
+        Raises:
+            HTTPException: If validation fails
+        """
+        if not file:
+            raise HTTPException(status_code=400, detail="Video file is required")
+        
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Video file must have a filename")
+        
+        allowed_types = [
+            "video/mp4", 
+            "video/mpeg", 
+            "video/quicktime", 
+            "video/x-msvideo",
+            "video/x-matroska"  # .mkv
+        ]
+        
+        if file.content_type not in allowed_types:
+            logger.warning(f"Invalid video content type: {file.content_type}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid video format. Allowed types: mp4, mpeg, mov, avi, mkv"
+            )
+    
+    def _validate_thumbnail_file(self, file: UploadFile):
+        """
+        Validate thumbnail file type
+        
+        Args:
+            file: Uploaded file to validate
+            
+        Raises:
+            HTTPException: If validation fails
+        """
+        if not file:
+            return
+        
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Thumbnail file must have a filename")
+        
+        allowed_types = ["image/jpeg", "image/png", "image/webp"]
+        
+        if file.content_type not in allowed_types:
+            logger.warning(f"Invalid thumbnail content type: {file.content_type}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid thumbnail format. Allowed types: jpeg, png, webp"
+            )
+
+  
     
     def get_video_by_id(self, db: Session, video_id: str, user_id: Optional[str] = None) -> Video:
         """Get video by ID with optional access control"""
