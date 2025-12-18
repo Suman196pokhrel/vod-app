@@ -49,7 +49,6 @@ export const uploadVideo = async ({
       title: data.title,
       description: data.description,
       category: data.category,
-      duration: data.duration,
       ageRating: data.ageRating,
       director: data.director,
       cast: data.cast,

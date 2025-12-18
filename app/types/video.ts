@@ -45,7 +45,7 @@ export interface VideoCreatePayload {
   title: string
   description: string
   category: string
-  duration?: string
+  // duration?: string
   ageRating?: string
   director?: string
   cast?: string

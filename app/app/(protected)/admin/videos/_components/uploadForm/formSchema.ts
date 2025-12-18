@@ -16,13 +16,13 @@ export const formSchema = z.object({
     .string()
     .min(1, "Please select a category."),
   
-  duration: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || /^(\d+h\s?)?(\d+m)?$/.test(val),
-      "Duration format should be like '2h 15m' or '90m'"
-    ),
+  // duration: z
+  //   .string()
+  //   .optional()
+  //   .refine(
+  //     (val) => !val || /^(\d+h\s?)?(\d+m)?$/.test(val),
+  //     "Duration format should be like '2h 15m' or '90m'"
+  //   ),
   
   ageRating: z
     .string()

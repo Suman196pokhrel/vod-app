@@ -31,7 +31,7 @@ const UploadForm = () => {
       title: '',
       description: '',
       category: '',
-      duration: '',
+      // duration: '',
       ageRating: '',
       director: '',
       cast: '',

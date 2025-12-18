@@ -95,7 +95,7 @@ const BasicInformationSection = ({ form }: BasicInformationSectionProps) => {
           </Field>
 
           {/* Duration */}
-          <Field>
+          {/* <Field>
             <FieldLabel htmlFor="duration">Duration (e.g., 2h 15m)</FieldLabel>
             <FieldGroup>
               <Input
@@ -107,7 +107,7 @@ const BasicInformationSection = ({ form }: BasicInformationSectionProps) => {
             {form.formState.errors.duration && (
               <FieldError>{form.formState.errors.duration.message}</FieldError>
             )}
-          </Field>
+          </Field> */}
         </div>
 
         {/* Age Rating & Release Date */}
