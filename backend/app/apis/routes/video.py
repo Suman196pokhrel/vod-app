@@ -5,9 +5,11 @@ from app.schemas.video import VideoResponse, VideoCreate, VideoList
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.video_service import video_service
-from app.core.dependencies import get_current_user  # Your auth dependency
-from app.models.users import User  # Your User model
+from app.core.dependencies import get_current_user  
+from app.models.users import User  
 from typing import Optional, List
+from app.schemas.video import VideoProcessingStatusResponse
+
 
 
 video_router = APIRouter(
@@ -122,3 +124,16 @@ def increment_video_views(
     """Increment view count when video is played"""
     video_service.increment_views(db, video_id)
     return {"message": "View count incremented"}
+
+
+@video_router.get("/{video_id}/status", response_model=VideoProcessingStatusResponse)
+async def get_video_processing_status(
+    video_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return video_service.get_video_processing_status_service(
+        db=db,
+        video_id=video_id,
+        current_user=current_user,
+    )
