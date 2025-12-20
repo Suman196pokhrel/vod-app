@@ -59,12 +59,12 @@ def prepare_video(self, video_id:str):
     # Create subdirectories 
     transcoded_dir = os.path.join(work_dir_path, "transcoded")
     segments_dir = os.path.join(work_dir_path, "segments")
-    manifests_dir = os.path.join(work_dir_path,"manifests")
+    # manifests_dir = os.path.join(work_dir_path,"manifests")
 
 
     os.makedirs(transcoded_dir, exist_ok=True)
     os.makedirs(segments_dir, exist_ok=True)
-    os.makedirs(manifests_dir, exist_ok=True)
+    # os.makedirs(manifests_dir, exist_ok=True)
 
 
     # Local path where raw video will be stored
@@ -127,7 +127,7 @@ def prepare_video(self, video_id:str):
         "work_dir":work_dir_path,
         "transcoded_dir": transcoded_dir,  
         "segments_dir": segments_dir,      
-        "manifests_dir": manifests_dir,    
+        # "manifests_dir": manifests_dir,    
         "metadata":metadata.to_dict()
     }
 
