@@ -1,3 +1,8 @@
+# Logger
+from app.core.logging_config import setup_logging
+setup_logging()
+
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +13,8 @@ from app.core.database import engine, Base
 
 # Routers 
 from app.apis.routes import auth_router, healthRouter, video_router, user_router
+
+
 
 """
 APPLICATION SETUP EXPLANATION:
