@@ -45,10 +45,17 @@ app/next-env.d.ts
 # *******************************************************
 
 backend/.venv
-backend/__pycache__
-backend/*.pyc
-backend/.pytest_cache
+backend/**/__pycache__/
+backend/**/**/__pycache__/
 
+backend/**/*.pyc
+backend/**/*.pyo
+backend/**/*.pyd
+backend/.pytest_cache
+backend/**/.pytest_cache
+backend/*.egg-info
+backend/.mypy_cache
+backend/.ruff_cache
 
 # *******************************************************
 # *****************ENV FILES*****************************
