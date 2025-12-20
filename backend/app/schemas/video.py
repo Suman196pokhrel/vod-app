@@ -2,6 +2,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, date
 from typing import Optional, List
+from app.utils.video_helpers import ProcessingStatus
 
 
 # ============== INPUT SCHEMAS ==============
@@ -85,3 +86,14 @@ class VideoList(BaseModel):
     tags: Optional[List[str]] = None
     
     model_config = ConfigDict(from_attributes=True)
+
+
+
+class VideoProcessingStatusResponse(BaseModel):
+    video_id: str
+    status: ProcessingStatus
+    progress: int = Field(ge=0, le=100)
+    message: str
+    error: Optional[str] = None
+    is_completed: bool
+    is_failed: bool
