@@ -33,6 +33,7 @@ def create_video_processing_workflow(video_id: str):
                 transcode_quality.s("720p"),
                 transcode_quality.s("480p"),
                 transcode_quality.s("360p"),
+                transcode_quality.s("144p"),
             ),
             on_transcode_complete.s()
         ),
