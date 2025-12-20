@@ -4,8 +4,6 @@ from app.models.videos import Video
 from app.core.config import get_settings
 from app.services.ffmpeg_service import extract_metadata
 import os
-import subprocess
-import json
 import time
 import logging
 
