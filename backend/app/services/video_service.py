@@ -5,6 +5,10 @@ from sqlalchemy.orm import Session
 from app.schemas.video import VideoCreate, VideoMetadata
 from app.models.videos import Video
 from app.services.minio_service import minio_service
+from app.models.users import User  
+from app.schemas.video import VideoProcessingStatusResponse
+from app.utils.video_helpers import DEFAULT_META, STATUS_META, ProcessingStatus
+
 from fastapi import HTTPException, UploadFile
 from typing import Optional, List
 import json
@@ -155,7 +159,7 @@ class VideoService:
                 tags=metadata.tags if metadata.tags else [],
                 is_public=is_public,
                 status=metadata.status,
-                processing_status="uploaded",
+                processing_status="queued",
                 user_id=user_id,
                 views_count=0,
                 likes_count=0
@@ -294,7 +298,44 @@ class VideoService:
                 detail=f"Invalid thumbnail format. Allowed types: jpeg, png, webp"
             )
 
-  
+    def get_video_processing_status_service(
+        self,
+        db: Session,
+        video_id: str,
+        current_user: User,
+    ) -> VideoProcessingStatusResponse:
+        video = db.query(Video).filter(Video.id == video_id).first()
+
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        # If you prefer "do not leak existence", return 404 instead of 403 here.
+        if str(video.user_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized to access this video")
+
+        # Normalize/validate DB status safely
+        try:
+            status = ProcessingStatus(str(video.processing_status))
+        except ValueError:
+            # If DB contains an unexpected string, keep API stable
+            # and treat it as a generic “processing” state.
+            status = ProcessingStatus.queued
+
+        meta = STATUS_META.get(status, DEFAULT_META)
+
+        is_failed = status == ProcessingStatus.failed
+        is_completed = status == ProcessingStatus.completed
+
+        return VideoProcessingStatusResponse(
+            video_id=str(video.id),
+            status=status,
+            progress=meta["progress"],
+            message=meta["message"],
+            error=str(video.processing_error) if is_failed and video.processing_error else None,
+            is_completed=is_completed,
+            is_failed=is_failed,
+        )
+
     
     def get_video_by_id(self, db: Session, video_id: str, user_id: Optional[str] = None) -> Video:
         """Get video by ID with optional access control"""
