@@ -6,6 +6,7 @@ from app.services.ffmpeg_service import extract_metadata
 import os
 import time
 import logging
+import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -147,8 +148,88 @@ def transcode_quality(self, data:dict, quality:str):
     - Return: video_id, quality, output_file_path
     """
     try:
-        # Your code here
-        pass
+        logger.info(f"Starting transcode for quality: {quality}")
+
+        # Extract data from previous task
+        video_id = data["video_id"]
+        input_path = data["local_path"]
+        transcoded_dir = data['transcoded_dir']
+        metadata = data['metadata']
+
+        # Get quality settings
+        q_settings = settings.QUALITY_SETTINGS.get(quality)
+        if not q_settings:
+            logger.error(f"Invalid quality : {quality}")
+            return None
+
+        # Check if we should skip (we're not upscaling at the moment)
+        source_height = metadata["height"]
+        target_height = q_settings["height"]
+        if target_height > source_height:
+            logger.info(f"Skipping {quality}- source is only {source_height}p")
+            return None
+        
+        # output path
+        output_path = os.path.join(transcoded_dir,f"{quality}.mp4")
+        logger.info(f"Output path: {output_path}")
+
+        # Build FFmpeg command
+        cmd = [
+            'ffmpeg',
+            '-i', input_path,
+            '-c:v', 'libx264',           # Video codec
+            '-preset', 'medium',         # Encoding speed
+            '-crf', '23',                # Quality (lower = better, 18-28 range)
+            '-vf', f"scale={q_settings['width']}:{q_settings['height']}",  # Resolution
+            '-b:v', q_settings['bitrate'], # Target bitrate
+            '-c:a', 'aac',               # Audio codec
+            '-b:a', '128k',              # Audio bitrate
+            '-y',                        # Overwrite output file
+            output_path      
+            ]
+        
+        logger.info(f"Runnign FFmpeg: {' '.join(cmd)}")
+
+        try:
+
+            # Run FFmpeg
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            logger.info(f"Transcoding complete for {quality}")
+
+            # Verify output exists
+            if not os.path.exists(output_path):
+                raise Exception (f"Output file not created: {output_path}")
+            
+            file_size = os.path.getsize(output_path)
+            logger.info(f"Cretaed {quality}.mp4 - Size: {file_size / (1024*1024):.2f} MB")
+
+            return {
+                "video_id": video_id,
+                "quality": quality,
+                "output_path": output_path,
+                "file_size": file_size
+            }
+        except subprocess.CalledProcessError as e:
+            logger.error(f"FFmpeg failed for {quality}: {str(e.stderr)}")
+
+            # Retry if not final attempt
+            if self.request.retries < self.max_retries:
+                logger.info(f"Retrying {quality} (attempt {self.request.retries + 1}/{self.max_retries})")
+                raise self.retry(exc=e, countdown=60)
+            else:
+                logger.error(f"Final failure for {quality} after {self.max_retries} retries")
+                return None  # Don't break entire workflow
+
+        except Exception as e:
+            logger.error(f"Unexpected error for {quality}: {str(e)}")
+            return None
+
     except Exception as exc:
         # Retry logic
         pass
