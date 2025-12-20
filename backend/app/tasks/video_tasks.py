@@ -147,27 +147,73 @@ def transcode_quality(self, data:dict, quality:str):
     - Track progress with self.update_state()
     - Return: video_id, quality, output_file_path
     """
+    logger.info(f"[{quality}] Starting transcode task")
+    logger.info(f"[{quality}] Task ID: {self.request.id}")
+    logger.info(f"[{quality}] Retry attempt: {self.request.retries}/{self.max_retries}")
     try:
-        logger.info(f"Starting transcode for quality: {quality}")
-
+    
         # Extract data from previous task
         video_id = data["video_id"]
         input_path = data["local_path"]
         transcoded_dir = data['transcoded_dir']
         metadata = data['metadata']
 
-        # Get quality settings
+        
+        # Validate all required data
+        if not all([video_id, input_path, transcoded_dir, metadata]):
+            missing = [k for k,v in {
+                "video_id": video_id,
+                "input_path": input_path,
+                "transcoded_dir": transcoded_dir,
+                "metadata": metadata
+            }.items() if not v]
+            raise ValueError(f"Missing required data: {', '.join(missing)}")
+
+        logger.info(f"[{quality}] Video ID: {video_id}")
+        logger.info(f"[{quality}] Input: {input_path}")
+
+
+        # INPUT FILE VALIDATION
+        
+        # Check if input file exists
+        if not os.path.exists(input_path):
+            raise FileNotFoundError(f"Input file not found: {input_path}")
+        
+        # Check if input file is readable
+        if not os.access(input_path, os.R_OK):
+            raise PermissionError(f"Cannot read input file: {input_path}")
+        
+        # Verify input file size
+        input_size = os.path.getsize(input_path)
+        logger.info(f"[{quality}] Input file size: {input_size / (1024*1024):.2f} MB")
+        
+        if input_size == 0:
+            raise ValueError(f"Input file is empty: {input_path}")
+
+
+
+        # QUALITY SETTINGS & UPSCALING CHECK
+        
         q_settings = settings.QUALITY_SETTINGS.get(quality)
         if not q_settings:
-            logger.error(f"Invalid quality : {quality}")
-            return None
-
-        # Check if we should skip (we're not upscaling at the moment)
-        source_height = metadata["height"]
+            raise ValueError(f"Invalid quality setting: {quality}")
+        
+        # Check if we should skip (no upscaling)
+        source_height = metadata.get("height")
+        if not source_height:
+            raise ValueError("Missing height in metadata")
+        
         target_height = q_settings["height"]
+        
         if target_height > source_height:
-            logger.info(f"Skipping {quality}- source is only {source_height}p")
-            return None
+            logger.info(f"[{quality}] Skipping - source is {source_height}p, target is {target_height}p (no upscaling)")
+            return {
+                "video_id": video_id,
+                "quality": quality,
+                "skipped": True,
+                "reason": f"Source resolution ({source_height}p) lower than target ({target_height}p)"
+            }
+        
         
         # output path
         output_path = os.path.join(transcoded_dir,f"{quality}.mp4")
@@ -246,12 +292,41 @@ def on_transcode_complete(self, results: list):
     - Combine results into single dict
     - Return: video_id, transcoded_files dict
     """
-    try:
-        # Your code here
-        pass
-    except Exception as exc:
-        # Handle error
-        pass
+    logger.info("Collecting transcoding results from all qualities")
+    logger.info(f"Received {len(results)} results")
+
+    # Filter out None/failed results
+    successful_results = [r for r in results if r is not None]
+
+    logger.info(f"Successful transcodes: {len(successful_results)}/{len(results)}")
+
+    if not successful_results:
+        logger.error("All transcoding tasks failed!")
+        raise Exception("No successful transcodes - cannot continue workflow")
+
+
+    # Get video_id (same across all results)
+    video_id = successful_results[0]['video_id']
+
+
+    # Build transcoded files dict
+    transcoded_files = {}
+    for result in successful_results:
+        quality = result['quality']
+        transcoded_files[quality] = {
+            'path':result['output_path'],
+            'size': result['file_size']
+        }
+        logger.info(f"  ✓ {quality}: {result['file_size'] / (1024*1024):.2f} MB")
+    
+    
+    logger.info(f"Transcoding complete for video: {video_id}")
+    return {
+        'video_id': video_id,
+        'transcoded_files': transcoded_files,
+        'total_qualities': len(transcoded_files)
+    }
+
 
 
 
