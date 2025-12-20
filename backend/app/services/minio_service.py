@@ -6,7 +6,6 @@ from app.core.config import get_settings
 from fastapi import UploadFile
 import uuid
 import logging
-from typing import Optional
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
