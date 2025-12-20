@@ -11,6 +11,8 @@ class Video(Base):
 
     # Primary key
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    celery_task_id = Column(String, nullable=True, index=True)
+
 
     # Basic Info
     title = Column(String(200), index=True, nullable=False)
