@@ -38,7 +38,9 @@ class MinIOService:
         
         buckets = [
             settings.minio_bucket_videos,
-            settings.minio_bucket_thumbnails
+            settings.minio_bucket_thumbnails,
+            settings.minio_bucket_processed_videos,
+
         ]
 
         for bucket in buckets:
@@ -196,6 +198,37 @@ class MinIOService:
             logger.error(f"Error uploading thumbnail: {str(e)}")
             raise Exception(f"Failed to upload thumbnail: {str(e)}")
              
+
+    def upload_file(self, bucket_name: str, object_name: str, file_path: str):  
+        """Upload a local file to MinIO"""
+        logger.info(f"Uploading file: {file_path} -> {bucket_name}/{object_name}")
+        
+        try:
+            # Get file size
+            import os
+            file_size = os.path.getsize(file_path)
+            
+            # Upload file
+            with open(file_path, 'rb') as file_data:
+                self.client.put_object(
+                    bucket_name=bucket_name,
+                    object_name=object_name,
+                    data=file_data,
+                    length=file_size
+                )
+            
+            logger.info(f"File uploaded successfully: {object_name}")
+            return object_name
+            
+        except S3Error as e:
+            logger.error(f"S3 error uploading file: {str(e)}")
+            raise Exception(f"Failed to upload file: {str(e)}")
+        
+        except Exception as e:
+            logger.error(f"Error uploading file: {str(e)}")
+            raise Exception(f"Failed to upload file: {str(e)}")
+
+
     def get_video_url(self, object_name: str, expires: timedelta = timedelta(hours=1)) -> str:
         """Generate presigned URL for private video access"""
         try:
