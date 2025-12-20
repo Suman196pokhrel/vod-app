@@ -40,7 +40,7 @@ def prepare_video(self, video_id:str):
         if not video:
             raise ValueError(f"Video not found : {video_id}")
         
-        if video.processing_status != "uploaded":
+        if video.processing_status != "queued":
             raise ValueError(f"Video not ready for processing. Current status : {video.processing_status}")
 
         # update status to proessing so that no other worker picks this up
@@ -152,11 +152,7 @@ def transcode_quality(self, data:dict, quality:str):
     logger.info(f"[{quality}] Retry attempt: {self.request.retries}/{self.max_retries}")
     try:
 
-        # UPDATE processing status
-        with get_db_session() as db:
-            update_video_processing_status(
-                db, video_id, "transcoding"
-            )
+
     
         # Extract data from previous task
         video_id = data["video_id"]
@@ -164,6 +160,11 @@ def transcode_quality(self, data:dict, quality:str):
         transcoded_dir = data['transcoded_dir']
         metadata = data['metadata']
 
+        # UPDATE processing status
+        with get_db_session() as db:
+            update_video_processing_status(
+                db, video_id, "transcoding"
+            )
         
         # Validate all required data
         if not all([video_id, input_path, transcoded_dir, metadata]):
@@ -305,11 +306,7 @@ def on_transcode_complete(self, results: list):
     logger.info("Collecting transcoding results from all qualities")
     logger.info(f"Received {len(results)} results")
 
-    with get_db_session() as db:
-        update_video_processing_status(
-                    db, video_id, "aggregating",
-                )
-  
+ 
 
     # Filter out None/failed results
     successful_results = [r for r in results if r is not None]
@@ -327,6 +324,10 @@ def on_transcode_complete(self, results: list):
 
     # Get video_id (same across all results)
     video_id = successful_results[0]['video_id']
+    with get_db_session() as db:
+        update_video_processing_status(
+                    db, video_id, "aggregating",
+                )
 
 
     # Build transcoded files dict
