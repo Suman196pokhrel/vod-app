@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     minio_secret_key: str  
     minio_bucket_videos: str
     minio_bucket_thumbnails: str
+    minio_bucket_processed_videos: str
     minio_secure: bool = False  # True in production with HTTPS
 
     # Redis Settings
