@@ -10,13 +10,15 @@ class Settings(BaseSettings):
     base_dir:str = str(Path(__file__).resolve().parent.parent.parent)
     processing_temp_dir: str = base_dir+ "/tmp" + "/video_processing"
     QUALITY_SETTINGS:dict = {
-        "1080p": {"width": 1920, "height": 1080, "bitrate": "5000k"},
-        "720p": {"width": 1280, "height": 720, "bitrate": "2500k"},
-        "480p": {"width": 854, "height": 480, "bitrate": "1000k"},
-        "360p": {"width": 640, "height": 360, "bitrate": "500k"},
-        "144p": {"width": 256, "height": 144, "bitrate": "200k"}
+        "2160p": {"width": 3840, "height": 2160, "bitrate": "20000k"},  # 4K
+        "1440p": {"width": 2560, "height": 1440, "bitrate": "10000k"},  # 2K
+        "1080p": {"width": 1920, "height": 1080, "bitrate": "5000k"},   # Full HD
+        "720p": {"width": 1280, "height": 720, "bitrate": "2500k"},     # HD
+        "480p": {"width": 854, "height": 480, "bitrate": "1000k"},      # SD
+        "360p": {"width": 640, "height": 360, "bitrate": "500k"},       # Low
+        "240p": {"width": 426, "height": 240, "bitrate": "300k"},        # Mobile preview
+        "144p": {"width": 256, "height": 144, "bitrate": "200k"}            # Mobile preview
     }
-
 
     # JWT Settings
     jwt_secret_key: str
