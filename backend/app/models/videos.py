@@ -45,7 +45,16 @@ class Video(Base):
 
     # processing status
     processing_status = Column(String(30), default="uploading", index=True)
-    # Values : uploading , uploaded, processing , completed, failed
+    # "uploading"              # User uploading (handled by frontend)
+    # "queued"                 # Upload done, workflow queued
+    # "preparing"              # prepare_video task
+    # "transcoding"            # transcode_quality tasks (parallel)
+    # "segmenting"             # segment_videos task  
+    # "creating_manifest"      # create_manifest task
+    # "uploading_to_storage"   # upload_to_minio task
+    # "finalizing"             # finalize_processing task
+    # "completed"              # All done!
+    # "failed"                 # Error occurred
 
     # Processing medata - stores infrom from prepare_video celery task
     processing_metadata = Column(JSON, nullable=True)
