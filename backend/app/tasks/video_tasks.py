@@ -568,35 +568,236 @@ def create_manifest(self, data: dict):
 @celery_app.task(bind=True, max_retries=3)
 def upload_to_minio(self, data: dict):
     """
-    Upload all processed files to MinIO
-    - Segments (.ts files)
-    - Manifests (.m3u8 files)
-    - Track upload progress
-    - Return: video_id, uploaded_urls
+    Upload all HLS segments and playlists to MinIO for permanent storage.
+    Uploads: master.m3u8, quality playlists, and all .ts segments.
     """
+    logger.info("=" * 60)
+    logger.info("Starting upload to MinIO")
+    
     try:
-        # Your code here
-        pass
-    except Exception as exc:
-        # Retry logic
-        pass
-
+        # Extract data from previous task
+        video_id = data['video_id']
+        master_playlist_path = data['master_playlist_path']
+        segments_dir = data['segments_dir']
+        available_qualities = data['available_qualities']
+        
+        logger.info(f"Video ID: {video_id}")
+        logger.info(f"Segments directory: {segments_dir}")
+        logger.info(f"Qualities to upload: {len(available_qualities)}")
+        
+        # Validate segments directory exists
+        if not os.path.exists(segments_dir):
+            raise ValueError(f"Segments directory not found: {segments_dir}")
+        
+        # Get MinIO client
+        minio_client = get_minio_client()
+        
+        # MinIO bucket and base path for this video
+        bucket_name = settings.minio_bucket_processed_videos
+        base_path = f"{video_id}/segments"
+        
+        uploaded_files = []
+        total_bytes = 0
+        
+        # Upload master playlist
+        logger.info("Uploading master playlist...")
+        master_minio_path = f"{base_path}/master.m3u8"
+        
+        try:
+            file_size = os.path.getsize(master_playlist_path)
+            minio_client.upload_file(
+                bucket_name=bucket_name,
+                object_name=master_minio_path,
+                file_path=master_playlist_path
+            )
+            total_bytes += file_size
+            uploaded_files.append(master_minio_path)
+            logger.info(f"✓ Uploaded master.m3u8")
+        except Exception as e:
+            logger.error(f"Failed to upload master playlist: {str(e)}")
+            raise
+        
+        # Upload each quality's files
+        for quality in available_qualities:
+            logger.info(f"[{quality}] Starting upload...")
+            
+            # Reconstruct quality directory path
+            quality_dir = os.path.join(segments_dir, quality)
+            
+            # Validate quality directory exists
+            if not os.path.exists(quality_dir):
+                logger.warning(f"[{quality}] Directory not found: {quality_dir}, skipping")
+                continue
+            
+            # Get all files in quality directory
+            quality_files = os.listdir(quality_dir)
+            
+            # Filter for playlist and segments
+            playlist_file = [f for f in quality_files if f == 'playlist.m3u8']
+            segment_files = [f for f in quality_files if f.endswith('.ts')]
+            
+            files_to_upload = playlist_file + sorted(segment_files)
+            uploaded_count = 0
+            quality_bytes = 0
+            
+            # Upload each file
+            for filename in files_to_upload:
+                local_path = os.path.join(quality_dir, filename)
+                minio_path = f"{base_path}/{quality}/{filename}"
+                
+                try:
+                    file_size = os.path.getsize(local_path)
+                    minio_client.upload_file(
+                        bucket_name=bucket_name,
+                        object_name=minio_path,
+                        file_path=local_path
+                    )
+                    uploaded_count += 1
+                    quality_bytes += file_size
+                    total_bytes += file_size
+                    uploaded_files.append(minio_path)
+                    
+                    # Log progress every 10 files
+                    if uploaded_count % 10 == 0:
+                        logger.info(f"[{quality}] Uploaded {uploaded_count}/{len(files_to_upload)} files...")
+                        
+                except Exception as e:
+                    logger.error(f"[{quality}] Failed to upload {filename}: {str(e)}")
+                    # Retry entire task if upload fails
+                    if self.request.retries < self.max_retries:
+                        raise self.retry(exc=e, countdown=60)
+                    else:
+                        raise
+            
+            logger.info(f"[{quality}] ✓ Upload complete: {uploaded_count} files ({quality_bytes / (1024*1024):.2f} MB)")
+        
+        # Generate master playlist URL
+        master_url = f"/{bucket_name}/{base_path}/master.m3u8"
+        
+        logger.info(f"✓ Upload complete!")
+        logger.info(f"Total files uploaded: {len(uploaded_files)}")
+        logger.info(f"Total size: {total_bytes / (1024*1024):.2f} MB")
+        logger.info(f"Master playlist URL: {master_url}")
+        logger.info("=" * 60)
+        
+        return {
+            'video_id': video_id,
+            'master_url': master_url,
+            'bucket_name': bucket_name,
+            'base_path': base_path,
+            'total_files': len(uploaded_files),
+            'total_bytes': total_bytes,
+            'available_qualities': available_qualities
+        }
+        
+    except Exception as e:
+        logger.error(f"MinIO upload failed: {str(e)}")
+        
+        # Retry if not final attempt
+        if self.request.retries < self.max_retries:
+            logger.info(f"Retrying upload (attempt {self.request.retries + 1}/{self.max_retries})")
+            raise self.retry(exc=e, countdown=60)
+        else:
+            raise
 
 # Stage 6: Finalization
 
 @celery_app.task(bind=True)
 def finalize_processing(self, data: dict):
     """
-    Update database with final status
+    Final step: Update database and cleanup temporary files.
     - Mark video as 'completed'
-    - Save manifest URL
-    - Save available qualities
-    - Clean up temporary files
-    - Return: final result
+    - Save manifest URL and available qualities
+    - Clean up temporary files from /tmp
+    - Clear celery_task_id (workflow complete)
     """
+    logger.info("=" * 60)
+    logger.info("Starting finalization")
+    
     try:
-        # Your code here
-        pass
-    except Exception as exc:
-        # Handle error, mark as failed
-        pass
+        # Extract data from previous task
+        video_id = data['video_id']
+        master_url = data['master_url']
+        total_files = data.get('total_files', 0)
+        total_bytes = data.get('total_bytes', 0)
+        
+        # Get available qualities (from create_manifest, passed through)
+        available_qualities = data.get('available_qualities', [])
+        
+        logger.info(f"Video ID: {video_id}")
+        logger.info(f"Master URL: {master_url}")
+        logger.info(f"Available qualities: {available_qualities}")
+        
+        # Update database
+        with get_db_session() as db:
+            video = db.query(Video).filter(Video.id == video_id).first()
+            
+            if not video:
+                raise ValueError(f"Video not found in database: {video_id}")
+            
+            logger.info(f"Updating database for video: {video.title}")
+            
+            # Update processing status and results
+            video.processing_status = "completed"
+            video.manifest_url = master_url
+            video.available_qualities = available_qualities
+            video.processing_error = None  # Clear any previous errors
+            video.celery_task_id = None  # Workflow complete, clear task ID
+            
+            db.commit()
+            logger.info("✓ Database updated successfully")
+        
+        # Clean up temporary files
+        work_dir = os.path.join(settings.processing_temp_dir, video_id)
+        
+        if os.path.exists(work_dir):
+            logger.info(f"Cleaning up temporary files: {work_dir}")
+            
+            try:
+                import shutil
+                shutil.rmtree(work_dir)
+                logger.info(f"✓ Deleted temporary directory: {work_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temp directory (non-critical): {str(e)}")
+                # Don't fail the task if cleanup fails - video is already processed
+        else:
+            logger.info("No temporary files to clean up")
+        
+        logger.info("=" * 60)
+        logger.info(" ✓ VIDEO PROCESSING COMPLETE!")
+        logger.info(f"Video ID: {video_id}")
+        logger.info(f"Total files uploaded: {total_files}")
+        logger.info(f"Total size: {total_bytes / (1024*1024):.2f} MB")
+        logger.info(f"Available qualities: {', '.join(available_qualities)}")
+        logger.info(f"Manifest URL: {master_url}")
+        logger.info("=" * 60)
+        
+        return {
+            'video_id': video_id,
+            'status': 'completed',
+            'manifest_url': master_url,
+            'available_qualities': available_qualities,
+            'total_files': total_files,
+            'total_bytes': total_bytes,
+            'message': 'Video processing completed successfully!'
+        }
+        
+    except Exception as e:
+        logger.error("=" * 60)
+        logger.error(" FINALIZATION FAILED")
+        logger.error(f"Error: {str(e)}")
+        logger.error("=" * 60)
+        
+        # Try to mark video as failed in database
+        try:
+            with get_db_session() as db:
+                video = db.query(Video).filter(Video.id == video_id).first()
+                if video:
+                    video.processing_status = "failed"
+                    video.processing_error = f"Finalization failed: {str(e)}"
+                    db.commit()
+                    logger.info("Marked video as failed in database")
+        except Exception as db_error:
+            logger.error(f"Failed to update database with error status: {str(db_error)}")
+        
+        raise
