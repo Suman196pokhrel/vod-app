@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.schemas.video import VideoCreate, VideoMetadata
 from app.models.videos import Video
 from app.services.minio_service import minio_service
+from app.tasks.workflows import start_video_processing
 from fastapi import HTTPException, UploadFile
 from typing import Optional, List
 import json
@@ -169,6 +170,13 @@ class VideoService:
                 db_committed = True
                 db.refresh(db_video)
                 logger.info(f"Database record created successfully: video_id={db_video.id}")
+
+                if db_committed:
+                   try:
+                       pass
+                   except Exception as e:
+                       logger.error(f"Failed to start processing workflow: {str(e)}")
+                    
             except Exception as e:
                 logger.error(f"Database insertion failed: {str(e)}")
                 db.rollback()
