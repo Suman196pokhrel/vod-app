@@ -49,6 +49,7 @@ class Video(Base):
     # "queued"                 # Upload done, workflow queued
     # "preparing"              # prepare_video task
     # "transcoding"            # transcode_quality tasks (parallel)
+    # "aggregating"            # compiling all transcoded files
     # "segmenting"             # segment_videos task  
     # "creating_manifest"      # create_manifest task
     # "uploading_to_storage"   # upload_to_minio task
