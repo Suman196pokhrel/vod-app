@@ -29,10 +29,13 @@ def create_video_processing_workflow(video_id: str):
         prepare_video.s(video_id),
         chord(
             group(
+                # transcode_quality.s("2160p"),  # 4K available for for development purpose its commented as testing would take a lot of time.
+                transcode_quality.s("1440p"),  # 2K
                 transcode_quality.s("1080p"),
                 transcode_quality.s("720p"),
                 transcode_quality.s("480p"),
                 transcode_quality.s("360p"),
+                transcode_quality.s("240p"),
                 transcode_quality.s("144p"),
             ),
             on_transcode_complete.s()
