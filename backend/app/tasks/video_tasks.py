@@ -3,6 +3,7 @@ from .dependencies import get_db_session, get_minio_client
 from app.models.videos import Video
 from app.core.config import get_settings
 from app.services.ffmpeg_service import extract_metadata
+from app.utils.video_helpers import update_video_processing_status
 import os
 import time
 import logging
@@ -43,7 +44,7 @@ def prepare_video(self, video_id:str):
             raise ValueError(f"Video not ready for processing. Current status : {video.processing_status}")
 
         # update status to proessing so that no other worker picks this up
-        video.processing_status = "processing"
+        video.processing_status = "preparing"
         db.commit()
 
 
@@ -87,10 +88,9 @@ def prepare_video(self, video_id:str):
         if self.request.retries >= self.max_retries:
             # Final failure - update DB
             with get_db_session() as db:
-                video = db.query(Video).filter(Video.id == video_id).first()
-                video.processing_status = "failed"
-                video.processing_error = f"Download failed after {self.max_retries} retries: {str(e)}"
-                db.commit()
+                update_video_processing_status(
+                    db, video_id, "failed"
+                )
             raise  # Let Celery know it's a final failure
         
         # Not final - retry
@@ -107,9 +107,9 @@ def prepare_video(self, video_id:str):
 
         # No retry for metadata extraction if file is corrupt , retrying wont help
         with get_db_session() as db:
-            video = db.query(Video).filter(Video.id == video_id).first()
-            video.processing_status = "failed"
-            video.processing_error=f"Metadata extraction failed : {str(e)}"
+            update_video_processing_status(
+                    db, video_id, "Failed",f"{str(e)}"
+                )
             raise
 
 
@@ -151,6 +151,12 @@ def transcode_quality(self, data:dict, quality:str):
     logger.info(f"[{quality}] Task ID: {self.request.id}")
     logger.info(f"[{quality}] Retry attempt: {self.request.retries}/{self.max_retries}")
     try:
+
+        # UPDATE processing status
+        with get_db_session() as db:
+            update_video_processing_status(
+                db, video_id, "transcoding"
+            )
     
         # Extract data from previous task
         video_id = data["video_id"]
@@ -273,7 +279,11 @@ def transcode_quality(self, data:dict, quality:str):
                 return None  # Don't break entire workflow
 
         except Exception as e:
-            logger.error(f"Unexpected error for {quality}: {str(e)}")
+            with get_db_session() as db:
+                update_video_processing_status(
+                        db, video_id, "Failed",f"{str(e)}"
+                    )
+
             return None
 
     except Exception as exc:
@@ -295,6 +305,12 @@ def on_transcode_complete(self, results: list):
     logger.info("Collecting transcoding results from all qualities")
     logger.info(f"Received {len(results)} results")
 
+    with get_db_session() as db:
+        update_video_processing_status(
+                    db, video_id, "aggregating",
+                )
+  
+
     # Filter out None/failed results
     successful_results = [r for r in results if r is not None]
 
@@ -302,6 +318,10 @@ def on_transcode_complete(self, results: list):
 
     if not successful_results:
         logger.error("All transcoding tasks failed!")
+        with get_db_session() as db:
+            update_video_processing_status(
+                    db, video_id, "Failed",f"All transcoding tasks failed!"
+                )
         raise Exception("No successful transcodes - cannot continue workflow")
 
 
@@ -343,6 +363,8 @@ def segment_videos(self, data: dict):
     logger.info("=" * 60)
     logger.info("Starting HLS segmentation for all qualities")
 
+
+
     try:
         # Extract data from previous task
         video_id = data["video_id"]
@@ -353,6 +375,12 @@ def segment_videos(self, data: dict):
         logger.info(f"Video ID: {video_id}")
         logger.info(f"Qualities to segment: {len(transcoded_files)}")
 
+        with get_db_session() as db:
+            update_video_processing_status(
+                db, video_id, "segmenting"
+            )
+        
+        
         # basic validation
         if not segments_dir or not os.path.exists(segments_dir):
             raise ValueError(f"Segments directory not fonnd: {segments_dir}")
@@ -460,6 +488,9 @@ def segment_videos(self, data: dict):
             logger.info(f"Retrying entire segmentation task (attempt {self.request.retries + 1}/{self.max_retries})")
             raise self.retry(exc=e, countdown=60)
         else:
+            with get_db_session() as db:
+                update_video_processing_status(
+                db, video_id, "failed",f"{str(e)}")
             raise
 
 
@@ -481,6 +512,10 @@ def create_manifest(self, data: dict):
         # extract data from previous task
         video_id = data["video_id"]
         segmented_files= data["segmented_files"]
+
+        with get_db_session() as db:
+                update_video_processing_status(
+                db, video_id, "creating_manifest")
 
         # Reconstruct path - master.m3u8 goes in segments/
         segments_dir = os.path.join(settings.processing_temp_dir, video_id, "segments")
@@ -560,6 +595,9 @@ def create_manifest(self, data: dict):
             logger.info(f"Retrying manifest creation (attempt {self.request.retries + 1}/{self.max_retries})")
             raise self.retry(exc=e, countdown=60)
         else:
+            with get_db_session() as db:
+                update_video_processing_status(
+                db, video_id, "failed",f"{str(e)}")
             raise
 
 
@@ -584,6 +622,10 @@ def upload_to_minio(self, data: dict):
         logger.info(f"Video ID: {video_id}")
         logger.info(f"Segments directory: {segments_dir}")
         logger.info(f"Qualities to upload: {len(available_qualities)}")
+
+        with get_db_session() as db:
+            update_video_processing_status(
+                db, video_id, "uploading to storage")
         
         # Validate segments directory exists
         if not os.path.exists(segments_dir):
@@ -698,6 +740,9 @@ def upload_to_minio(self, data: dict):
             logger.info(f"Retrying upload (attempt {self.request.retries + 1}/{self.max_retries})")
             raise self.retry(exc=e, countdown=60)
         else:
+            with get_db_session() as db:
+                update_video_processing_status(
+                db, video_id, "failed",f"{str(e)}")
             raise
 
 # Stage 6: Finalization
@@ -727,6 +772,10 @@ def finalize_processing(self, data: dict):
         logger.info(f"Video ID: {video_id}")
         logger.info(f"Master URL: {master_url}")
         logger.info(f"Available qualities: {available_qualities}")
+
+        with get_db_session() as db:
+            update_video_processing_status(
+                db, video_id, "finalizing")
         
         # Update database
         with get_db_session() as db:
@@ -771,6 +820,11 @@ def finalize_processing(self, data: dict):
         logger.info(f"Available qualities: {', '.join(available_qualities)}")
         logger.info(f"Manifest URL: {master_url}")
         logger.info("=" * 60)
+
+
+        with get_db_session() as db:
+            update_video_processing_status(
+                db, video_id, "completed")
         
         return {
             'video_id': video_id,
@@ -800,4 +854,7 @@ def finalize_processing(self, data: dict):
         except Exception as db_error:
             logger.error(f"Failed to update database with error status: {str(db_error)}")
         
+        with get_db_session() as db:
+            update_video_processing_status(
+                db, video_id, "failed",f"{str(e)}")
         raise
