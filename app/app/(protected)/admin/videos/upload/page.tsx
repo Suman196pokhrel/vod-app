@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { VideoProcessingDialog } from "@/app/(protected)/admin/videos/_components/multi_step_progress/video-processing-dialog";
 import {ProcessingStatus} from "@/lib/types/video"
 import { ApiError, uploadVideo } from '@/lib/apis/video'
-import { useVideoProcessing } from '../_components/multi_step_progress/use-video-processing'
+import { useVideoProcessing } from '../../../../../hooks/video/use-video-processing'
 
 const UploadVideoPage = () => {
 
