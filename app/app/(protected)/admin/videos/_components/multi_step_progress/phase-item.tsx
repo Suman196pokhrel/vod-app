@@ -6,6 +6,7 @@ import React from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PhaseItemProps } from "@/lib/types/video";
+import { PROCESSING_PHASES } from "@/constants/video-processing";
 
 export const PhaseItem: React.FC<PhaseItemProps> = ({
   phase,
@@ -20,15 +21,15 @@ export const PhaseItem: React.FC<PhaseItemProps> = ({
       {/* Icon Container */}
       <div
         className={cn(
-          "relative flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-500 ease-out",
+          "relative flex items-center justify-center xl:w-14 xl:h-14 w-10 h-10 rounded-2xl transition-all duration-500 ease-out",
           "border-2",
           isComplete && [
-             "bg-gradient-to-br from-purple-500 via-purple-600 to-blue-600",
+             "bg-linear-to-br from-purple-500 via-purple-600 to-blue-600",
             "border-purple-500",
             "shadow-lg shadow-purple-500/30",
           ],
           isActive && [
-            "bg-gradient-to-br from-purple-50 to-blue-50",
+            "bg-linear-to-br from-purple-50 to-blue-600 via-purple-600  animate-bounce",
             "border-purple-500",
             "shadow-lg shadow-purple-400/20",
             "animate-pulse",
@@ -43,18 +44,18 @@ export const PhaseItem: React.FC<PhaseItemProps> = ({
         }}
       >
         {isActive ? (
-          <Loader2 
-            className="w-6 h-6 text-purple-600 animate-spin" 
-            strokeWidth={2.5}
+          <Icon 
+            className="xl:w-8 w-6 xl:h-8 h-6 text-white" 
+            strokeWidth={2}
           />
         ) : isComplete ? (
-          <CheckCircle2 
-            className="w-6 h-6 text-white animate-in zoom-in duration-300" 
-            strokeWidth={2.5}
+          <Icon 
+            className="xl:w-8 w-7 xl:h-8 h-7 text-white transition ease-in-out" 
+            strokeWidth={2}
           />
         ) : (
           <Icon 
-            className="w-6 h-6 text-gray-400" 
+            className="xl:w-6 w-6 xl:h-6 h-6 text-gray-400" 
             strokeWidth={2}
           />
         )}
@@ -75,12 +76,12 @@ export const PhaseItem: React.FC<PhaseItemProps> = ({
       </span>
 
       {/* Connector Line */}
-       {index < 3 && (
+       {index < PROCESSING_PHASES.length - 1 && (
         <div
           className={cn(
-            "absolute top-7 left-[calc(50%+28px)] w-[calc(100%-40px)] h-0.5 transition-all duration-700 z-0",
+            "absolute top-10 xl:top-7 h-2 w-0.5 xl:left-[calc(50%+28px)] xl:w-[calc(100%-40px)] xl:h-0.5 transition-all duration-700 z-0",
             isComplete 
-              ? "bg-gradient-to-r from-purple-500 to-blue-500" 
+              ? "bg-linear-to-r from-purple-500 to-blue-500" 
               : "bg-gray-200"
           )}
           style={{

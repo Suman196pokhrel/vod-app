@@ -43,7 +43,7 @@ const ThumbnailUploadZone = ({ thumbnailFile, setThumbnailFile }: ThumbnailUploa
     setPreview(null)
   }
 
-  if (preview) {
+  if (preview && thumbnailFile) {
     return (
       <div className="relative aspect-video rounded-lg overflow-hidden border">
         <Image

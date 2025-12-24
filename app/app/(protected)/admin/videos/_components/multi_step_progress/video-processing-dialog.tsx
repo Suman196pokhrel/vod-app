@@ -52,10 +52,10 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
      <DialogContent
         className={cn(
-          "sm:max-w-[580px] gap-6 p-0 overflow-hidden border-0",
+          "sm:max-w-[580px] xl:min-w-4xl gap-6 p-0 overflow-hidden border-0",
           "bg-white shadow-2xl shadow-purple-500/10"
         )}
-        overlayClassName="bg-black/20 backdrop-blur-sm" // ✅ Custom light overlay
+        overlayClassName="bg-black/20 backdrop-blur-sm" //  Custom light overlay
         onInteractOutside={(e) => {
           if (isInProgress) {
             e.preventDefault();
@@ -139,8 +139,8 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
               </div>
 
               {/* Processing Phases */}
-              <div className="relative pt-4 pb-2">
-                <div className="grid grid-cols-4 gap-4">
+              <div className="relative pt-4 pb-2 ">
+                <div className="xl:grid  xl:grid-cols-7 xl:gap-3 xl:overflow-x-auto pb-2 flex flex-col items-center gap-5">
                   {PROCESSING_PHASES.map((phase, index) => (
                     <PhaseItem
                       key={phase.id}

@@ -11,7 +11,6 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { VideoProcessingDialog } from "@/app/(protected)/admin/videos/_components/multi_step_progress/video-processing-dialog";
-import {ProcessingStatus} from "@/lib/types/video"
 import { ApiError, uploadVideo } from '@/lib/apis/video'
 import { useVideoProcessing } from '../../../../../hooks/video/use-video-processing'
 
@@ -43,25 +42,20 @@ const UploadVideoPage = () => {
   const { isOpen, currentStatus, videoId, openDialog, closeDialog } = useVideoProcessing({
     pollingInterval: 3000,
     onComplete: (id) => {
-      console.log("✅ Video processing completed:", id)
+      console.log(" Video processing completed:", id)
       
-      toast.success("Video is ready to stream!", {
-        description: "Redirecting to video library...",
-        duration: 3000,
-      })
-
-      // ✅ Clear the form
+      // Clear the form
       form.reset()
       setVideoFile(null)
       setThumbnailFile(null)
       setUploadError(null)
-      closeDialog()
-        router.push('/admin/videos')
+      // closeDialog()
+      //   router.push('/admin/videos')
 
      
     },
     onError: (error) => {
-      console.log("❌ Processing error:", error)
+      console.log(" Processing error:", error)
       toast.error("Processing failed", {
         description: error.message,
       })
