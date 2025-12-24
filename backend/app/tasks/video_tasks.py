@@ -309,7 +309,7 @@ def on_transcode_complete(self, results: list):
  
 
     # Filter out None/failed results
-    successful_results = [r for r in results if r is not None]
+    successful_results = [r for r in results if r is not None and not r.get('skipped',False)]
 
     logger.info(f"Successful transcodes: {len(successful_results)}/{len(results)}")
 
