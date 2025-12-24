@@ -1,6 +1,7 @@
 import api from './client'
 import { VideoFormData } from '@/app/(protected)/admin/videos/_components/uploadForm/formSchema'
 import { AxiosError } from 'axios'
+import { ProcessingStatus } from '../types/video'
 
 
 
@@ -23,6 +24,17 @@ export interface ApiError {
   message: string
   errors?: Record<string, string[]>
   status?: number
+}
+
+
+export interface VideoProcessingStatusResponse {
+  video_id: string
+  status: ProcessingStatus
+  progress: number
+  message: string
+  error?: string | null
+  is_completed: boolean
+  is_failed: boolean
 }
 
 
@@ -130,4 +142,47 @@ export const getVideos = async () => {
 export const deleteVideo = async (videoId: string) => {
   const response = await api.delete(`/videos/${videoId}`)
   return response.data
+}
+
+
+/**
+ * Get the current processing status of a video
+ * @param videoId - The ID of the video to check
+ * @returns Processing status with progress information
+ * @throws ApiError if request fails
+ */
+export const getVideoStatus = async (
+  videoId: string
+): Promise<VideoProcessingStatusResponse> => {
+  try {
+    const response = await api.get<VideoProcessingStatusResponse>(
+      `/videos/${videoId}/status`
+    )
+    
+    console.log('📊 Video status response:', response.data)
+    
+    return response.data
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      const apiError: ApiError = {
+        message: 'Failed to fetch video status',
+        status: error.response?.status
+      }
+
+      if (error.response?.data) {
+        apiError.message = error.response.data.detail || 'Failed to fetch video status'
+      } else if (error.request) {
+        apiError.message = 'Network error. Please check your connection.'
+      } else {
+        apiError.message = error.message || 'An unexpected error occurred'
+      }
+
+      throw apiError
+    }
+
+    throw {
+      message: 'An unexpected error occurred while fetching status',
+      status: 500
+    } as ApiError
+  }
 }

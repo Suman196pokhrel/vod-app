@@ -1,7 +1,6 @@
 'use client'
 // app/admin/videos/upload/page.tsx
-import React, { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import  { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from 'react-hook-form'
@@ -14,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { VideoProcessingDialog } from "@/app/(protected)/admin/videos/_components/multi_step_progress/video-processing-dialog";
 import {ProcessingStatus} from "@/lib/types/video"
 import { ApiError, uploadVideo } from '@/lib/apis/video'
+import { useVideoProcessing } from '../_components/multi_step_progress/use-video-processing'
 
 const UploadVideoPage = () => {
 
@@ -30,7 +30,6 @@ const UploadVideoPage = () => {
       title: '',
       description: '',
       category: '',
-      // duration: '',
       ageRating: '',
       director: '',
       cast: '',
@@ -39,6 +38,36 @@ const UploadVideoPage = () => {
       tags: []
     }
   })
+
+  // Video Processing Dialog states 
+  const { isOpen, currentStatus, videoId, openDialog, closeDialog } = useVideoProcessing({
+    pollingInterval: 3000,
+    onComplete: (id) => {
+      console.log("✅ Video processing completed:", id)
+      
+      toast.success("Video is ready to stream!", {
+        description: "Redirecting to video library...",
+        duration: 3000,
+      })
+
+      // ✅ Clear the form
+      form.reset()
+      setVideoFile(null)
+      setThumbnailFile(null)
+      setUploadError(null)
+      closeDialog()
+        router.push('/admin/videos')
+
+     
+    },
+    onError: (error) => {
+      console.log("❌ Processing error:", error)
+      toast.error("Processing failed", {
+        description: error.message,
+      })
+    },
+  })
+
 
   const onSubmit = async (data: VideoFormData) => {
     if (!videoFile) {
@@ -65,10 +94,17 @@ const UploadVideoPage = () => {
         thumbnailFile: thumbnailFile
       })
 
-      toast.success("Video uploaded successfully!")
-      console.log('Upload result:', result)
-      router.push('/admin/videos')
+      // Get uploaded Video ID 
+      const uploadedVideoId = result.id
+
+      toast.success("Video uploaded successfully!", {
+        description: "Processing has started...",
+      })
       
+      console.log('Upload result:', result)
+
+      openDialog(uploadedVideoId)
+
     } catch (error) {
       console.error('Upload error:', error)
       
@@ -109,15 +145,36 @@ const UploadVideoPage = () => {
       setIsSubmitting(false)
     }
   }
-
   
-  
-  // Video Processing Dialog states 
-  const [isDialogOpen, setIsDialogOpen] = useState(true);
-  const [currentStatus, setCurrentStatus] = useState<ProcessingStatus>(
-    ProcessingStatus.UPLOADING
-  );
+    const handleCloseDialog = () => {
+    closeDialog()
+    
+  }
 
+    const handleRetry = async () => {
+    if (!videoId) return
+
+    // try {
+    //   // Call your retry API endpoint
+    //   const response = await fetch(`/api/videos/${videoId}/retry`, {
+    //     method: 'POST',
+    //   })
+
+    //   if (!response.ok) {
+    //     throw new Error('Retry failed')
+    //   }
+
+    //   toast.info("Retrying video processing...")
+      
+    //   // Reset and reopen dialog
+    //   resetProcessing()
+    //   openDialog()
+      
+    // } catch (error) {
+    //   console.error('Retry error:', error)
+    //   toast.error("Failed to retry processing")
+    // }
+  }
 
 
 
@@ -125,14 +182,12 @@ const UploadVideoPage = () => {
     <div className="space-y-6 max-w-5xl">
 
       <VideoProcessingDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        isOpen={isOpen}
+        onClose={handleCloseDialog}
+        videoId={videoId || undefined}
         currentStatus={currentStatus}
-        fileName="my-video.mp4"
-        onRetry={() => {
-          setCurrentStatus(ProcessingStatus.UPLOADING);
-          // Retry logic here
-        }}
+        fileName={videoFile?.name}
+        onRetry={handleRetry}
       />
 
 

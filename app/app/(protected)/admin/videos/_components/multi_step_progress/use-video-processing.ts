@@ -2,23 +2,23 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ProcessingStatus } from "@/lib/types/video";
+import { ApiError, getVideoStatus } from "@/lib/apis/video";
 
 interface UseVideoProcessingOptions {
-  videoId?: string;
-  initialStatus?: ProcessingStatus;
   pollingInterval?: number;
   onComplete?: (videoId: string) => void;
   onError?: (error: Error) => void;
 }
 
+
 interface UseVideoProcessingReturn {
   isOpen: boolean;
   currentStatus: ProcessingStatus;
-  openDialog: () => void;
+  videoId: string | null;
+  openDialog: (videoId: string) => void;
   closeDialog: () => void;
-  updateStatus: (status: ProcessingStatus) => void;
   resetProcessing: () => void;
 }
 
@@ -26,61 +26,74 @@ export const useVideoProcessing = (
   options: UseVideoProcessingOptions = {}
 ): UseVideoProcessingReturn => {
   const {
-    videoId,
-    initialStatus = ProcessingStatus.UPLOADING,
     pollingInterval = 2000,
     onComplete,
     onError,
   } = options;
 
-  const [isOpen, setIsOpen] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<ProcessingStatus>(initialStatus);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [currentStatus, setCurrentStatus] = useState<ProcessingStatus>(
+    ProcessingStatus.UPLOADING
+  );
+  //  Use ref to store videoId - available immediately, no re-render delays
+  const videoIdRef = useRef<string | null>(null);
 
   // Poll for status updates
   useEffect(() => {
-    if (!isOpen || !videoId) return;
+    if (!isOpen || !videoIdRef.current) {
+      console.log('Not polling:', { isOpen, videoId: videoIdRef.current });
+      return;
+    }
 
-    const pollStatus = async () => {
+    console.log(' Starting polling for video:', videoIdRef.current);
+
+    const pollStatus = async (): Promise<void> => {
       try {
-        // Replace with your actual API call
-        const response = await fetch(`/api/videos/${videoId}/status`);
+        //  Use the helper function instead of fetch
+        const data = await getVideoStatus(videoIdRef.current!);
         
-        if (!response.ok) {
-          throw new Error("Failed to fetch video status");
-        }
-
-        const data = await response.json();
-        const newStatus = data.processing_status as ProcessingStatus;
-        
-        setCurrentStatus(newStatus);
+        console.log(' Polled status:', data.status, data);
+        setCurrentStatus(data.status);
 
         // Handle completion
-        if (newStatus === ProcessingStatus.COMPLETED) {
-          onComplete?.(videoId);
+        if (data.is_completed) {
+          console.log(' Processing complete!');
+          onComplete?.(videoIdRef.current!);
         }
 
         // Handle failure
-        if (newStatus === ProcessingStatus.FAILED) {
-          onError?.(new Error("Video processing failed"));
+        if (data.is_failed) {
+          console.log(' Processing failed!');
+          onError?.(new Error(data.error || "Video processing failed"));
         }
       } catch (error) {
         console.error("Error polling video status:", error);
-        onError?.(error as Error);
+        
+        // Handle ApiError type
+        const apiError = error as ApiError;
+        onError?.(new Error(apiError.message || "Failed to fetch status"));
       }
     };
 
     // Poll immediately
     pollStatus();
 
-    // Set up polling interval
+    // Then poll on interval
     const interval = setInterval(pollStatus, pollingInterval);
 
-    return () => clearInterval(interval);
-  }, [isOpen, videoId, pollingInterval, onComplete, onError]);
+    // Cleanup
+    return () => {
+      console.log(' Stopping polling');
+      clearInterval(interval);
+    };
+  }, [isOpen, pollingInterval, onComplete, onError]);
 
-  const openDialog = useCallback(() => {
-    setIsOpen(true);
+  const openDialog = useCallback((videoId: string) => {
+    console.log('🚪 Opening dialog for video:', videoId);
+    videoIdRef.current = videoId;  // Store in ref (immediate)
+    setIsOpen(true);               // Open dialog (triggers useEffect)
   }, []);
+
 
   const closeDialog = useCallback(() => {
     setIsOpen(false);
@@ -98,9 +111,9 @@ export const useVideoProcessing = (
   return {
     isOpen,
     currentStatus,
+    videoId: videoIdRef.current,
     openDialog,
     closeDialog,
-    updateStatus,
     resetProcessing,
   };
 };
