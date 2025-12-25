@@ -11,7 +11,7 @@ const VideosPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Videos</h1>
           <p className="text-muted-foreground">
@@ -24,13 +24,9 @@ const VideosPage = () => {
             Upload Video
           </Button>
         </Link>
-      </div>
+      </div> */}
 
-      {/* Stats Overview */}
-      <VideoStats />
 
-      {/* Filters & Search */}
-      <VideoFilters />
 
       {/* Videos Table */}
       <VideoTable />

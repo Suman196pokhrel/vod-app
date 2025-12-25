@@ -1,12 +1,15 @@
 // constants/video-processing.ts
 
 import { 
-  Upload, 
-  FileSearch, 
-  Clapperboard, 
-  PackageCheck,
-  LucideIcon 
+  Upload,           // Phase 1
+  CloudUpload,      // Phase 2  
+  ScanEye,          // Phase 3
+  Clapperboard,     // Phase 4
+  Grid3x3,          // Phase 5
+  Package,          // Phase 6
+  Sparkles,         // Phase 7
 } from "lucide-react";
+
 import { ProcessingStatus, StatusMeta, ProcessingPhase } from "@/lib/types/video";
 
 export const STATUS_META: Record<ProcessingStatus, StatusMeta> = {
@@ -59,32 +62,48 @@ export const STATUS_META: Record<ProcessingStatus, StatusMeta> = {
 export const PROCESSING_PHASES: ProcessingPhase[] = [
   {
     id: "upload",
-    label: "Upload",
+    label: "Upload",           
     icon: Upload,
-    statuses: [ProcessingStatus.UPLOADING, ProcessingStatus.QUEUED],
+    statuses: [ProcessingStatus.UPLOADING],
+  },
+  {
+    id: "queue",
+    label: "Queue",            
+    icon: CloudUpload,
+    statuses: [ProcessingStatus.QUEUED],
   },
   {
     id: "analyze",
-    label: "Analyze",
-    icon: FileSearch,
+    label: "Analyze",          
+    icon: ScanEye,
     statuses: [ProcessingStatus.PREPARING],
   },
   {
-    id: "process",
-    label: "Process",
+    id: "transcode",
+    label: "Transcode",       
     icon: Clapperboard,
+    statuses: [ProcessingStatus.TRANSCODING],
+  },
+  {
+    id: "segment",
+    label: "Segment",          
+    icon: Grid3x3,
     statuses: [
-      ProcessingStatus.TRANSCODING,
       ProcessingStatus.AGGREGATING,
       ProcessingStatus.SEGMENTING,
     ],
   },
   {
-    id: "finalize",
-    label: "Finalize",
-    icon: PackageCheck,
+    id: "package",
+    label: "Package",          
+    icon: Package,
+    statuses: [ProcessingStatus.CREATING_MANIFEST],
+  },
+  {
+    id: "deploy",
+    label: "Deploy",           
+    icon: Sparkles,
     statuses: [
-      ProcessingStatus.CREATING_MANIFEST,
       ProcessingStatus.UPLOADING_TO_STORAGE,
       ProcessingStatus.FINALIZING,
     ],

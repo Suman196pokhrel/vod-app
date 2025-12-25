@@ -1,169 +1,175 @@
-// app/admin/videos/_components/VideoTable.tsx
 "use client"
+import { DataTable } from './videos_table/data-table';
+import { columns } from './videos_table/columns';
+import { mockVideos } from './videos_table/mock_video_data';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Video, Film, TrendingUp, AlertCircle } from 'lucide-react';
 
-import React from 'react'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Eye, Edit, Trash, Copy } from 'lucide-react'
-import Image from 'next/image'
-import { Card } from '@/components/ui/card'
-
-const VideoTable = () => {
-  const videos = [
-    {
-      id: '1',
-      title: 'Stranger Things: Season 4',
-      thumbnail: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&q=80',
-      category: 'Sci-Fi',
-      views: '2.4M',
-      duration: '2h 15m',
-      uploadDate: '2024-05-15',
-      status: 'published'
-    },
-    {
-      id: '2',
-      title: 'The Last of Us',
-      thumbnail: 'https://images.unsplash.com/photo-1560169897-fc0cdbdfa4d5?w=400&q=80',
-      category: 'Drama',
-      views: '1.8M',
-      duration: '2h 05m',
-      uploadDate: '2024-05-10',
-      status: 'published'
-    },
-    {
-      id: '3',
-      title: 'Breaking Bad: Complete Series',
-      thumbnail: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=400&q=80',
-      category: 'Crime',
-      views: '3.2M',
-      duration: '3h 20m',
-      uploadDate: '2024-05-01',
-      status: 'published'
-    },
-    {
-      id: '4',
-      title: 'The Witcher',
-      thumbnail: 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&q=80',
-      category: 'Fantasy',
-      views: '890K',
-      duration: '1h 50m',
-      uploadDate: '2024-04-28',
-      status: 'draft'
-    },
-    {
-      id: '5',
-      title: 'Planet Earth III',
-      thumbnail: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&q=80',
-      category: 'Documentary',
-      views: '1.5M',
-      duration: '55m',
-      uploadDate: '2024-04-20',
-      status: 'published'
-    }
-  ]
-
-  const statusColors = {
-    published: 'bg-green-500/10 text-green-500',
-    draft: 'bg-yellow-500/10 text-yellow-500',
-    processing: 'bg-blue-500/10 text-blue-500'
-  }
+export default function AdminVideosPage() {
+  // Calculate statistics
+  const stats = {
+    total: mockVideos.length,
+    published: mockVideos.filter(v => v.status === 'published' && v.is_public).length,
+    processing: mockVideos.filter(v => 
+      !['completed', 'failed'].includes(v.processing_status)
+    ).length,
+    failed: mockVideos.filter(v => v.processing_status === 'failed').length,
+    totalViews: mockVideos.reduce((sum, v) => sum + v.views_count, 0),
+    totalLikes: mockVideos.reduce((sum, v) => sum + v.likes_count, 0),
+  };
 
   return (
-    <Card>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[300px]">Video</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Views</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead>Upload Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {videos.map((video) => (
-            <TableRow key={video.id}>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <div className="relative w-24 aspect-video rounded overflow-hidden flex-shrink-0">
-                    <Image
-                      src={video.thumbnail}
-                      alt={video.title}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold line-clamp-1">{video.title}</p>
-                    <p className="text-xs text-muted-foreground">ID: {video.id}</p>
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">{video.category}</Badge>
-              </TableCell>
-              <TableCell>{video.views}</TableCell>
-              <TableCell>{video.duration}</TableCell>
-              <TableCell>{video.uploadDate}</TableCell>
-              <TableCell>
-                <Badge
-                  variant="outline"
-                  className={statusColors[video.status as keyof typeof statusColors]}
-                >
-                  {video.status}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Duplicate
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
-  )
-}
+    <div className="flex flex-col gap-6 p-6">
+      {/* Header */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Video Management</h1>
+        <p className="text-muted-foreground">
+          Manage and monitor all videos in your VOD platform
+        </p>
+      </div>
 
-export default VideoTable
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Videos</CardTitle>
+            <Video className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.published} published
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Processing</CardTitle>
+            <Film className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.processing}</div>
+            <p className="text-xs text-muted-foreground">
+              Currently being processed
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Views</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {(stats.totalViews / 1000000).toFixed(1)}M
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {(stats.totalLikes / 1000).toFixed(1)}K likes
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Failed</CardTitle>
+            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.failed}</div>
+            <p className="text-xs text-muted-foreground">
+              {stats.failed > 0 ? 'Needs attention' : 'All good!'}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content */}
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="all">
+            All Videos ({mockVideos.length})
+          </TabsTrigger>
+          <TabsTrigger value="published">
+            Published ({stats.published})
+          </TabsTrigger>
+          <TabsTrigger value="processing">
+            Processing ({stats.processing})
+          </TabsTrigger>
+          <TabsTrigger value="failed">
+            Failed ({stats.failed})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Videos</CardTitle>
+              <CardDescription>
+                Complete list of all videos in the system
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable columns={columns} data={mockVideos} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="published" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Published Videos</CardTitle>
+              <CardDescription>
+                Videos that are live and publicly accessible
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable 
+                columns={columns} 
+                data={mockVideos.filter(v => v.status === 'published' && v.is_public)} 
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="processing" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Processing Videos</CardTitle>
+              <CardDescription>
+                Videos currently being transcoded and processed
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable 
+                columns={columns} 
+                data={mockVideos.filter(v => 
+                  !['completed', 'failed'].includes(v.processing_status)
+                )} 
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="failed" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Failed Videos</CardTitle>
+              <CardDescription>
+                Videos that encountered errors during processing
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DataTable 
+                columns={columns} 
+                data={mockVideos.filter(v => v.processing_status === 'failed')} 
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
