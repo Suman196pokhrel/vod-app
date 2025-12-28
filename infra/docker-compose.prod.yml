@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: vod-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # These will be read from .env.production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_REGION=${AWS_REGION}
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - DEBUG=${DEBUG}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    env_file:
+      - ../backend/.env.production
+    volumes:
+      - /tmp/vod-processing:/tmp/vod-processing
+    command: >
+      gunicorn app.main:app 
+      --workers 4 
+      --worker-class uvicorn.workers.UvicornWorker 
+      --bind 0.0.0.0:8000 
+      --access-logfile - 
+      --error-logfile - 
+      --log-level info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - vod-network
+
+  celery-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: vod-celery-worker
+    restart: unless-stopped
+    env_file:
+      - ../backend/.env.production
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - AWS_REGION=${AWS_REGION}
+    volumes:
+      - /tmp/vod-processing:/tmp/vod-processing
+    command: >
+      celery -A app.celery_app worker 
+      --loglevel=info 
+      --concurrency=1 
+      --max-tasks-per-child=10 
+      --time-limit=3600 
+      --soft-time-limit=3300
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - vod-network
+
+networks:
+  vod-network:
+    driver: bridge
