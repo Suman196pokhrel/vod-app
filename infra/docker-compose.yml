@@ -1,4 +1,5 @@
 services:
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -94,11 +95,28 @@ services:
       - postgres
       - redis
       - minio
-    ports:
-      - "8000:8000"
+    #  Caddy will be the only public entry
+    # ports:
+    #   - "8000:8000"
     networks:
       - backend_net
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: vod_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - backend_net
+    depends_on:
+      - api
 
   worker:
     cpu_shares: 256
@@ -139,3 +157,5 @@ volumes:
   minio_data:
     driver: local
   redisinsight_data:
+  caddy_data:
+  caddy_config:
