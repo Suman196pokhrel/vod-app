@@ -114,6 +114,19 @@ services:
       - backend_net
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
 
+  flower:
+    image: mher/flower
+    command: celery --broker=${CELERY_BROKER_URL} flower
+    env_file:
+      - dev.env
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    networks:
+      - backend_net
+
+
 networks:
   backend_net:
     driver: bridge
