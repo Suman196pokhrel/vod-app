@@ -1,6 +1,7 @@
 # Logger
 from app.core.logging_config import setup_logging
 setup_logging()
+import os
 
 
 from fastapi import FastAPI
@@ -14,6 +15,7 @@ from app.core.database import engine, Base
 # Routers 
 from app.apis.routes import auth_router, healthRouter, video_router, user_router
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
 """
@@ -55,6 +57,7 @@ app.add_middleware(
         "http://localhost:3000",  # Your Next.js dev server
         "http://127.0.0.1:3000",  # Alternative localhost
         # "http://10.0.0.211:3000",
+        FRONTEND_URL,
     ],
     allow_credentials=True,
     allow_methods=["*"],
