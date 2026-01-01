@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         "240p": {"width": 426, "height": 240, "bitrate": "300k"},        # Mobile preview
         "144p": {"width": 256, "height": 144, "bitrate": "200k"}            # Mobile preview
     }
+    FFMPEG_THREADS:int = 1,
 
     # JWT Settings
     jwt_secret_key: str
@@ -48,6 +49,8 @@ class Settings(BaseSettings):
     redis_port: int = 6739
     redis_password:str
     redis_db:int = 0
+
+
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
