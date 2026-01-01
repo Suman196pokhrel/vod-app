@@ -231,6 +231,7 @@ def transcode_quality(self, data:dict, quality:str):
             'ffmpeg',
             '-i', input_path,
             '-c:v', 'libx264',           # Video codec
+            '-threads', '2',             # THREAD LIMIT HERE
             '-preset', 'medium',         # Encoding speed
             '-crf', '23',                # Quality (lower = better, 18-28 range)
             '-vf', f"scale={q_settings['width']}:{q_settings['height']}",  # Resolution
