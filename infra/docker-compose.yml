@@ -1,9 +1,6 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: vod_postgres
     restart: unless-stopped
     env_file:
       - dev.env
@@ -20,7 +17,6 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: vod_pgadmin
     restart: unless-stopped
     env_file:
       - dev.env
@@ -38,7 +34,6 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: vod_minio
     restart: unless-stopped
     ports:
       - "9000:9000"  # MinIO API
@@ -56,7 +51,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: vod_redis
     restart: unless-stopped
     env_file:
       - dev.env
@@ -78,7 +72,6 @@ services:
 
   redisinsight:
     image: redis/redisinsight:latest
-    container_name: vod_redis_insight
     restart: unless-stopped
     ports:
       - "5540:5540"
@@ -93,7 +86,6 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    container_name: vod_api
     restart: unless-stopped
     env_file:
       - dev.env
@@ -111,7 +103,6 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    container_name: vod_worker
     restart: unless-stopped
     env_file:
       - dev.env
