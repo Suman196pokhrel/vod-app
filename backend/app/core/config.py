@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     smtp_user: str
     smtp_password: str
     from_email: str
-    frontend_url: str = "http://localhost:3000"
+    FRONTEND_URL:str
 
     # MinIO Settings
     minio_endpoint: str 

@@ -24,7 +24,7 @@ def send_verification_email(to_email: str, username: str, token: str):
     """
     
     # Create verification link
-    verification_link = f"{settings.frontend_url}/verify-email?token={token}"
+    verification_link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
     
     # Email content
     subject = "Verify Your Email - VOD Platform"
