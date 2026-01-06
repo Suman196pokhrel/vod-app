@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "@/app/globals.css";
 import { Toaster } from "@/components/ui/sonner"
 import { DevModeBadge } from "@/components/DevModeBadge";
+import { Analytics } from "@vercel/analytics/next"
 
 
 const geistSans = Geist({
@@ -32,7 +33,8 @@ export default function RootLayout({
       >
         {children}
         {/* <DevModeBadge />  */}
-      <Toaster />        
+      <Toaster />
+      <Analytics />        
       </body>
     </html>
   );
