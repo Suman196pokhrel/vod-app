@@ -28,12 +28,10 @@ class Settings(BaseSettings):
     refresh_token_expire_days:int = 7
 
     # Email settings
-    smtp_host: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    smtp_user: str
-    smtp_password: str
     from_email: str
     FRONTEND_URL:str
+    RESEND_API_KEY:str
+
 
     # MinIO Settings
     minio_endpoint: str 

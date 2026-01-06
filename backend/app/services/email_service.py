@@ -5,12 +5,13 @@ Email service for sending verification emails.
 For MVP: Uses SMTP (Gmail)
 For Production: Use SendGrid, AWS SES, or Mailgun
 """
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import resend
 from app.core.config import get_settings
 
 settings = get_settings()
+
+# Set Resend API key
+resend.api_key = settings.RESEND_API_KEY
 
 
 def send_verification_email(to_email: str, username: str, token: str):
@@ -83,29 +84,23 @@ def send_verification_email(to_email: str, username: str, token: str):
     </html>
     """
     
-    # Create message
-    message = MIMEMultipart("alternative")
-    message["Subject"] = subject
-    message["From"] = settings.from_email
-    message["To"] = to_email
-    
-    # Attach HTML
-    html_part = MIMEText(html_content, "html")
-    message.attach(html_part)
-    
-    # Send email
+    # Send email via Resend
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()  # Secure connection
-            server.login(settings.smtp_user, settings.smtp_password)
-            server.send_message(message)
-            print(f"✅ Verification email sent to {to_email}")
-            
+        params = {
+            "from": settings.from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
+        
+        email = resend.Emails.send(params)
+        print(f"✅ Verification email sent to {to_email} (ID: {email.get('id', 'N/A')})")
+        return email
+        
     except Exception as e:
         print(f"❌ Failed to send email to {to_email}: {e}")
         # In production, log this error and maybe retry
         raise
-
 
 def send_password_reset_email(to_email: str, username: str, reset_code: str):
     """
@@ -194,21 +189,19 @@ def send_password_reset_email(to_email: str, username: str, reset_code: str):
     </html>
     """
     
-    # Create and send message (same as before)
-    message = MIMEMultipart("alternative")
-    message["Subject"] = subject
-    message["From"] = settings.from_email
-    message["To"] = to_email
-    
-    html_part = MIMEText(html_content, "html")
-    message.attach(html_part)
-    
+    # Send email via Resend
     try:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port) as server:
-            server.starttls()
-            server.login(settings.smtp_user, settings.smtp_password)
-            server.send_message(message)
-            print(f"✅ Password reset code sent to {to_email}")
+        params = {
+            "from": settings.from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        }
+        
+        email = resend.Emails.send(params)
+        print(f"✅ Password reset code sent to {to_email} (ID: {email.get('id', 'N/A')})")
+        return email
+        
     except Exception as e:
         print(f"❌ Failed to send password reset code: {e}")
         raise
