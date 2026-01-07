@@ -92,9 +92,9 @@ const UploadVideoPage = () => {
       // Get uploaded Video ID 
       const uploadedVideoId = result.id
 
-      toast.success("Video uploaded successfully!", {
-        description: "Processing has started...",
-      })
+      // toast.success("Video uploaded successfully!", {
+      //   description: "Processing has started...",
+      // })
       
       console.log('Upload result:', result)
 

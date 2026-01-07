@@ -90,25 +90,6 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
                   )}
                 </DialogDescription>
               </div>
-              
-              {isComplete && (
-                <Badge
-                  variant="outline"
-                  className="bg-green-50 text-green-700 border-green-200 px-3 py-1"
-                >
-                  <CheckCircle2 className="w-3 h-3 mr-1" />
-                  Ready
-                </Badge>
-              )}
-              {isFailed && (
-                <Badge
-                  variant="outline"
-                  className="bg-red-50 text-red-700 border-red-200 px-3 py-1"
-                >
-                  <XCircle className="w-3 h-3 mr-1" />
-                  Failed
-                </Badge>
-              )}
             </div>
           </DialogHeader>
         </div>
@@ -121,10 +102,10 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
               <div className="space-y-2">
                 <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
                   <div
-                    className="h-full bg-gradient-to-r from-purple-500 via-purple-600 to-blue-600 transition-all duration-700 ease-out rounded-full shadow-lg shadow-purple-500/30"
+                    className="h-full bg-linear-to-r from-purple-500 via-purple-600 to-blue-600 transition-all duration-700 ease-out rounded-full shadow-lg shadow-purple-500/30"
                     style={{ width: `${statusMeta.progress}%` }}
                   >
-                    <div className="h-full w-full animate-shimmer bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                    <div className="h-full w-full animate-shimmer bg-linear-to-r from-transparent via-white/30 to-transparent" />
                   </div>
                 </div>
                 
@@ -132,7 +113,7 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
                   <span className="text-gray-700 font-medium">
                     {statusMeta.message}
                   </span>
-                  <span className="font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent tabular-nums text-base">
+                  <span className="font-bold bg-linear-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent tabular-nums text-base">
                     {statusMeta.progress}%
                   </span>
                 </div>
@@ -200,7 +181,7 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
             <Button
               onClick={handleClose}
               className={cn(
-                "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/30",
+                "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/30",
                 isComplete && "from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-green-500/30"
               )}
             >
