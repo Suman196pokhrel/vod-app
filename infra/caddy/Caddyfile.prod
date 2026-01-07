@@ -1,3 +1,4 @@
+# Production Caddyfile - HTTPS with domain
 vod-api.spokhrel.dev {
   reverse_proxy api:8000
 }

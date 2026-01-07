@@ -4,7 +4,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file:
-      - dev.env
+      - local_dev.env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-vod_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vod_password}
@@ -16,22 +16,22 @@ services:
     networks:
       - backend_net
 
-  # pgadmin:
-  #   image: dpage/pgadmin4
-  #   restart: unless-stopped
-  #   env_file:
-  #     - dev.env
-  #   environment:
-  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@local}
-  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
-  #   ports:
-  #     - "5050:80"
-  #   depends_on:
-  #     - postgres
-  #   networks:
-  #     - backend_net
-  #   volumes:
-  #     - pgadmin_data:/var/lib/pgadmin 
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: unless-stopped
+    env_file:
+      - local_dev.env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - backend_net
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin 
 
   minio:
     image: minio/minio:latest
@@ -40,7 +40,7 @@ services:
       - "9000:9000"  # MinIO API
       - "9001:9001"  # MinIO Console UI
     env_file:
-      - dev.env
+      - local_dev.env
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
@@ -54,7 +54,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     env_file:
-      - dev.env
+      - local_dev.env
     ports:
       - "6379:6379"      # host : container
     environment:
@@ -71,17 +71,17 @@ services:
       timeout: 3s
       retries: 3
 
-  # redisinsight:
-  #   image: redis/redisinsight:latest
-  #   restart: unless-stopped
-  #   ports:
-  #     - "5540:5540"
-  #   networks:
-  #     - backend_net
-  #   depends_on:
-  #     - redis
-  #   volumes:
-  #     - redisinsight_data:/data
+  redisinsight:
+    image: redis/redisinsight:latest
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    networks:
+      - backend_net
+    depends_on:
+      - redis
+    volumes:
+      - redisinsight_data:/data
 
   api:
     cpu_shares: 1024
@@ -90,14 +90,14 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - dev.env
+      - local_dev.env
     depends_on:
       - postgres
       - redis
       - minio
     #  Caddy will be the only public entry
-    # ports:
-    #   - "8000:8000"
+    ports:
+      - "8000:8000"
     networks:
       - backend_net
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -108,9 +108,8 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile
+      - ./caddy/Caddyfile.local:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     networks:
@@ -125,7 +124,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - dev.env
+      - local_dev.env
     depends_on:
       - postgres
       - redis
@@ -134,17 +133,17 @@ services:
       - backend_net
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
 
-  # flower:
-  #   image: mher/flower
-  #   command: celery --broker=${CELERY_BROKER_URL} flower
-  #   env_file:
-  #     - dev.env
-  #   ports:
-  #     - "5555:5555"
-  #   depends_on:
-  #     - redis
-  #   networks:
-  #     - backend_net
+  flower:
+    image: mher/flower
+    command: celery --broker=${CELERY_BROKER_URL} flower
+    env_file:
+      - local_dev.env
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    networks:
+      - backend_net
 
 
 networks:
@@ -156,6 +155,6 @@ volumes:
   pgadmin_data:
   minio_data:
     driver: local
-  # redisinsight_data:
+  redisinsight_data:
   caddy_data:
   caddy_config:
