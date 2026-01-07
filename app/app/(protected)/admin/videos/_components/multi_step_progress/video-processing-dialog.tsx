@@ -43,9 +43,9 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
   const isInProgress = isProcessingInProgress(currentStatus);
 
   const handleClose = () => {
-    if (!isInProgress) {
+    // if (!isInProgress) {
       onClose();
-    }
+    // }
   };
 
   return (
@@ -72,7 +72,7 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
           <DialogHeader className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2">
-                <DialogTitle className="text-2xl font-bold tracking-tight bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                <DialogTitle className="text-2xl font-bold tracking-tight bg-linear-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
                   {isComplete
                     ? "Processing Complete"
                     : isFailed
