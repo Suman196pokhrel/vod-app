@@ -1,7 +1,7 @@
 import axios from "axios"
 import { shouldAttemptTokenRefresh } from "../utils/tokenManager";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 // simple axios instance
 const api = axios.create({
