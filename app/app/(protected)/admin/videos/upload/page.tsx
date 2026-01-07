@@ -82,7 +82,7 @@ const UploadVideoPage = () => {
     setIsSubmitting(true)
 
     try {
-      openDialog("....")
+      openDialog()
       const result = await uploadVideo({
         data,
         videoFile,

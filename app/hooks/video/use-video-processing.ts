@@ -17,7 +17,7 @@ interface UseVideoProcessingReturn {
   isOpen: boolean;
   currentStatus: ProcessingStatus;
   videoId: string | null;
-  openDialog: (videoId: string) => void;
+  openDialog: (videoId?: string) => void;
   closeDialog: () => void;
   resetProcessing: () => void;
 }
@@ -88,9 +88,11 @@ export const useVideoProcessing = (
     };
   }, [isOpen, pollingInterval, onComplete, onError]);
 
-  const openDialog = useCallback((videoId: string) => {
+  const openDialog = useCallback((videoId?: string) => {
     console.log('🚪 Opening dialog for video:', videoId);
+    if(videoId && videoId.trim() !== ""){
     videoIdRef.current = videoId;  // Store in ref (immediate)
+    }
     setIsOpen(true);               // Open dialog (triggers useEffect)
   }, []);
 
