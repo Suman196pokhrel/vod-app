@@ -17,9 +17,12 @@ LOCAL_ENV = $(INFRA_DIR)/local.env
 PROD_COMPOSE = $(INFRA_DIR)/docker-compose.yml
 PROD_ENV = $(INFRA_DIR)/prod.env
 
-help: ## Show available commands
-	@echo "$(BLUE)VOD App - Available Commands:$(RESET)"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-15s$(RESET) %s\n", $$1, $$2}'
+
+## Show available commands
+help:
+	@echo "VOD App - Available Commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+
 
 # ============================================
 # LOCAL DEVELOPMENT
