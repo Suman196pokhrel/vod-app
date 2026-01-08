@@ -73,6 +73,8 @@ backend/.ruff_cache
 infra/minio-data
 infra/pgdata
 infra/*.log
+**/Caddyfile.local
+**/Caddyfile.prod
 
 
 # *******************************************************
