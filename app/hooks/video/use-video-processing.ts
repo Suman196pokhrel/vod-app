@@ -89,7 +89,7 @@ export const useVideoProcessing = (
   }, [isOpen, pollingInterval, onComplete, onError]);
 
   const openDialog = useCallback((videoId?: string) => {
-    console.log('🚪 Opening dialog for video:', videoId);
+    console.log(' Opening dialog for video:', videoId);
     if(videoId && videoId.trim() !== ""){
     videoIdRef.current = videoId;  // Store in ref (immediate)
     }
