@@ -56,17 +56,17 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       <div className="w-11/12 m-auto mt-5">
-      <DevelopmentHero />
+      {/* <DevelopmentHero /> */}
 
       </div>
      
-      <HeroSection />
+      {/* <HeroSection /> */}
 
       <div className="max-w-[2000px] mx-auto px-4 sm:px-6 lg:px-8  relative z-10">
-        <CategoryPills />
+        {/* <CategoryPills /> */}
 
         {/* Subtle AI Banner */}
-        <AIWatchTimeBanner />
+        {/* <AIWatchTimeBanner /> */}
 
         {/* OPTION 1: Prominent Mood Selector (RIGHT AFTER BANNER) */}
         {/* <MoodSelector /> */}
@@ -75,29 +75,29 @@ export default function HomePage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-12">
           {/* Left: Main Feed */}
           <div className="space-y-12">
-            <ContinueWatching />
-            <Top10ThisWeek />
+            {/* <ContinueWatching /> */}
+            {/* <Top10ThisWeek /> */}
             
-            <PersonalizedRow
+            {/* <PersonalizedRow
               title="Because You Watched Stranger Things"
               subtitle="AI-powered recommendations"
               videos={becauseYouWatched}
-            />
+            /> */}
 
-            <PersonalizedRow
+            {/* <PersonalizedRow
               title="New Releases"
               videos={newReleases}
-            />
+            /> */}
 
             <VideoGrid />
           </div>
 
           {/* Right: Sidebar */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <ContentJourney />
+            {/* <ContentJourney /> */}
             
             {/* OPTION 2: Compact Mood Selector in Sidebar (UNCOMMENT TO USE) */}
-            <MoodSelectorCompact />
+            {/* <MoodSelectorCompact /> */}
           </div>
         </div>
       </div>
@@ -105,7 +105,7 @@ export default function HomePage() {
        
 
       {/* Floating Widget */}
-      <QuickAccessSidebar />
+      {/* <QuickAccessSidebar /> */}
     </div>
   )
 }
