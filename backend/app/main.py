@@ -15,8 +15,15 @@ from app.core.database import engine, Base
 # Routers 
 from app.apis.routes import auth_router, healthRouter, video_router, user_router
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+# Helpers
+from app.utils.origin_helpers import parse_origins
 
+CORS_ALLOW_ORIGINS = parse_origins(os.getenv("CORS_ALLOW_ORIGINS"))
+if not CORS_ALLOW_ORIGINS:
+    CORS_ALLOW_ORIGINS = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 """
 APPLICATION SETUP EXPLANATION:
@@ -53,12 +60,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     # In production, replace with  frontend URL
-    allow_origins=[
-        "http://localhost:3000",  # Your Next.js dev server
-        "http://127.0.0.1:3000",  # Alternative localhost
-        # "http://10.0.0.211:3000",
-        FRONTEND_URL,
-    ],
+    allow_origins=CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
