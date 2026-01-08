@@ -1,7 +1,7 @@
 # /app/schemas/videos.py 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime, date
-from typing import Optional, List, TypeVar, Generic
+from typing import Optional, List, TypeVar, Generic, Any
 from app.utils.video_helpers import ProcessingStatus
 
 
@@ -18,6 +18,20 @@ class VideoMetadata(BaseModel):
     releaseDate: Optional[str] = None
     status: str = Field(default="draft")  # draft, published, scheduled
     tags: Optional[List[str]] = None
+
+
+class VideoFFmpegMetadata(BaseModel):
+    duration_seconds: Optional[float] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    codec: Optional[str] = None
+    bitrate: Optional[int] = None
+    frame_rate: Optional[float] = None
+    file_size: Optional[int] = None
+    audio_codec: Optional[str] = None
+    audio_bitrate: Optional[int] = None
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class VideoCreate(BaseModel):
@@ -59,7 +73,7 @@ class VideoResponse(BaseModel):
     age_rating: Optional[str]
     release_date: Optional[date]
     director: Optional[str]
-    cast: Optional[str]
+    cast: Optional[List[str]]=None
     tags: Optional[List[str]]
     views_count: int
     likes_count: int
@@ -70,6 +84,19 @@ class VideoResponse(BaseModel):
     user_id: str
     
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("cast", mode="before")
+    @classmethod
+    def normalize_cast(cls, v: Any) -> Optional[List[str]]:
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return [str(x).strip() for x in v if str(x).strip()]
+        if isinstance(v, str):
+            # comma-separated string -> list
+            parts = [s.strip() for s in v.split(",") if s.strip()]
+            return parts or None
+        return None
 
 
 # Admin-specific video response with all details
@@ -82,16 +109,16 @@ class AdminVideoList(BaseModel):
     raw_video_path: str
     thumbnail_url: Optional[str]
     age_rating: str
-    release_date: Optional[datetime]
+    release_date: Optional[date]
     director: Optional[str]
-    cast: Optional[List[str]]
+    cast: Optional[List[str]] = None
     tags: Optional[List[str]]
     views_count: int
     likes_count: int
     is_public: bool
     status: str  # draft, published, archived
     processing_status: str
-    processing_metadata: Optional[VideoMetadata]
+    processing_metadata: Optional[VideoFFmpegMetadata]
     processing_error: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -105,6 +132,18 @@ class AdminVideoList(BaseModel):
     
     class Config:
         from_attributes = True
+
+    @field_validator("cast", mode="before")
+    @classmethod
+    def normalize_cast(cls, v: Any) -> Optional[List[str]]:
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return [str(x).strip() for x in v if str(x).strip()]
+        if isinstance(v, str):
+            parts = [s.strip() for s in v.split(",") if s.strip()]
+            return parts or None
+        return None
 
 # Paginated response wrapper
 T = TypeVar('T')  # This makes the response reusable for any data type:

@@ -468,7 +468,7 @@ class VideoService:
         Get videos for admin panel with filtering, searching, and sorting
         Returns tuple of (videos, total_count)
         """
-
+        print("ADMIN VIDEOS API HIT")
         # BASE QUERY
         query = db.query(Video).options(joinedload(Video.user))
         

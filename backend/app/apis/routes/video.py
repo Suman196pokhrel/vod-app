@@ -51,7 +51,7 @@ async def create_new_video(
 
 
 @video_router.get(
-    "/{video_id}",
+    "/by-id/{video_id}",
     response_model=VideoResponse,
     summary="Get video by ID"
 )
@@ -98,7 +98,7 @@ def get_public_videos(
 
 
 @video_router.delete(
-    "/{video_id}",
+    "/by-id/{video_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete video"
 )
@@ -166,7 +166,7 @@ def get_all_videos(
     
     Requires admin privileges.
     """
-        videos, total = video_service.get_admin_videos(
+        videos, total = video_service.get_all_videos_admin(
             db=db,
             skip=skip,
             limit=limit,
