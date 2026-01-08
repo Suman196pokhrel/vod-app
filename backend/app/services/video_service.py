@@ -1,7 +1,8 @@
 # Service layer - contains business logic for video operations
 # /backend/app/services/video_service.py
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_, desc, asc
 from app.schemas.video import VideoCreate, VideoMetadata
 from app.models.videos import Video
 from app.services.minio_service import minio_service
@@ -10,7 +11,7 @@ from app.schemas.video import VideoProcessingStatusResponse
 from app.utils.video_helpers import DEFAULT_META, STATUS_META, ProcessingStatus
 
 from fastapi import HTTPException, UploadFile
-from typing import Optional, List
+from typing import Optional, List, Tuple
 import json
 from datetime import datetime
 import logging
@@ -450,6 +451,67 @@ class VideoService:
             return total_minutes if total_minutes > 0 else None
         except:
             return None
+
+    def get_all_videos_admin(
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 20,
+        status: Optional[str] = None,
+        processing_status: Optional[str] = None,
+        search: Optional[str] = None,
+        user_id: Optional[str] = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc"
+    ) -> Tuple[List[Video], int]:
+        """
+        Get videos for admin panel with filtering, searching, and sorting
+        Returns tuple of (videos, total_count)
+        """
+
+        # BASE QUERY
+        query = db.query(Video).options(joinedload(Video.user))
+        
+        # Apply filters on BASE QUERY
+        if status:
+            query = query.filter(Video.status == status)
+        
+        if processing_status:
+            query = query.filter(Video.processing_status == processing_status)
+        
+        if user_id:
+            query = query.filter(Video.user_id == user_id)
+        
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Video.title.ilike(search_pattern),
+                    Video.description.ilike(search_pattern)
+                )
+            )
+        
+        # Get total count before pagination // this also triggers a DB call that executes the query we've been building till now
+        total = query.count()
+        
+        # Apply sorting
+        sort_column = getattr(Video, sort_by, Video.created_at)
+        if sort_order == "asc":
+            query = query.order_by(asc(sort_column))
+        else:
+            query = query.order_by(desc(sort_column))
+        
+        # Apply pagination
+        videos = query.offset(skip).limit(limit).all()
+        
+        # Attach user info to each video for the response
+        for video in videos:
+            if video.user:
+                video.user_email = video.user.email
+                video.user_username = video.user.username
+        
+        return videos, total
+
 
 
 # Singleton instance
