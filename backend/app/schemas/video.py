@@ -1,7 +1,7 @@
 # /app/schemas/videos.py 
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, date
-from typing import Optional, List
+from typing import Optional, List, TypeVar, Generic
 from app.utils.video_helpers import ProcessingStatus
 
 
@@ -70,6 +70,54 @@ class VideoResponse(BaseModel):
     user_id: str
     
     model_config = ConfigDict(from_attributes=True)
+
+
+# Admin-specific video response with all details
+class AdminVideoList(BaseModel):
+    id: str
+    celery_task_id: Optional[str]
+    title: str
+    description: Optional[str]
+    category: str
+    raw_video_path: str
+    thumbnail_url: Optional[str]
+    age_rating: str
+    release_date: Optional[datetime]
+    director: Optional[str]
+    cast: Optional[List[str]]
+    tags: Optional[List[str]]
+    views_count: int
+    likes_count: int
+    is_public: bool
+    status: str  # draft, published, archived
+    processing_status: str
+    processing_metadata: Optional[VideoMetadata]
+    processing_error: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    manifest_url: Optional[str]
+    available_qualities: List[str]
+    user_id: str
+    
+    # Additional admin fields
+    user_email: Optional[str] = None  # Join with user table
+    user_username: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+# Paginated response wrapper
+T = TypeVar('T')  # This makes the response reusable for any data type:
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: List[T]      # The actual data
+    total: int          # Total count in DB
+    skip: int           # Current offset
+    limit: int          # Page size
+    
+    @property
+    def has_more(self) -> bool:
+        return self.skip + self.limit < self.total
 
 
 class VideoList(BaseModel):
