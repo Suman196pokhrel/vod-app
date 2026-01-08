@@ -5,39 +5,45 @@ export enum VideoPublicationStatus {
   PUBLISHED = 'published',
   SCHEDULED = 'scheduled'
 }
+export interface VideoFFmpegMetadata {
+  duration_seconds: number;
+  width: number;
+  height: number;
+  codec: string;
+  bitrate: number;
+  frame_rate: number;
+  file_size: number;
+  audio_codec: string | null;
+  audio_bitrate: number | null;
+}
 
-// Now your interface becomes:
+
+// Video Response Type from Backend API for Admin Video table 
 export interface Video {
-  // Core identifiers (from backend)
-  id?: string
-  userId?: string
-  
-  // Required fields
-  title: string
-  description: string
-  category: string
-  
-  // Optional metadata
-  duration?: string
-  ageRating?: string
-  director?: string
-  cast?: string
-  releaseDate?: string
-  tags?: string[]
-  
-  // Publishing
-  status: VideoPublicationStatus
-  
-  // URLs (set by backend after upload)
-  videoUrl?: string
-  thumbnailUrl?: string
-  
-  // Timestamps (from backend)
-  createdAt?: string
-  updatedAt?: string
-  
-  // Views
-  views?: number
+  id: string;
+  celery_task_id: string | null;
+  title: string;
+  description: string | null;
+  category: string;
+  raw_video_path: string;
+  thumbnail_url: string | null;
+  age_rating: string;
+  release_date: string | null;
+  director: string | null;
+  cast: string[] | null;
+  tags: string[] | null;
+  views_count: number;
+  likes_count: number;
+  is_public: boolean;
+  status: VideoPublicationStatus;
+  processing_status: ProcessingStatus;
+  processing_metadata: VideoFFmpegMetadata | null;
+  processing_error: string | null;
+  created_at: string;
+  updated_at: string;
+  manifest_url: string | null;
+  available_qualities: string[];
+  user_id: string;
 }
 
 // For the upload/create request

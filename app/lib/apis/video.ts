@@ -2,7 +2,7 @@ import api from "./client";
 import { VideoFormData } from "@/app/(protected)/admin/videos/_components/uploadForm/formSchema";
 import { AxiosError } from "axios";
 import { ProcessingStatus, Video } from "../types/video";
-import { VideoStatus } from "@/app/(protected)/admin/videos/_components/videos_table/video_types";
+import { VideoPublicationStatus } from "@/lib/types/video";
 
 export interface VideoUploadPayload {
   data: VideoFormData;
@@ -37,7 +37,7 @@ export interface VideoProcessingStatusResponse {
 export interface AdminVideoFilters {
   skip?: number;
   limit?: number;
-  status?: VideoStatus;
+  status?: VideoPublicationStatus;
   processing_status?: ProcessingStatus;
   search?: string;
   user_id?: string;
