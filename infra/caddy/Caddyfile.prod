@@ -3,6 +3,6 @@ vod-api.spokhrel.dev {
   reverse_proxy 127.0.0.1:8000
 }
 
-staging-api.spokhrel.dev {
+staging-vod-api.spokhrel.dev {
   reverse_proxy 127.0.0.1:8001
 }
