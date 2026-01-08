@@ -1,5 +1,5 @@
 import { ColumnDef } from '@tanstack/react-table';
-import { Video } from './video_types';
+import { Video } from '@/lib/types/video';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

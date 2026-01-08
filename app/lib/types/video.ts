@@ -71,7 +71,7 @@ export enum ProcessingStatus {
   AGGREGATING = "aggregating",
   SEGMENTING = "segmenting",
   CREATING_MANIFEST = "creating_manifest",
-  UPLOADING_TO_STORAGE = "uploading_to_storage",
+  UPLOADING_TO_STORAGE = "uploading to storage",
   FINALIZING = "finalizing",
   COMPLETED = "completed",
   FAILED = "failed",

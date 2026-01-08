@@ -1,7 +1,6 @@
 "use client";
 import { DataTable } from "./videos_table/data-table";
 import { columns } from "./videos_table/columns";
-import { mockVideos } from "./videos_table/mock_video_data";
 import {
   Card,
   CardContent,
@@ -18,17 +17,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 export default function AdminVideosPage() {
   // Calculate statistics
-  const stats = {
-    total: mockVideos.length,
-    published: mockVideos.filter((v) => v.status === "published" && v.is_public)
-      .length,
-    processing: mockVideos.filter(
-      (v) => !["completed", "failed"].includes(v.processing_status)
-    ).length,
-    failed: mockVideos.filter((v) => v.processing_status === "failed").length,
-    totalViews: mockVideos.reduce((sum, v) => sum + v.views_count, 0),
-    totalLikes: mockVideos.reduce((sum, v) => sum + v.likes_count, 0),
-  };
+ 
 
   const [filters, setFilters] = useState<AdminVideoFilters>({
     skip: 0,
@@ -65,9 +54,9 @@ export default function AdminVideosPage() {
             <Video className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold">99</div>
             <p className="text-xs text-muted-foreground">
-              {stats.published} published
+              99 published
             </p>
           </CardContent>
         </Card>
@@ -78,7 +67,7 @@ export default function AdminVideosPage() {
             <Film className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.processing}</div>
+            <div className="text-2xl font-bold">99</div>
             <p className="text-xs text-muted-foreground">
               Currently being processed
             </p>
@@ -92,10 +81,10 @@ export default function AdminVideosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(stats.totalViews / 1000000).toFixed(1)}M
+              99M
             </div>
             <p className="text-xs text-muted-foreground">
-              {(stats.totalLikes / 1000).toFixed(1)}K likes
+              99K likes
             </p>
           </CardContent>
         </Card>
@@ -106,9 +95,9 @@ export default function AdminVideosPage() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.failed}</div>
+            <div className="text-2xl font-bold">99</div>
             <p className="text-xs text-muted-foreground">
-              {stats.failed > 0 ? "Needs attention" : "All good!"}
+              {99 > 0 ? "Needs attention" : "All good!"}
             </p>
           </CardContent>
         </Card>
@@ -118,15 +107,15 @@ export default function AdminVideosPage() {
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
           <TabsTrigger value="all">
-            All Videos ({mockVideos.length})
+            All Videos 
           </TabsTrigger>
           <TabsTrigger value="published">
-            Published ({stats.published})
+            Published 
           </TabsTrigger>
           <TabsTrigger value="processing">
-            Processing ({stats.processing})
+            Processing 
           </TabsTrigger>
-          <TabsTrigger value="failed">Failed ({stats.failed})</TabsTrigger>
+          <TabsTrigger value="failed">Failed </TabsTrigger>
         </TabsList>
 
         {isPending && (
