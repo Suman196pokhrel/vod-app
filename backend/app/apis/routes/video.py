@@ -8,7 +8,7 @@ from app.services.video_service import video_service
 from app.core.dependencies import get_current_user , get_current_admin_user 
 from app.models.users import User  
 from typing import Optional, List
-from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList
+from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList, MasterManifestSignedUrlByIDResponse
 
 
 
@@ -184,3 +184,29 @@ def get_all_videos(
             skip=skip,
             limit=limit
         )
+
+
+
+
+@video_router.get(
+          "/get_mm_surl",
+          response_model=MasterManifestSignedUrlByIDResponse,
+          summary="Get a temporaily signed url for master manifest file for the provided videoID"
+)
+async def get_signed_url_for_master_manifest_by_id(
+     video_id:str,
+     db:Session=Depends(get_db),
+    current_user:User = Depends(get_current_user)
+):
+    """
+    Get a temporarily signed url for master manifest file for given videoID.
+    - videoID
+
+    User needs to be signed In
+    """
+    result = await video_service.get_mm_surl(video_id, db)
+    
+    return {
+        "manifestUrl":result,
+        "expires_in":7200
+    }

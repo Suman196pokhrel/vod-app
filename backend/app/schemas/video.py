@@ -184,3 +184,10 @@ class VideoProcessingStatusResponse(BaseModel):
     error: Optional[str] = None
     is_completed: bool
     is_failed: bool
+
+
+
+class MasterManifestSignedUrlByIDResponse(BaseModel):
+    surl:str
+    video_id:str
+    
