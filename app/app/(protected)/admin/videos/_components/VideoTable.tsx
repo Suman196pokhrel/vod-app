@@ -1,23 +1,51 @@
-"use client"
-import { DataTable } from './videos_table/data-table';
-import { columns } from './videos_table/columns';
-import { mockVideos } from './videos_table/mock_video_data';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Video, Film, TrendingUp, AlertCircle } from 'lucide-react';
+"use client";
+import { DataTable } from "./videos_table/data-table";
+import { columns } from "./videos_table/columns";
+import { mockVideos } from "./videos_table/mock_video_data";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Video, Film, TrendingUp, AlertCircle, CloudCog } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AdminVideoFilters, getAdminVideos } from "@/lib/apis/video";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function AdminVideosPage() {
   // Calculate statistics
   const stats = {
     total: mockVideos.length,
-    published: mockVideos.filter(v => v.status === 'published' && v.is_public).length,
-    processing: mockVideos.filter(v => 
-      !['completed', 'failed'].includes(v.processing_status)
+    published: mockVideos.filter((v) => v.status === "published" && v.is_public)
+      .length,
+    processing: mockVideos.filter(
+      (v) => !["completed", "failed"].includes(v.processing_status)
     ).length,
-    failed: mockVideos.filter(v => v.processing_status === 'failed').length,
+    failed: mockVideos.filter((v) => v.processing_status === "failed").length,
     totalViews: mockVideos.reduce((sum, v) => sum + v.views_count, 0),
     totalLikes: mockVideos.reduce((sum, v) => sum + v.likes_count, 0),
   };
+
+  const [filters, setFilters] = useState<AdminVideoFilters>({
+    skip: 0,
+    limit: 20,
+    sort_by: "created_at",
+    sort_order: "desc",
+  });
+
+  const { isPending, isError, error, data } = useQuery({
+    queryKey: ["getAllVideosAdmin", filters],
+    queryFn: async () => {
+      const response = await getAdminVideos(filters);
+      return response;
+    },
+    placeholderData: keepPreviousData,
+  });
+
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -80,7 +108,7 @@ export default function AdminVideosPage() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.failed}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.failed > 0 ? 'Needs attention' : 'All good!'}
+              {stats.failed > 0 ? "Needs attention" : "All good!"}
             </p>
           </CardContent>
         </Card>
@@ -98,26 +126,34 @@ export default function AdminVideosPage() {
           <TabsTrigger value="processing">
             Processing ({stats.processing})
           </TabsTrigger>
-          <TabsTrigger value="failed">
-            Failed ({stats.failed})
-          </TabsTrigger>
+          <TabsTrigger value="failed">Failed ({stats.failed})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Videos</CardTitle>
-              <CardDescription>
-                Complete list of all videos in the system
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable columns={columns} data={mockVideos} />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {isPending && (
+          <div>
+            <Spinner />
+          </div>
+        )}
 
-        <TabsContent value="published" className="space-y-4">
+        {isError && <div>{error.message}</div>}
+
+        {data && (
+          <TabsContent value="all" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Videos</CardTitle>
+                <CardDescription>
+                  Complete list of all videos in the system
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DataTable columns={columns} data={data.items} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* <TabsContent value="published" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Published Videos</CardTitle>
@@ -168,7 +204,7 @@ export default function AdminVideosPage() {
               />
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
       </Tabs>
     </div>
   );
