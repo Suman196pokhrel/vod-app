@@ -39,6 +39,7 @@ import {
   ArrowUpDown,
   Copy
 } from 'lucide-react';
+import { useVideoProcessing } from '@/hooks/video/use-video-processing';
 
 export const columns: ColumnDef<Video>[] = [
   // Selection column
@@ -49,7 +50,7 @@ export const columns: ColumnDef<Video>[] = [
         checked={table.getIsAllPageRowsSelected()}
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Select all"
-        className="translate-y-[2px]"
+        className="translate-y-0.5"
       />
     ),
     cell: ({ row }) => (
@@ -57,7 +58,7 @@ export const columns: ColumnDef<Video>[] = [
         checked={row.getIsSelected()}
         onCheckedChange={(value) => row.toggleSelected(!!value)}
         aria-label="Select row"
-        className="translate-y-[2px]"
+        className="translate-y-0.5"
       />
     ),
     enableSorting: false,
@@ -86,7 +87,7 @@ export const columns: ColumnDef<Video>[] = [
       return (
         <div className="flex items-start gap-3 min-w-[300px]">
           {/* Thumbnail */}
-          <div className="relative w-28 h-16 rounded-md overflow-hidden bg-muted flex-shrink-0 border">
+          <div className="relative w-28 h-16 rounded-md overflow-hidden bg-muted shrink-0 border">
             {video.thumbnail_url ? (
               <img
                 src={video.thumbnail_url}
@@ -160,12 +161,19 @@ export const columns: ColumnDef<Video>[] = [
     header: 'Status',
     cell: ({ row }) => {
       const video = row.original;
+        const { isOpen, currentStatus, videoId, openDialog, closeDialog } = useVideoProcessing()
+      
       
       // Show processing status if not completed
       if (video.processing_status !== 'completed') {
         return (
           <div className="min-w-[140px]">
+            <Button variant={"ghost"} onClick={()=>openDialog()}>
             <ProcessingStatusBadge status={video.processing_status} />
+
+            </Button>
+
+
             {video.processing_error && (
               <TooltipProvider>
                 <Tooltip>
@@ -247,7 +255,7 @@ export const columns: ColumnDef<Video>[] = [
       if (processingStatus !== 'completed') {
         return (
           <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-[100px] pl-4">
-            <div className="animate-spin">⏳</div>
+            {/* <div className="animate-spin">⏳</div> */}
             <span className="text-xs">Processing...</span>
           </div>
         );
