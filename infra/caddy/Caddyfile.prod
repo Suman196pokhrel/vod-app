@@ -1,4 +1,8 @@
-# Production Caddyfile - HTTPS with domain
+# Production + Staging API routing (single edge Caddy)
 vod-api.spokhrel.dev {
-  reverse_proxy api:8000
+  reverse_proxy 127.0.0.1:8000
+}
+
+staging-api.spokhrel.dev {
+  reverse_proxy 127.0.0.1:8001
 }

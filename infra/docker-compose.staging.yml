@@ -4,43 +4,50 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file:
-      - prod.env
+      - staging.env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-vod_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vod_password}
       POSTGRES_DB: ${POSTGRES_DB:-vod_db}
+    ports:
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_staging:/var/lib/postgresql/data
     networks:
-      - backend_net
+      - backend_net_staging
 
 
   minio:
     image: minio/minio:latest
     restart: unless-stopped
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console UI
     env_file:
-      - prod.env
+      - staging.env
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
     volumes:
-      - minio_data:/data
+      - minio_data_staging:/data
     command: server /data --console-address ":9001"
     networks:
-      - backend_net  
+      - backend_net_staging  
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     env_file:
-      - prod.env
+      - staging.env
+    ports:
+      - "6379:6379"      # host : container
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     
     command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
 
     networks:
-      - backend_net
+      - backend_net_staging
     
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "redis_dev_password", "ping"]
@@ -57,32 +64,18 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - prod.env
+      - staging.env
     depends_on:
       - postgres
       - redis
       - minio
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8000"
     networks:
-      - backend_net
+      - backend_net_staging
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
-  caddy:
-    image: caddy:2-alpine
-    container_name: vod_caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - backend_net
-    depends_on:
-      - api
+
 
   worker:
     cpu_shares: 256
@@ -91,23 +84,21 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - prod.env
+      - staging.env
     depends_on:
       - postgres
       - redis
       - minio
     networks:
-      - backend_net
+      - backend_net_staging
     command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
 
 
 networks:
-  backend_net:
+  backend_net_staging:
     driver: bridge
 
 volumes:
-  postgres_data:
-  minio_data:
+  postgres_data_staging:
+  minio_data_staging:
     driver: local
-  caddy_data:
-  caddy_config:
