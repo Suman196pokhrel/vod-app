@@ -1,14 +1,14 @@
 # /backend/app/apis/routes/video.py
 
-from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Query
 from app.schemas.video import VideoResponse, VideoCreate, VideoList
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.video_service import video_service
-from app.core.dependencies import get_current_user  
+from app.core.dependencies import get_current_user , get_current_admin_user 
 from app.models.users import User  
 from typing import Optional, List
-from app.schemas.video import VideoProcessingStatusResponse
+from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList
 
 
 
@@ -137,3 +137,50 @@ async def get_video_processing_status(
         video_id=video_id,
         current_user=current_user,
     )
+
+
+
+@video_router.get(
+    "/list-all",
+    response_model=PaginatedResponse[AdminVideoList],
+    summary="Get all video for admin panel"
+)
+def get_all_videos(
+    skip:int = Query(0, ge=0),
+    limit:int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None, description="Filter by status: draft, published, archived"),
+    processing_status: Optional[str] = Query(None, description="Filter by processing status"),
+    search: Optional[str] = Query(None, description="Search by title or description"),
+    user_id: Optional[str] = Query(None, description="Filter by user ID"),
+    sort_by: str = Query("created_at", description="Sort field: created_at, title, views_count, etc."),
+    sort_order: str = Query("desc", description="Sort order: asc or desc"),
+    current_admin: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+        """
+    Get all videos with admin-level details including:
+    - Processing status and errors
+    - Private videos
+    - User information
+    - Full metadata
+    
+    Requires admin privileges.
+    """
+        videos, total = video_service.get_admin_videos(
+            db=db,
+            skip=skip,
+            limit=limit,
+            status=status,
+            processing_status=processing_status,
+            search=search,
+            user_id=user_id,
+            sort_by=sort_by,
+            sort_order=sort_order
+        )
+    
+        return PaginatedResponse(
+            items=videos,
+            total=total,
+            skip=skip,
+            limit=limit
+        )
