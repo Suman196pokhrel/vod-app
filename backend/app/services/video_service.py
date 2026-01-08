@@ -511,8 +511,47 @@ class VideoService:
                 video.user_username = video.user.username
         
         return videos, total
+    
 
 
+    def get_mm_surl(self, video_id: str, db: Session):
+        """
+        - checks if video exists
+        - gets master manifest url's minio path
+        - calls minio service
+
+        Returns signed url - surl
+        """
+        # Check if Video exists
+        video = db.query(Video).filter(Video.id == video_id).first()
+
+        if not video:
+            raise HTTPException(  # ← RAISE, not return
+                status_code=404,
+                detail=f"Video {video_id} does not exist"
+            )
+
+        # Get master manifest path from database
+        master_manifest_path = video.manifest_url
+
+        if not master_manifest_path:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Video {video_id} has no manifest file (not processed yet?)"
+            )
+
+        # Generate signed URL
+        try:
+            surl = minio_service.get_surl_by_mm_path(master_manifest_path)
+            logger.info(f"Generated signed URL for video {video_id}")
+            return surl
+            
+        except Exception as e:
+            logger.error(f"Failed to generate signed URL for video {video_id}: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Could not generate signed URL for video {video_id}"
+            )
 
 # Singleton instance
 video_service = VideoService()

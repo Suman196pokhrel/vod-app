@@ -241,6 +241,62 @@ class MinIOService:
         except S3Error as e:
             logger.error(f"Failed to generate video URL: {str(e)}")
             raise Exception(f"Failed to generate video URL: {str(e)}")
+        
+    
+    def get_surl_by_mm_path(self, mm_path: str, expires: timedelta = timedelta(hours=2)) -> str:
+        """
+        Generate signed URL for master manifest file of a video
+        
+        Args:
+            mm_path: Full path from DB (e.g., "/vod-processed-videos/user-123/video/master.m3u8")
+            expires: URL expiration time (default 2 hours)
+        
+        Returns:
+            str: Presigned URL for the manifest file
+        """
+        logger.info(f"Generating signed URL for manifest: {mm_path}")
+        
+        try:
+            # Remove leading slash if present
+            clean_path = mm_path.lstrip('/')
+            
+            # Split into bucket and object name
+            # Expected format: "vod-processed-videos/path/to/file.m3u8"
+            path_parts = clean_path.split('/', 1)
+            
+            if len(path_parts) < 2:
+                raise ValueError(f"Invalid manifest path format: {mm_path}")
+            
+            bucket_name = path_parts[0]
+            object_name = path_parts[1]
+            
+            logger.info(f"Bucket: {bucket_name}, Object: {object_name}")
+            
+            # Validate it's the correct bucket
+            if bucket_name != settings.minio_bucket_processed_videos:
+                raise ValueError(f"Expected bucket '{settings.minio_bucket_processed_videos}', got '{bucket_name}'")
+            
+            # Generate presigned URL
+            url = self.client.presigned_get_object(
+                bucket_name=bucket_name,
+                object_name=object_name,
+                expires=expires
+            )
+            
+            logger.info(f"Signed URL generated successfully for: {mm_path}")
+            return url
+            
+        except S3Error as e:
+            logger.error(f"S3 error generating signed URL for {mm_path}: {str(e)}")
+            raise Exception(f"Failed to generate signed URL: {str(e)}")
+        
+        except ValueError as e:
+            logger.error(f"Invalid path format: {str(e)}")
+            raise Exception(str(e))
+        
+        except Exception as e:
+            logger.error(f"Unexpected error generating signed URL for {mm_path}: {str(e)}")
+            raise Exception(f"Failed to generate signed URL: {str(e)}")
 
     def get_thumbnail_url(self, object_name: str) -> str:
         """Generate public thumbnail URL"""
