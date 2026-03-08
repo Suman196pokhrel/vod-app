@@ -9,25 +9,30 @@ Base = declarative_base()
 settings = get_settings()
 
 
-# creating the engine - this will run only once
+# Use the SYNC database URL (psycopg2 driver) here.
+# The async URL (asyncpg) is only needed if you switch to async SQLAlchemy throughout.
+# Since get_db(), SessionLocal, and all queries in this project are synchronous,
+# we must use the sync driver — mixing asyncpg with sync create_engine causes the
+# MissingGreenlet crash you were seeing.
 engine = create_engine(
-    settings.database_url,
+    settings.database_url_sync,  # was: settings.database_url (asyncpg) — that was the bug
     future=True,
     echo=False,
     pool_pre_ping=True
 )
 
 
-# Session factory - this will create session each time the dependency gets triggered
+# Session factory - creates a new session each time the dependency is called
 SessionLocal = sessionmaker(
-    bind = engine,
+    bind=engine,
     autoflush=False,
     autocommit=False,
     future=True
 )
 
 
-# dependency 
+# FastAPI dependency — used in route functions via Depends(get_db)
+# Name kept the same so nothing else in the codebase needs to change
 def get_db():
     db = SessionLocal()
     try:
