@@ -1,16 +1,70 @@
-# VOD App – Video on Demand
+# 🎬 VOD App — Video on Demand
 
-Full-stack Video on Demand app: **Next.js** frontend, **FastAPI** backend, **PostgreSQL**, **MinIO**, **Redis**, and **Celery** for video processing.
+[![Frontend: Next.js](https://img.shields.io/badge/Frontend-Next.js-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![Backend: FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![DB: Postgres](https://img.shields.io/badge/DB-PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Queue: Redis](https://img.shields.io/badge/Queue-Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Object Storage: MinIO](https://img.shields.io/badge/Object%20Storage-MinIO-C72E49?logo=minio&logoColor=white)](https://min.io/)
+[![Workers: Celery](https://img.shields.io/badge/Workers-Celery-37814A?logo=celery&logoColor=white)](https://docs.celeryq.dev/)
+
+Full-stack Video on Demand app with **auth**, **admin upload**, and an **async processing pipeline** (Celery + FFmpeg) that stores raw/processed assets in S3-compatible object storage.
 
 ---
 
-## Quick start (run everything & test upload)
+## ✨ What this project demonstrates
+
+- **Modern web app architecture**: Next.js App Router + API-first backend.
+- **Layered backend design**: routes → services → models/schemas with DB migrations.
+- **Async job processing**: Redis-backed Celery workers + observability via Flower.
+- **Media pipeline basics**: upload, store, and process video assets with FFmpeg.
+- **Infra fundamentals**: Docker Compose for a complete local stack.
+
+---
+
+## 🧱 Tech stack
+
+- **Frontend**: Next.js 16 (React 19), TypeScript, Tailwind CSS, Radix UI, TanStack Query, Zustand
+- **Backend**: FastAPI, SQLAlchemy, Alembic, Pydantic Settings, JWT auth
+- **Data**: PostgreSQL
+- **Async**: Celery (worker), Redis (broker/result backend), Flower (monitoring)
+- **Storage**: MinIO (S3-compatible buckets for videos/thumbnails/processed outputs)
+- **Reverse proxy (local)**: Caddy (optional, handy for “one entry point”)
+- **Media**: FFmpeg (runs in the backend/worker containers)
+
+---
+
+## 🏗️ Architecture (local)
+
+```text
+Browser (Next.js @ :3000)
+   │
+   │  REST + multipart upload (JWT in Authorization header)
+   ▼
+FastAPI API (@ :8000)  ────────►  PostgreSQL (@ :5432)
+   │
+   │  Enqueue processing job
+   ▼
+Redis (@ :6379)  ───────►  Celery Worker
+                               │
+                               │  FFmpeg transcode / thumbnails
+                               ▼
+                          MinIO (@ :9000/9001)
+```
+
+Key endpoints:
+- **API docs**: `http://localhost:8000/docs`
+- **Upload**: `POST /videos/create` (multipart: `video`, `thumbnail`, `data` JSON string)
+- **Status polling**: `GET /videos/{video_id}/status`
+
+---
+
+## 🚀 Quick start (run everything & test upload)
 
 ### Prerequisites
 
 - **Docker** and **Docker Compose**
 - **Node.js** 20+ and **npm**
-- **infra/local.env** in place (you already added this)
+- A local env file: copy `infra/.env.example` → `infra/local.env`
 
 ### 1. Start backend, DB, and services (Docker)
 
@@ -21,7 +75,7 @@ cd infra
 docker compose -f docker-compose.local.yml up -d --build
 ```
 
-This starts:
+This starts (local ports):
 
 | Service   | Port(s)        | Purpose                          |
 |----------|-----------------|----------------------------------|
@@ -55,14 +109,14 @@ npm run dev
 
 Frontend runs at **http://localhost:3000**. It talks to the API at `http://localhost:8000` by default (see `NEXT_PUBLIC_API_URL` in the app if you need to change it).
 
-### 3. Create an account and make yourself admin
+### 3. Create an account and make yourself admin (one-time)
 
 1. Open **http://localhost:3000**
 2. Sign up (e.g. **Sign up** → email, username, password)
 3. Check your email for the verification link, or in local dev you may need to **log in** and handle verification depending on your email setup
 4. Sign in at **http://localhost:3000/auth/sign-in**
 
-The **Upload** page lives under the **admin** area, which only allows users with role `admin`. New signups get role `user`, so promote your user once:
+The Upload page lives under the admin area, which only allows users with role `admin`. New signups get role `user`, so promote your user once:
 
 - **Option A – pgAdmin:**  
   - Open **http://localhost:5050**  
@@ -92,7 +146,7 @@ The backend stores the file in MinIO, creates a DB record, and enqueues Celery p
 
 ---
 
-## Project layout
+## 🗂️ Project layout
 
 ```
 vod-app/
@@ -120,7 +174,7 @@ vod-app/
 
 ---
 
-## Env and config
+## ⚙️ Configuration
 
 - **Backend (Docker):** All settings come from **infra/local.env** via `docker-compose.local.yml` (`env_file: local.env`). The API uses `DATABASE_URL_SYNC` for the DB, MinIO and Redis vars for storage and Celery.
 - **Frontend:** Optional **app/.env.local**:  
@@ -129,19 +183,20 @@ vod-app/
 
 ---
 
-## Useful commands
+## 🧰 Useful commands
 
 | Task              | Command |
 |-------------------|--------|
 | Start all services | `cd infra && docker compose -f docker-compose.local.yml up -d --build` |
 | Stop all          | `cd infra && docker compose -f docker-compose.local.yml down` |
-| View API logs     | `docker compose -f infra/docker-compose.local.yml -f infra/docker-compose.local.yml logs -f api` |
+| View API logs     | `cd infra && docker compose -f docker-compose.local.yml logs -f api` |
+| View worker logs  | `cd infra && docker compose -f docker-compose.local.yml logs -f worker` |
 | Frontend dev      | `cd app && npm run dev` |
 | Run migrations    | From `backend/`: ensure `DATABASE_URL_SYNC` points to DB (e.g. `postgres:5432` inside Docker or `localhost:5432` on host), then `alembic upgrade head` |
 
 ---
 
-## Video upload flow (for reference)
+## 🎞️ Video upload flow (high-level)
 
 1. **Frontend:** User submits the form on `/admin/videos/upload`; the app sends `POST /videos/create` with `multipart/form-data` (video file, thumbnail file, JSON metadata).
 2. **Backend:** `POST /videos/create` (auth required) → `video_service.create_video_with_files()` → uploads to MinIO, creates `Video` row, enqueues Celery task for processing.
