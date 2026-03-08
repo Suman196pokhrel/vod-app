@@ -44,11 +44,12 @@ FastAPI API (@ :8000)  ────────►  PostgreSQL (@ :5432)
    │
    │  Enqueue processing job
    ▼
-Redis (@ :6379)  ───────►  Celery Worker
+Redis (@ :6379)  ───────►  Celery Worker (FFmpeg)
                                │
-                               │  FFmpeg transcode / thumbnails
+                               │  Download raw → transcode → HLS segments
                                ▼
                           MinIO (@ :9000/9001)
+                          raw + thumbnails + processed
 ```
 
 Key endpoints:
