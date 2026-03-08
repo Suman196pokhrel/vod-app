@@ -6,16 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
 import { toast } from 'sonner';
 
@@ -30,6 +21,7 @@ import {
   resetPasswordSchema,
   type ResetPasswordFormValues,
 } from '@/lib/schemas/auth.schema';
+import { AuthPageShell } from '../_components/AuthPageShell';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -39,7 +31,6 @@ function ResetPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Initialize form with Zod schema
   const form = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
@@ -50,14 +41,12 @@ function ResetPasswordForm() {
     },
   });
 
-  // Update email if URL param changes
   useEffect(() => {
     if (emailFromUrl) {
       form.setValue('email', emailFromUrl);
     }
   }, [emailFromUrl, form]);
 
-  // Handle form submission
   const onSubmit = async (values: ResetPasswordFormValues) => {
     setIsLoading(true);
 
@@ -70,32 +59,22 @@ function ResetPasswordForm() {
         error.response?.data?.detail || 'Failed to reset password';
       toast.error(errorMessage);
 
-      // Set specific field errors
       if (errorMessage.toLowerCase().includes('code')) {
-        form.setError('code', {
-          type: 'manual',
-          message: 'Invalid or expired code',
-        });
+        form.setError('code', { type: 'manual', message: 'Invalid or expired code' });
       } else if (errorMessage.toLowerCase().includes('email')) {
-        form.setError('email', {
-          type: 'manual',
-          message: 'Email not found',
-        });
+        form.setError('email', { type: 'manual', message: 'Email not found' });
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle resend code
   const handleResendCode = async () => {
     const email = form.getValues('email');
-
     if (!email) {
       toast.error('Please enter your email first');
       return;
     }
-
     try {
       await authAPI.forgotPassword(email);
       toast.success('New code sent to your email!');
@@ -104,57 +83,39 @@ function ResetPasswordForm() {
     }
   };
 
-  // Show success state
   if (isSuccess) {
-    return (
-      <SuccessCard
-        title="Password Reset!"
-        description="Your password has been successfully reset"
-        message="You can now log in with your new password"
-        buttonText="Go to Login"
-        buttonHref="/auth/sign-in"
-      />
-    );
+    return <SuccessCard
+      title="Password Reset!"
+      description="Your password has been successfully reset"
+      message="You can now log in with your new password"
+      buttonText="Go to Login"
+      buttonHref="/auth/sign-in"
+    />;
   }
 
-  // Show form
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" asChild className="-ml-2">
-              <Link href="/auth/forgot-password">
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-            </Button>
-            <div>
-              <CardTitle className="text-2xl">Reset Password</CardTitle>
-              <CardDescription className="mt-1">
-                Enter the code sent to your email and set a new password
-              </CardDescription>
+    <AuthPageShell>
+      <div className="w-full max-w-sm animate-fade-in-scale">
+        <div className="rounded-2xl bg-white px-8 py-9 shadow-[0_24px_80px_rgba(15,23,42,0.09)] ring-1 ring-slate-200/70">
+          {/* Header */}
+          <div className="mb-7 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-violet-600 to-indigo-600 shadow-[0_4px_14px_rgba(99,75,229,0.38)]">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <rect x="5" y="9" width="10" height="8" rx="1.5" stroke="white" strokeWidth="1.5"/>
+                <path d="M7 9V6a3 3 0 1 1 6 0v3" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="10" cy="13" r="1.2" fill="white"/>
+              </svg>
             </div>
+            <h1 className="text-xl font-bold text-slate-900">Reset your password</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Enter the code sent to your email and choose a new password.
+            </p>
           </div>
-        </CardHeader>
 
-        <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Email Field */}
-              <EmailFormField
-                control={form.control}
-                name="email"
-                disabled={isLoading}
-              />
-
-              {/* OTP Code Field */}
-              <OTPFormField
-                control={form.control}
-                name="code"
-                disabled={isLoading}
-              />
-
-              {/* New Password Field */}
+              <EmailFormField control={form.control} name="email" disabled={isLoading} />
+              <OTPFormField control={form.control} name="code" disabled={isLoading} />
               <PasswordFormField
                 control={form.control}
                 name="password"
@@ -163,8 +124,6 @@ function ResetPasswordForm() {
                 description="Must be at least 8 characters long"
                 placeholder="Enter new password"
               />
-
-              {/* Confirm Password Field */}
               <PasswordFormField
                 control={form.control}
                 name="confirmPassword"
@@ -174,65 +133,63 @@ function ResetPasswordForm() {
                 placeholder="Confirm new password"
               />
 
-              {/* Submit Button */}
-              <Button type="submit" disabled={isLoading} className="w-full">
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(79,70,229,0.38)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(79,70,229,0.5)] disabled:opacity-60 disabled:hover:scale-100"
+              >
                 {isLoading ? (
-                  <>
-                    <span className="mr-2">⏳</span>
-                    Resetting Password...
-                  </>
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Resetting...
+                  </span>
                 ) : (
-                  'Reset Password'
+                  'Reset password'
                 )}
-              </Button>
+              </button>
 
-              {/* Resend Code */}
-              <p className="text-center text-sm text-muted-foreground">
+              {/* Resend code */}
+              <p className="text-center text-xs text-slate-500">
                 Didn&apos;t receive the code?{' '}
-                <Button
+                <button
                   type="button"
-                  variant="link"
                   onClick={handleResendCode}
                   disabled={isLoading}
-                  className="p-0 h-auto font-medium"
+                  className="font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-60"
                 >
-                  Resend Code
-                </Button>
+                  Resend code
+                </button>
               </p>
-
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground">
-                    Or
-                  </span>
-                </div>
-              </div>
-
-              {/* Back to Login */}
-              <Button variant="outline" className="w-full" asChild>
-                <Link href="/auth/sign-in">
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Login
-                </Link>
-              </Button>
             </form>
           </Form>
-        </CardContent>
-      </Card>
-    </div>
+
+          {/* Footer */}
+          <div className="mt-6 text-center">
+            <Link
+              href="/auth/sign-in"
+              className="flex items-center justify-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Back to sign in
+            </Link>
+          </div>
+        </div>
+      </div>
+    </AuthPageShell>
   );
 }
 
-// Main page component
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
       </div>
     }>
       <ResetPasswordForm />

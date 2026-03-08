@@ -1,97 +1,70 @@
-# Makefile for VOD App
-# All Docker files are in ./infra/
+# ─────────────────────────────────────────────
+#   VOD App — Developer Makefile
+# ─────────────────────────────────────────────
 
-.PHONY: help dev prod down logs restart clean shell db-shell status
+.PHONY: help dev build down restart logs shell db clean
 
 .DEFAULT_GOAL := help
 
-# Colors for output
-BLUE := \033[36m
+# Colors
+BOLD  := \033[1m
+CYAN  := \033[36m
 GREEN := \033[32m
+GRAY  := \033[90m
 RESET := \033[0m
 
-# Paths to Docker files
-INFRA_DIR = infra
-LOCAL_COMPOSE = $(INFRA_DIR)/docker-compose.local.yml
-LOCAL_ENV = $(INFRA_DIR)/local.env
-PROD_COMPOSE = $(INFRA_DIR)/docker-compose.yml
-PROD_ENV = $(INFRA_DIR)/prod.env
+INFRA_DIR    = infra
+COMPOSE_FILE = $(INFRA_DIR)/docker-compose.local.yml
+ENV_FILE     = $(INFRA_DIR)/local.env
+DC           = docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE)
 
+# ── Help ──────────────────────────────────────
 
-## Show available commands
 help:
-	@echo "VOD App - Available Commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@printf "\n$(BOLD)  VOD App$(RESET) $(GRAY)— local dev commands$(RESET)\n\n"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "dev"     "Start containers"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "build"   "Rebuild images and start"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "down"    "Stop containers"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "restart" "Stop then start"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "logs"    "Follow logs  (e.g. make logs s=api)"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "shell"   "Shell into the api container"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "db"      "Open a psql session"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "clean"   "Stop and remove volumes"
+	@printf "\n"
 
+# ── Core ──────────────────────────────────────
 
-# ============================================
-# LOCAL DEVELOPMENT
-# ============================================
+dev:
+	@printf "$(CYAN)▶ Starting dev environment…$(RESET)\n"
+	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env up -d
+	@printf "$(GREEN)✔ Ready$(RESET)\n"
 
-dev: ## Start local development
-	@echo "$(BLUE)Starting local development...$(RESET)"
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env up -d
-	@echo "$(GREEN) Development environment started!$(RESET)"
+build:
+	@printf "$(CYAN)▶ Rebuilding images…$(RESET)\n"
+	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env up -d --build
+	@printf "$(GREEN)✔ Done$(RESET)\n"
 
-dev-build: ## Rebuild and start local development
-	@echo "$(BLUE)Rebuilding local development...$(RESET)"
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env up -d --build
+down:
+	@printf "$(CYAN)▶ Stopping containers…$(RESET)\n"
+	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env down
+	@printf "$(GREEN)✔ Stopped$(RESET)\n"
 
-down: ## Stop all containers
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env down
+restart: down dev
 
-restart: down dev ## Restart local development
+logs:
+	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env logs -f $(s)
 
-logs: ## Show logs (usage: make logs s=api)
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env logs -f $(s)
+# ── Shells ────────────────────────────────────
 
-ps: ## List running containers
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env ps
+shell:
+	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env exec api bash
 
-shell: ## Open shell in API container
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env exec api bash
+db:
+	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env exec postgres psql -U vod_user -d vod_db
 
-worker-shell: ## Open shell in worker container
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env exec worker bash
+# ── Cleanup ───────────────────────────────────
 
-db-shell: ## Open PostgreSQL shell
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env exec postgres psql -U vod_user -d vod_db
-
-redis-cli: ## Open Redis CLI
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env exec redis redis-cli -a redis_local_password
-
-clean: ## Remove containers and volumes
-	cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env down -v
-	@echo "$(GREEN) Cleaned up!$(RESET)"
-
-# ============================================
-# PRODUCTION
-# ============================================
-
-prod: ## Start production environment
-	@echo "$(BLUE)Starting production...$(RESET)"
-	cd $(INFRA_DIR) && docker compose -f docker-compose.yml --env-file prod.env up -d
-	@echo "$(GREEN) Production started!$(RESET)"
-
-prod-build: ## Rebuild and start production
-	cd $(INFRA_DIR) && docker compose -f docker-compose.yml --env-file prod.env up -d --build
-
-prod-down: ## Stop production
-	cd $(INFRA_DIR) && docker compose -f docker-compose.yml --env-file prod.env down
-
-prod-logs: ## Show production logs (usage: make prod-logs s=api)
-	cd $(INFRA_DIR) && docker compose -f docker-compose.yml --env-file prod.env logs -f $(s)
-
-prod-restart: prod-down prod ## Restart production
-
-# ============================================
-# UTILITIES
-# ============================================
-
-status: ## Show container status
-	@echo "$(BLUE)Container Status:$(RESET)"
-	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-health: ## Check service health
-	@echo "$(BLUE)Checking API health...$(RESET)"
-	@curl -s http://localhost:8000/health || echo "API not responding"
+clean:
+	@printf "$(CYAN)▶ Removing containers and volumes…$(RESET)\n"
+	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env down -v
+	@printf "$(GREEN)✔ Clean$(RESET)\n"

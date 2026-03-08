@@ -1,14 +1,6 @@
 // components/auth/SuccessCard.tsx
 import Link from 'next/link';
-import { CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { AuthPageShell } from './AuthPageShell';
 
 interface SuccessCardProps {
   title: string;
@@ -26,24 +18,33 @@ export function SuccessCard({
   buttonHref = '/auth/sign-in',
 }: SuccessCardProps) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle2 className="h-10 w-10 text-green-600" />
+    <AuthPageShell>
+      <div className="w-full max-w-sm animate-fade-in-scale">
+        <div className="rounded-2xl bg-white px-8 py-10 text-center shadow-[0_24px_80px_rgba(15,23,42,0.09)] ring-1 ring-slate-200/70">
+          {/* Icon */}
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-500 to-teal-500 shadow-[0_4px_14px_rgba(16,185,129,0.38)]">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+              <path d="M5 14l6 6L23 8" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
-          <CardTitle className="text-2xl">{title}</CardTitle>
-          <CardDescription className="text-base">{description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
-            <p className="text-sm text-green-800">✓ {message}</p>
+
+          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
+
+          {/* Message banner */}
+          <div className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200/70">
+            <p className="text-sm font-medium text-emerald-700">{message}</p>
           </div>
-          <Button className="w-full" asChild>
-            <Link href={buttonHref}>{buttonText}</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+
+          {/* CTA */}
+          <Link
+            href={buttonHref}
+            className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(79,70,229,0.38)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(79,70,229,0.5)]"
+          >
+            {buttonText}
+          </Link>
+        </div>
+      </div>
+    </AuthPageShell>
   );
 }
