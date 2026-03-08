@@ -22,7 +22,8 @@ services:
     env_file:
       - local.env
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@local}
+      # Domain must contain a period (e.g. local.dev); admin@local is invalid
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@local.dev}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
     ports:
       - "5050:80"
@@ -58,8 +59,8 @@ services:
     ports:
       - "6379:6379"      # host : container
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-    
+      # Default so container gets a password even when host shell doesn't set REDIS_PASSWORD
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_dev_password}
     command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
 
     networks:
