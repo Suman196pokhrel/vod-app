@@ -1,0 +1,236 @@
+# 07 — Frontend Foundation
+
+With the backend pipeline fully documented, let's shift to the frontend. The Next.js app is where users actually interact with everything we've built. But before looking at any individual page, you need to understand the foundation: how the API client works, how authentication state is managed, and how tokens flow through the system. Getting this wrong breaks everything above it.
+
+---
+
+## Technology Overview
+
+The frontend is a **Next.js 16** app using the **App Router** (not the older Pages Router). It uses:
+
+- **React 19** — the latest React release
+- **TypeScript** — all code is typed
+- **Tailwind CSS v4** — utility-first styling with the new v4 configuration format
+- **Zustand** — lightweight global state management for auth
+- **TanStack Query** (React Query) — for server state management (underused currently — the home feed and video pages use direct API calls instead)
+- **shadcn/ui** — pre-built accessible UI components (buttons, dialogs, forms, etc.)
+- **Axios** — HTTP client with interceptors for token attachment and auto-refresh
+
+---
+
+## Directory Layout
+
+```
+app/
+├── app/
+│   ├── (public)/        ← No auth required: landing page, all auth routes
+│   └── (protected)/     ← All authenticated routes
+│       ├── home/        ← Main feed and watch page
+│       └── admin/       ← Admin panel
+├── lib/
+│   ├── apis/            ← Typed API function modules + shared Axios client
+│   ├── store/           ← Zustand stores
+│   ├── types/           ← TypeScript type definitions
+│   └── utils/           ← tokenManager, constants, helpers
+├── hooks/               ← Custom React hooks
+└── components/
+    └── ui/              ← shadcn/ui components
+```
+
+The parentheses in `(public)` and `(protected)` are Next.js route groups — they don't appear in URLs but let you apply different layouts to different sections of the app without affecting the route structure.
+
+---
+
+## The Axios Client
+
+**`app/lib/apis/client.ts`** — this is the most important file in the frontend. Every API call in the app goes through this single configured Axios instance.
+
+```typescript
+const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost',
+  timeout: 30000,
+  headers: { 'Content-Type': 'application/json' },
+})
+```
+
+The client has two interceptors:
+
+**Request interceptor** — reads the access token from localStorage and attaches it to every outgoing request:
+
+```typescript
+apiClient.interceptors.request.use((config) => {
+  const token = tokenManager.getAccessToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+```
+
+**Response interceptor** — handles 401 responses by automatically refreshing the access token and retrying the original request:
+
+```typescript
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401 && !error.config._retry) {
+      error.config._retry = true
+      const refreshToken = tokenManager.getRefreshToken()
+      if (refreshToken) {
+        try {
+          const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refresh_token: refreshToken })
+          tokenManager.setAccessToken(data.access_token)
+          error.config.headers.Authorization = `Bearer ${data.access_token}`
+          return apiClient(error.config)  // retry original request
+        } catch {
+          tokenManager.clearTokens()
+          window.location.href = '/auth/sign-in'
+        }
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+```
+
+The `_retry` flag prevents an infinite loop if the refresh request itself returns a 401.
+
+This interceptor means most components never need to think about token expiry — it's handled automatically. The session just works until the refresh token expires (7 days), at which point the user is redirected to sign in.
+
+---
+
+## Token Storage
+
+**`app/lib/utils/tokenManager.ts`** — a thin wrapper over `localStorage` that provides typed access to the two tokens:
+
+```typescript
+const tokenManager = {
+  getAccessToken: () => localStorage.getItem('access_token'),
+  setAccessToken: (token: string) => localStorage.setItem('access_token', token),
+  getRefreshToken: () => localStorage.getItem('refresh_token'),
+  setRefreshToken: (token: string) => localStorage.setItem('refresh_token', token),
+  clearTokens: () => {
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+  }
+}
+```
+
+Why `localStorage` and not cookies? localStorage is simpler to implement with Axios interceptors — you read it synchronously and attach the value to headers. Cookies require more ceremony (credentials: 'include', CORS cookie settings, httpOnly configuration). The trade-off: localStorage is accessible from JavaScript (XSS risk). This is documented in Known Issues.
+
+---
+
+## Auth State: Zustand Store
+
+**`app/lib/store/authStore.ts`** — the global auth store. This is the primary Zustand store that's actually implemented. (`userStore.ts` and `videoStore.ts` exist as files but are currently empty placeholders.)
+
+The store holds:
+```typescript
+interface AuthState {
+  user: User | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  // actions:
+  initialize: () => Promise<void>
+  signin: (email: string, password: string) => Promise<void>
+  signup: (data: SignupData) => Promise<void>
+  refreshToken: () => Promise<void>
+  logout: () => Promise<void>
+  updateUser: (user: Partial<User>) => void
+}
+```
+
+**`initialize()`** is the most important action. It's called once when the app first loads (in `ProtectedLayout`). It:
+1. Reads the access token from localStorage
+2. If present, calls `GET /users/me` to fetch the current user's profile
+3. On success: sets `user` and `isAuthenticated = true`
+4. On failure (token expired or invalid): tries to refresh using the refresh token
+5. If refresh also fails: clears tokens and sets `isAuthenticated = false`
+
+This means the auth state is derived from localStorage + backend validation every time the app opens. If you're logged in and your access token expired while the browser was closed, `initialize()` transparently refreshes it and you stay logged in.
+
+---
+
+## Route Protection
+
+**`app/(protected)/layout.tsx`** — the layout component that wraps all authenticated routes.
+
+```typescript
+export default function ProtectedLayout({ children }) {
+  const { isAuthenticated, isLoading, initialize } = useAuthStore()
+  
+  useEffect(() => {
+    initialize()
+  }, [])
+
+  if (isLoading) return <LoadingSpinner />
+  if (!isAuthenticated) {
+    redirect('/auth/sign-in')
+  }
+  
+  return <>{children}</>
+}
+```
+
+Every route under `app/(protected)/` is automatically protected by this layout. There is no Next.js middleware involved — this is purely client-side. It works fine in practice for this use case, but a middleware-based approach would protect routes at the edge (faster and more secure). See Future Upgrades.
+
+---
+
+## API Function Modules
+
+The `lib/apis/` directory has one file per domain:
+
+- **`client.ts`** — the shared Axios instance (don't import Axios directly elsewhere)
+- **`auth.ts`** — `signin()`, `signup()`, `refreshToken()`, `logout()`, `forgotPassword()`, `resetPassword()`, `verifyEmail()`, `resendVerification()`
+- **`video.ts`** — `createVideo()`, `deleteVideo()`, `getVideoStatus()`, `incrementVideoView()`, etc. Note: `getPublicVideos()` and `getVideoById()` functions are **not yet implemented** in this file — the home feed and watch page don't have the API functions wired up yet.
+- **`user.ts`** — `getCurrentUser()`, `updateProfile()`, admin user management
+
+All functions return typed promises and let Axios errors propagate to the caller (which handles them with try/catch).
+
+---
+
+## TypeScript Types
+
+`lib/types/` contains the TypeScript interfaces that mirror the backend Pydantic schemas:
+
+```typescript
+interface User {
+  id: string
+  email: string
+  username: string
+  role: 'user' | 'admin'   // note: lowercase, matches DB enum lowercase values
+  is_verified: boolean
+  is_active: boolean
+}
+
+interface Video {
+  id: string
+  title: string
+  description: string
+  category: string
+  processing_status: ProcessingStatus
+  manifest_url: string | null
+  thumbnail_url: string | null
+  available_qualities: string[] | null
+  view_count: number
+  // ... etc
+}
+```
+
+Keep these in sync with the backend schemas manually — there's no automatic type generation from the OpenAPI spec yet. Adding `openapi-typescript` to auto-generate these from the Swagger schema would be a significant quality-of-life improvement.
+
+---
+
+## Future Upgrades
+
+- **Middleware-based route protection** — use Next.js `middleware.ts` to protect routes at the edge before React renders, eliminating the flash of unauthenticated content
+- **httpOnly cookie tokens** — move from localStorage to httpOnly cookies for XSS protection; requires backend changes to set cookies
+- **Auto-generated API types** — use `openapi-typescript` to generate TypeScript types from the FastAPI OpenAPI schema, eliminating manual sync
+- **TanStack Query for all API calls** — currently underused; adopting it consistently would give you caching, background refetching, and loading/error states for free
+- **React Query devtools** — add to the dev environment for debugging query state
+
+---
+
+## What's Next
+
+Now that you understand the foundation, let's see the first real user-facing feature built on top of it: the authentication pages. The next document covers every auth screen — sign-up, email verification, sign-in, forgot password, and reset password — all of which are fully implemented and working.
