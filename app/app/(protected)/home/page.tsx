@@ -16,41 +16,41 @@ import { DevelopmentHero } from "./_components/DevelopmentHero";
 
 
 // Mock data for personalized rows
-const becauseYouWatched = [
-  {
-    id: "vid_006_dark",
-    title: "Dark",
-    thumbnail: "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=800&q=80"
-  },
-  {
-    id: "vid_015_black_mirror",
-    title: "Black Mirror",
-    thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80"
-  },
-  {
-    id: "vid_022_true_detective",
-    title: "True Detective",
-    thumbnail: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80"
-  }
-]
+// const becauseYouWatched = [
+//   {
+//     id: "vid_006_dark",
+//     title: "Dark",
+//     thumbnail: "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=800&q=80"
+//   },
+//   {
+//     id: "vid_015_black_mirror",
+//     title: "Black Mirror",
+//     thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=80"
+//   },
+//   {
+//     id: "vid_022_true_detective",
+//     title: "True Detective",
+//     thumbnail: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80"
+//   }
+// ]
 
-const newReleases = [
-  {
-    id: "vid_001_stranger_things_s4",
-    title: "Stranger Things: Season 4",
-    thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80"
-  },
-  {
-    id: "vid_004_wednesday",
-    title: "Wednesday",
-    thumbnail: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80"
-  },
-  {
-    id: "vid_013_house_of_dragon",
-    title: "House of the Dragon",
-    thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80"
-  }
-]
+// const newReleases = [
+//   {
+//     id: "vid_001_stranger_things_s4",
+//     title: "Stranger Things: Season 4",
+//     thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80"
+//   },
+//   {
+//     id: "vid_004_wednesday",
+//     title: "Wednesday",
+//     thumbnail: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=800&q=80"
+//   },
+//   {
+//     id: "vid_013_house_of_dragon",
+//     title: "House of the Dragon",
+//     thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80"
+//   }
+// ]
 
 export default function HomePage() {
   return (
