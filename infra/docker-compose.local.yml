@@ -136,7 +136,7 @@ services:
       - minio
     networks:
       - backend_net
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=3"]
 
   flower:
     image: mher/flower
