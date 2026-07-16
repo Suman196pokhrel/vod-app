@@ -1,138 +1,186 @@
-// app/home/watch/[id]/_components/VideoPlayer.tsx
 "use client"
 
-import React, { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Play, Pause, Volume2, VolumeX, Maximize, Settings, SkipBack, SkipForward } from 'lucide-react'
-import { Slider } from '@/components/ui/slider'
-import Image from 'next/image'
-import { Video } from '../../../_components/VideoGrid'
+import { useEffect, useRef, useState } from "react"
+import Hls from "hls.js"
+import { Pause, Play, Settings } from "lucide-react"
 
-interface VideoPlayerProps {
-  video: Video
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+interface VideoData {
+  id: string
+  title: string
+  thumbnail_url?: string | null
+  manifest_url?: string | null // stored as "/vod-processed/{id}/segments/master.m3u8"
 }
 
-const VideoPlayer = ({ video }: VideoPlayerProps) => {
+interface VideoPlayerProps {
+  video: VideoData
+}
+
+// Turn a stored MinIO path into a browser-reachable URL via the Caddy /storage route.
+const storageUrl = (path: string) =>
+  `${process.env.NEXT_PUBLIC_API_URL}/storage${path}`
+
+const formatTime = (s: number) => {
+  if (!Number.isFinite(s)) return "0:00"
+  const m = Math.floor(s / 60)
+  const sec = Math.floor(s % 60).toString().padStart(2, "0")
+  return `${m}:${sec}`
+}
+
+export default function VideoPlayer({ video }: VideoPlayerProps) {
+  // Refs = handles to things that live OUTSIDE React's render cycle:
+  // the actual <video> DOM element, and the Hls instance managing it.
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const hlsRef = useRef<Hls | null>(null)
+
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isMuted, setIsMuted] = useState(false)
-  const [volume, setVolume] = useState([70])
-  const [progress, setProgress] = useState([0])
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [qualities, setQualities] = useState<{ index: number; height: number }[]>([])
+  const [quality, setQuality] = useState(-1) // -1 = Auto (HLS picks based on bandwidth)
+
+  // Set up HLS: runs once when the component mounts 
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el || !video.manifest_url) return
+
+    const manifestUrl = storageUrl(video.manifest_url)
+
+    if (Hls.isSupported()) {
+      // hls.js downloads the manifest, picks a quality, fetches .ts segments,
+      // and feeds them into the <video> element.
+      const hls = new Hls()
+      hlsRef.current = hls
+      hls.loadSource(manifestUrl)
+      hls.attachMedia(el)
+
+      // Once the master manifest is parsed we know which qualities exist.
+      hls.on(Hls.Events.MANIFEST_PARSED, (_evt, data) => {
+        setQualities(
+          data.levels
+            .map((l, i) => ({ index: i, height: l.height }))
+            .sort((a, b) => b.height - a.height)
+        )
+      })
+
+      // Cleanup when leaving the page — stops downloads, frees memory.
+      return () => hls.destroy()
+    }
+
+    // Safari plays HLS natively — no hls.js needed, just set src.
+    if (el.canPlayType("application/vnd.apple.mpegurl")) {
+      el.src = manifestUrl
+    }
+  }, [video.manifest_url])
+
+  // Keep React state in sync with what the <video> element does 
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+
+    const onPlay = () => setIsPlaying(true)
+    const onPause = () => setIsPlaying(false)
+    const onTimeUpdate = () => setCurrentTime(el.currentTime)
+    const onDurationChange = () => setDuration(el.duration)
+
+    el.addEventListener("play", onPlay)
+    el.addEventListener("pause", onPause)
+    el.addEventListener("timeupdate", onTimeUpdate)
+    el.addEventListener("durationchange", onDurationChange)
+    return () => {
+      el.removeEventListener("play", onPlay)
+      el.removeEventListener("pause", onPause)
+      el.removeEventListener("timeupdate", onTimeUpdate)
+      el.removeEventListener("durationchange", onDurationChange)
+    }
+  }, [])
+
+  //  Controls 
+  const togglePlay = () => {
+    const el = videoRef.current
+    if (!el) return
+    el.paused ? void el.play() : el.pause()
+  }
+
+  const onSeek = (value: number[]) => {
+    const el = videoRef.current
+    if (!el) return
+    el.currentTime = value[0]
+    setCurrentTime(value[0])
+  }
+
+  const onSelectQuality = (index: number) => {
+    if (hlsRef.current) hlsRef.current.currentLevel = index // -1 restores Auto
+    setQuality(index)
+  }
+
+  // Video still transcoding — nothing to play yet.
+  if (!video.manifest_url) {
+    return (
+      <div className="flex aspect-video items-center justify-center rounded-lg bg-black text-sm text-muted-foreground">
+        This video is still processing. Check back shortly.
+      </div>
+    )
+  }
 
   return (
-    <div className="relative w-full bg-black group">
-      {/* Video Container - 21:9 Ultra-wide aspect ratio for cinematic feel */}
-      <div className="relative aspect-[21/9] bg-black">
-        {/* Mock Video (Replace with actual video player) */}
-        <Image
-          src={video.thumbnail}
-          alt={video.title}
-          fill
-          className="object-cover"
+    <div className="overflow-hidden rounded-lg bg-black">
+      {/* The actual video surface. Click it to toggle play. */}
+      <video
+        ref={videoRef}
+        className="aspect-video w-full"
+        poster={video.thumbnail_url ? storageUrl(video.thumbnail_url) : undefined}
+        playsInline
+        onClick={togglePlay}
+      />
+
+      {/* Controls bar */}
+      <div className="flex items-center gap-3 bg-neutral-900 px-3 py-2">
+        <Button variant="ghost" size="icon" onClick={togglePlay}>
+          {isPlaying ? <Pause /> : <Play />}
+        </Button>
+
+        <span className="text-xs tabular-nums text-neutral-300">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </span>
+
+        <Slider
+          value={[currentTime]}
+          max={duration || 0}
+          step={0.1}
+          onValueChange={onSeek}
+          className="flex-1"
         />
 
-        {/* Play/Pause Overlay */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            size="icon"
-            className="h-20 w-20 rounded-full bg-white/90 hover:bg-white text-black"
-            onClick={() => setIsPlaying(!isPlaying)}
-          >
-            {isPlaying ? (
-              <Pause className="h-10 w-10" />
-            ) : (
-              <Play className="h-10 w-10 ml-1" />
-            )}
-          </Button>
-        </div>
-
-        {/* Custom Controls */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 opacity-0 group-hover:opacity-100 transition-opacity">
-          {/* Progress Bar */}
-          <Slider
-            value={progress}
-            onValueChange={setProgress}
-            max={100}
-            step={0.1}
-            className="mb-4 cursor-pointer"
-          />
-
-          {/* Control Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Play/Pause */}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-white hover:bg-white/20"
-                onClick={() => setIsPlaying(!isPlaying)}
-              >
-                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-              </Button>
-
-              {/* Skip Buttons */}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-white hover:bg-white/20"
-              >
-                <SkipBack className="h-5 w-5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-white hover:bg-white/20"
-              >
-                <SkipForward className="h-5 w-5" />
-              </Button>
-
-              {/* Volume Control */}
-              <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="text-white hover:bg-white/20"
-                  onClick={() => setIsMuted(!isMuted)}
-                >
-                  {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-                </Button>
-                <Slider
-                  value={volume}
-                  onValueChange={setVolume}
-                  max={100}
-                  className="w-24"
-                />
-              </div>
-
-              {/* Time Display */}
-              <span className="text-white text-sm font-medium">
-                0:00 / {video.duration}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Settings */}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-white hover:bg-white/20"
-              >
-                <Settings className="h-5 w-5" />
-              </Button>
-
-              {/* Fullscreen */}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="text-white hover:bg-white/20"
-              >
-                <Maximize className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1 text-xs">
+              <Settings className="h-4 w-4" />
+              {quality === -1
+                ? "Auto"
+                : `${qualities.find((q) => q.index === quality)?.height}p`}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onSelectQuality(-1)}>
+              Auto
+            </DropdownMenuItem>
+            {qualities.map((q) => (
+              <DropdownMenuItem key={q.index} onClick={() => onSelectQuality(q.index)}>
+                {q.height}p
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )
 }
-
-export default VideoPlayer

@@ -288,3 +288,21 @@ export const getVideoStatus = async (
     } as ApiError;
   }
 };
+
+
+export async function getPublicVideos(skip=0, limit=20){
+  const {data} =  await api.get("/videos/",{params: {skip:skip, limit: limit}})
+  return data
+}
+
+
+export async function getVideoById(videoId:string){
+  const {data} = await api.get(`/videos/by-id/${videoId}`)
+  return data
+}
+
+
+export async function incrementVideoView(videoId:string){
+  const {data} = await api.post(`/videos/${videoId}/view`)
+  return data
+}
