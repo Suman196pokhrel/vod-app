@@ -1,78 +1,75 @@
+"use client"
 // app/home/watch/[id]/page.tsx
-import VideoPlayer from './_components/VideoPlayer'
-import VideoInfo from './_components/VideoInfo'
-import VideoStats from './_components/VideoStats'
-import RelatedVideos from './_components/RelatedVideos'
-import CommentSection from './_components/CommentSection'
-import AISceneTimeline from './_components/AISceneTimeline'
-import AIMoodAnalysis from './_components/AIMoodAnalysis'
-import AIRecommendations from './_components/AIRecommendations'
-import AIWatchParty from './_components/AIWatchParty'
-import AIContentWarnings from './_components/AIContentWarnings'
+import VideoPlayer from "./_components/VideoPlayer";
+import VideoInfo from "./_components/VideoInfo";
+import VideoStats from "./_components/VideoStats";
+import RelatedVideos from "./_components/RelatedVideos";
+import CommentSection from "./_components/CommentSection";
+import AISceneTimeline from "./_components/AISceneTimeline";
+import AIMoodAnalysis from "./_components/AIMoodAnalysis";
+import AIRecommendations from "./_components/AIRecommendations";
+import AIWatchParty from "./_components/AIWatchParty";
+import AIContentWarnings from "./_components/AIContentWarnings";
+import { use, useEffect, useState } from "react";
+import { getVideoById } from "@/lib/apis/video";
 
-interface WatchPageProps {
-  params: Promise<{video_id: string}>
-}
 
-const WatchPage = async ({ params }: WatchPageProps) => {
-  const {video_id} = await params
-  const mockVideo = {
-    id: video_id,
-    title: "Stranger Things: Season 4",
-    thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
-    duration: "2h 15m",
-    views: "12.5M",
-    category: "Sci-Fi Thriller",
-    description: "When a young boy vanishes, a small town uncovers a mystery involving secret experiments, terrifying supernatural forces and one strange little girl.",
-    releaseDate: "2024-05-27",
-    rating: 4.7,
-    ageRating: "TV-14",
-    director: "The Duffer Brothers",
-    cast: ["Millie Bobby Brown", "Finn Wolfhard", "Winona Ryder"],
-    tags: ["sci-fi", "thriller", "supernatural", "80s"],
-    isNew: true,
-    isTrending: true,
-    isFeatured: true,
-  }
+
+const WatchPage =  ({ params }: {params: Promise<{video_id:string}>}) => {
+  const { video_id } = use(params)
+  const [video, setVideo] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVideoById(video_id)
+      .then(setVideo)
+      .catch(() => setError("Video not found"));
+  }, [video_id]);
+
+  if (error) return <div className="p-8 text-muted-foreground">{error}</div>;
+  if (!video) return <div className="p-8 text-muted-foreground">Loading…</div>;
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[2000px] mx-auto">
         {/* Video Player */}
         <div className="w-full">
-          <VideoPlayer video={mockVideo} />
+          <VideoPlayer video={video} />
         </div>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 p-4 lg:p-6">
           {/* Left Column */}
           <div className="space-y-6">
-            <VideoInfo video={mockVideo} />
-            
+            <VideoInfo video={video} />
+
             {/* AI Scene Timeline - NEW */}
             <AISceneTimeline />
-            
-            <VideoStats video={mockVideo} />
-            
+
+            <VideoStats video={video} />
+
             {/* AI Features Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <AIMoodAnalysis />
               <AIContentWarnings />
             </div>
-            
-            <CommentSection videoId={mockVideo.id} />
+
+            <CommentSection videoId={video.id} />
           </div>
 
           {/* Right Sidebar */}
           <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
             <AIRecommendations />
             <AIWatchParty />
-            <RelatedVideos currentVideoId={mockVideo.id} category={mockVideo.category} />
+            <RelatedVideos
+              currentVideoId={video.id}
+              category={video.category}
+            />
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default WatchPage
+export default WatchPage;
