@@ -9,7 +9,7 @@ import { Video } from "./VideoGrid"
 
 // Same helper as the player — stored paths become browser URLs via Caddy /storage
 const storageUrl = (path: string) =>
-  `${process.env.NEXT_PUBLIC_API_URL}/storage${path}`
+  `${process.env.NEXT_PUBLIC_API_URL}/storage/${path}`
 
 // 12500 → "12.5K", 12500000 → "12.5M"
 const formatViews = (n: number) =>
