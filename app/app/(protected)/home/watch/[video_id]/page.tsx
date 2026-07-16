@@ -11,14 +11,13 @@ import AIWatchParty from './_components/AIWatchParty'
 import AIContentWarnings from './_components/AIContentWarnings'
 
 interface WatchPageProps {
-  params: {
-    id: string
-  }
+  params: Promise<{video_id: string}>
 }
 
-const WatchPage = ({ params }: WatchPageProps) => {
+const WatchPage = async ({ params }: WatchPageProps) => {
+  const {video_id} = await params
   const mockVideo = {
-    id: params.id,
+    id: video_id,
     title: "Stranger Things: Season 4",
     thumbnail: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
     duration: "2h 15m",
