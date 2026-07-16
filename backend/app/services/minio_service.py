@@ -188,7 +188,7 @@ class MinIOService:
             )
             
             logger.info(f"Thumbnail uploaded: {unique_filename}")
-            return f"{settings.minio_bucket_videos}/{unique_filename}"
+            return f"{settings.minio_bucket_thumbnails}/{unique_filename}"
 
             
         except S3Error as e:
@@ -276,12 +276,14 @@ class MinIOService:
     def download_video_to_file(self, object_name: str, local_path: str, chunk_size: int = 8*1024*1024):
         """Stream video from MinIO directly to local file"""
         
-        logger.info(f"Downloading: {object_name} -> {local_path}")
+        pure_object_name = "/".join(object_name.split("/")[1:])
+        logger.info(f"Downloading: {pure_object_name} -> {local_path}")
         
         try:
+            print(f"From minio service, pure object name : {pure_object_name}, bucket name : {settings.minio_bucket_processed_videos}")
             response = self.client.get_object(
                 bucket_name=settings.minio_bucket_videos,
-                object_name=object_name
+                object_name=pure_object_name
             )
 
             bytes_downloaded = 0
@@ -298,10 +300,10 @@ class MinIOService:
             return bytes_downloaded
 
         except S3Error as e:
-            logger.error(f"Failed to download {object_name}: {str(e)}")
+            logger.error(f"Failed to download {pure_object_name}: {str(e)}")
             raise Exception(f"Failed to download video: {str(e)}")
         except Exception as e:
-            logger.error(f"Error downloading {object_name}: {str(e)}")
+            logger.error(f"Error downloading {pure_object_name}: {str(e)}")
             raise Exception(f"Failed to download video: {str(e)}")
 
 
