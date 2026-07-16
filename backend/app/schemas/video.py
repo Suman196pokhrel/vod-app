@@ -81,6 +81,8 @@ class VideoResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: Optional[datetime]
+    manifest_url: str
+    available_qualities: List[str]
     user_id: str
     
     model_config = ConfigDict(from_attributes=True)
