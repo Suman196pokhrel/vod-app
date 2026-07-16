@@ -129,7 +129,7 @@ class MinIOService:
             logger.info(f"Video upload successful: {unique_filename}")
             logger.info("=" * 60)
             
-            return unique_filename
+            return f"{settings.minio_bucket_videos}/{unique_filename}"
         
         except S3Error as e:
             logger.error("=" * 60)
@@ -188,7 +188,8 @@ class MinIOService:
             )
             
             logger.info(f"Thumbnail uploaded: {unique_filename}")
-            return unique_filename
+            return f"{settings.minio_bucket_videos}/{unique_filename}"
+
             
         except S3Error as e:
             logger.error(f"S3 error uploading thumbnail: {str(e)}")

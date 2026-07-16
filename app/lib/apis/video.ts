@@ -87,16 +87,6 @@ export const uploadVideo = async ({
       })
     );
 
-    // DEBUG: See what's actually in FormData
-    console.log("=== FormData Contents ===");
-    for (let [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        console.log(key, ":", value.name, `(${value.size} bytes)`);
-      } else {
-        console.log(key, ":", value);
-      }
-    }
-    console.log("========================");
 
     // IMPORTANT: Override Content-Type to let browser set it automatically
     const response = await api.post<VideoUploadResponse>(
