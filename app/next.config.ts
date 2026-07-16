@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+            {
+        protocol: "https",
+        hostname: "api.vod.spokhrel.dev",
+        pathname: "/storage/**",
+      },
       { protocol: "http", hostname: "localhost", pathname: "/storage/**" },
     ],
   },
