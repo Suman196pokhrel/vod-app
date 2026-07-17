@@ -12,13 +12,13 @@ import AIWatchParty from "./_components/AIWatchParty";
 import AIContentWarnings from "./_components/AIContentWarnings";
 import { use, useEffect, useState } from "react";
 import { getVideoById } from "@/lib/apis/video";
+import { useTheaterMode } from "./_components/player/useTheaterMode";
 
-
-
-const WatchPage =  ({ params }: {params: Promise<{video_id:string}>}) => {
+const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
   const { video_id } = use(params)
   const [video, setVideo] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const { theater, toggle: toggleTheater } = useTheaterMode()
 
   useEffect(() => {
     getVideoById(video_id)
@@ -31,24 +31,41 @@ const WatchPage =  ({ params }: {params: Promise<{video_id:string}>}) => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-[2000px] mx-auto">
-        {/* Video Player */}
-        <div className="w-full">
-          <VideoPlayer video={video} />
+      {/* Player band — full-bleed black letterbox in theater, contained otherwise */}
+      <div className={theater ? "w-full bg-black" : ""}>
+        <div
+          className={
+            theater
+              ? "mx-auto flex w-full max-w-[1800px] justify-center"
+              : "mx-auto w-full max-w-[2000px] px-4 pt-4 lg:px-6"
+          }
+        >
+          <VideoPlayer
+            video={video}
+            theater={theater}
+            onToggleTheater={toggleTheater}
+            className={
+              theater
+                ? "aspect-video max-h-[calc(100vh-8rem)] w-auto max-w-full"
+                : "aspect-video w-full"
+            }
+          />
         </div>
+      </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 p-4 lg:p-6">
+      {/* Main Content */}
+      <div className="max-w-[2000px] mx-auto">
+        <div
+          className={`grid gap-6 p-4 lg:p-6 ${
+            theater ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-[1fr_380px]"
+          }`}
+        >
           {/* Left Column */}
           <div className="space-y-6">
             <VideoInfo video={video} />
-
-            {/* AI Scene Timeline - NEW */}
             <AISceneTimeline />
-
             <VideoStats video={video} />
 
-            {/* AI Features Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <AIMoodAnalysis />
               <AIContentWarnings />
@@ -57,14 +74,16 @@ const WatchPage =  ({ params }: {params: Promise<{video_id:string}>}) => {
             <CommentSection videoId={video.id} />
           </div>
 
-          {/* Right Sidebar */}
-          <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-            <AIRecommendations />
-            <AIWatchParty />
-            <RelatedVideos
-              currentVideoId={video.id}
-              category={video.category}
-            />
+          {/* Right Sidebar — becomes a row below the player in theater */}
+          <div className={theater ? "" : "space-y-4 lg:sticky lg:top-6 lg:self-start"}>
+            <div className={theater ? "grid grid-cols-1 gap-4 md:grid-cols-3" : "space-y-4"}>
+              <AIRecommendations />
+              <AIWatchParty />
+              <RelatedVideos
+                currentVideoId={video.id}
+                category={video.category}
+              />
+            </div>
           </div>
         </div>
       </div>

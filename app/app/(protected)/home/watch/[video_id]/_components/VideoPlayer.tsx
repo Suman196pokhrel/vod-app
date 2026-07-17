@@ -35,6 +35,7 @@ interface VideoData {
 
 interface VideoPlayerProps {
   video: VideoData
+
 }
 
 const storageUrl = (path: string) =>

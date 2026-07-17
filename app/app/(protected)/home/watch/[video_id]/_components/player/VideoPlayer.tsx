@@ -13,7 +13,14 @@ import { ControlBar } from "./ControlBar"
 import { storageUrl } from "./utils"
 import type { VideoData } from "./types"
 
-export default function VideoPlayer({ video }: { video: VideoData }) {
+interface VideoPlayerProps {
+  video: VideoData
+  theater: boolean
+  onToggleTheater: () => void
+  className?:string
+}
+
+export default function VideoPlayer({ video, theater, onToggleTheater, className }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const shellRef = useRef<HTMLDivElement>(null)
 
@@ -94,6 +101,8 @@ export default function VideoPlayer({ video }: { video: VideoData }) {
         buffered={s.buffered}
         volume={s.volume}
         muted={s.muted}
+        theater={theater}
+        onToggleTheater={onToggleTheater}
         fullscreen={fullscreen}
         speed={speed}
         qualities={qualities}

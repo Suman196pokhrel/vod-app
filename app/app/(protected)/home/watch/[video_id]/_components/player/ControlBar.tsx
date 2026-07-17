@@ -7,6 +7,7 @@ import { VolumeControl } from "./VolumeControl"
 import { SettingsMenu } from "./SettingsMenu"
 import { formatTime } from "./utils"
 import type { QualityLevel } from "./types"
+import { TheaterButton } from "./TheaterButton"
 
 interface Props {
   visible: boolean
@@ -16,12 +17,14 @@ interface Props {
   buffered: number
   volume: number
   muted: boolean
+  theater: boolean
   fullscreen: boolean
   speed: number
   qualities: QualityLevel[]
   quality: number
   autoHeight: number | null
   onTogglePlay: () => void
+  onToggleTheater: ()=> void
   onSeekBy: (d: number) => void
   onScrubStart: () => void
   onScrub: (t: number) => void
@@ -85,6 +88,9 @@ export function ControlBar(p: Props) {
           qualities={p.qualities} quality={p.quality} autoHeight={p.autoHeight}
           onQualityChange={p.onQualityChange} onOpenChange={p.onMenuOpenChange}
         />
+
+        {!p.fullscreen && <TheaterButton theater={p.theater} onToggle={p.onToggleTheater} />}
+
 
         <Button variant="ghost" size="icon" onClick={p.onToggleFullscreen}
           className="h-9 w-9 text-white hover:bg-white/10 hover:text-white"
