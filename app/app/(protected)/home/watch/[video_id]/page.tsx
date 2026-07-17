@@ -1,6 +1,6 @@
 "use client"
 // app/home/watch/[id]/page.tsx
-import VideoPlayer from "./_components/VideoPlayer";
+import VideoPlayer from "./_components/player/VideoPlayer";
 import VideoInfo from "./_components/VideoInfo";
 import VideoStats from "./_components/VideoStats";
 import RelatedVideos from "./_components/RelatedVideos";
