@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThumbsUp, ThumbsDown, Share2, Download, Plus, Check } from 'lucide-react'
-import { Video } from '../../../_components/VideoGrid'
+import { Video } from '@/lib/types/video'
 
 interface VideoInfoProps {
   video: Video
@@ -22,12 +22,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
     <div className="space-y-4">
       {/* Title and Badges */}
       <div className="space-y-3">
-        <div className="flex items-start gap-3">
-          <h1 className="text-3xl font-bold flex-1">{video.title}</h1>
-          {video.isNew && (
-            <Badge variant="destructive" className="mt-1">NEW</Badge>
-          )}
-        </div>
+        <h1 className="text-3xl font-bold">{video.title}</h1>
 
         {/* Metadata Row */}
         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -35,16 +30,19 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             {video.category}
           </Badge>
           <span>•</span>
-          <span>{video.views} views</span>
-          <span>•</span>
-          <span>{new Date(video.releaseDate).getFullYear()}</span>
-          <span>•</span>
-          <Badge variant="outline">{video.ageRating}</Badge>
-          <span>•</span>
-          <div className="flex items-center gap-1">
-            <span className="text-yellow-500">★</span>
-            <span className="font-semibold text-foreground">{video.rating}</span>
-          </div>
+          <span>{video.views_count} views</span>
+          {video.release_date && (
+            <>
+              <span>•</span>
+              <span>{new Date(video.release_date).getFullYear()}</span>
+            </>
+          )}
+          {video.age_rating && (
+            <>
+              <span>•</span>
+              <Badge variant="outline">{video.age_rating}</Badge>
+            </>
+          )}
         </div>
       </div>
 
@@ -151,16 +149,18 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       )}
 
       {/* Tags */}
-      <div>
-        <h3 className="font-semibold mb-2">Tags</h3>
-        <div className="flex flex-wrap gap-2">
-          {video.tags.map((tag, index) => (
-            <Badge key={index} variant="outline" className="font-normal cursor-pointer hover:bg-muted">
-              #{tag}
-            </Badge>
-          ))}
+      {video.tags && video.tags.length > 0 && (
+        <div>
+          <h3 className="font-semibold mb-2">Tags</h3>
+          <div className="flex flex-wrap gap-2">
+            {video.tags.map((tag, index) => (
+              <Badge key={index} variant="outline" className="font-normal cursor-pointer hover:bg-muted">
+                #{tag}
+              </Badge>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
