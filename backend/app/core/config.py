@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     redis_password: str
     redis_db: int = 0
 
+    # video settings
+    max_video_size:int   #in GB
+    max_thumbnail_size:int  # in MB
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 
