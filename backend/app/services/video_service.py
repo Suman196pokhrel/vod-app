@@ -9,6 +9,8 @@ from app.services.minio_service import minio_service
 from app.models.users import User  
 from app.schemas.video import VideoProcessingStatusResponse
 from app.utils.video_helpers import DEFAULT_META, STATUS_META, ProcessingStatus
+from app.core.config import get_settings
+from app.core.dependencies import _check_file_size, _detect_format_from_magic,_validate_thumbnail_with_pillow,_validate_video_with_ffprobe
 
 from fastapi import HTTPException, UploadFile
 from typing import Optional, List, Tuple
@@ -17,10 +19,16 @@ from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 class VideoService:
     """Business logic for video operations"""
-    
+    MAX_VIDEO_SIZE = settings.max_video_size * 1024**3      # 1 GB
+    MAX_THUMBNAIL_SIZE = settings.max_thumbnail_size * 1024**2  # 10 MB
+
+    ALLOWED_VIDEO_FORMATS = {"mp4", "mov", "avi", "mkv/webm", "webm"}
+    ALLOWED_THUMBNAIL_FORMATS = {"jpeg", "png", "gif", "webp"}
+
     async def create_video_with_files(
         self,
         db: Session,
@@ -243,61 +251,43 @@ class VideoService:
             else:
                 logger.info("Database commit successful, no cleanup required")
     
-    def _validate_video_file(self, file: UploadFile):
-        """
-        Validate video file type
+    def _validate_video_file(self, file: UploadFile) -> dict:
+        # 1. Size
+        _check_file_size(file, self.MAX_VIDEO_SIZE, "Video")
         
-        Args:
-            file: Uploaded file to validate
-            
-        Raises:
-            HTTPException: If validation fails
-        """
-        if not file:
-            raise HTTPException(status_code=400, detail="Video file is required")
-        
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="Video file must have a filename")
-        
-        allowed_types = [
-            "video/mp4", 
-            "video/mpeg", 
-            "video/quicktime", 
-            "video/x-msvideo",
-            "video/x-matroska"  # .mkv
-        ]
-        
-        if file.content_type not in allowed_types:
-            logger.warning(f"Invalid video content type: {file.content_type}")
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid video format. Allowed types: mp4, mpeg, mov, avi, mkv"
-            )
-    
-    def _validate_thumbnail_file(self, file: UploadFile):
-        """
-        Validate thumbnail file type
-        
-        Args:
-            file: Uploaded file to validate
-            
-        Raises:
-            HTTPException: If validation fails
-        """
-        if not file:
-            return
-        
-        if not file.filename:
-            raise HTTPException(status_code=400, detail="Thumbnail file must have a filename")
-        
-        allowed_types = ["image/jpeg", "image/png", "image/webp"]
-        
-        if file.content_type not in allowed_types:
-            logger.warning(f"Invalid thumbnail content type: {file.content_type}")
+        # Magic bytes
+        detected = _detect_format_from_magic(file)
+        if detected not in self.ALLOWED_VIDEO_FORMATS:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid thumbnail format. Allowed types: jpeg, png, webp"
+                detail=f"Video format '{detected}' not allowed. Allowed: {self.ALLOWED_VIDEO_FORMATS}"
             )
+        
+        # 2. Deep validation with ffprobe
+        stream_info = _validate_video_with_ffprobe(file)
+        
+        # Optional: check duration, resolution limits
+        duration = float(stream_info.get("duration", 0))
+        if duration > 3600:  # 1 hour max
+            raise HTTPException(status_code=400, detail="Video exceeds 1 hour duration")
+        
+        return stream_info
+    
+    def _validate_thumbnail_file(self, file: UploadFile) -> tuple[int, int]:
+        # 1. Size
+        _check_file_size(file, self.MAX_THUMBNAIL_SIZE, "Thumbnail")
+        
+        #  Magic bytes
+        detected = _detect_format_from_magic(file)
+        if detected not in self.ALLOWED_THUMBNAIL_FORMATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Image format '{detected}' not allowed"
+            )
+        
+        # 2. Deep validation with Pillow
+        return _validate_thumbnail_with_pillow(file)
+    
 
     def get_video_processing_status_service(
         self,
@@ -336,7 +326,6 @@ class VideoService:
             is_completed=is_completed,
             is_failed=is_failed,
         )
-
     
     def get_video_by_id(self, db: Session, video_id: str, user_id: Optional[str] = None) -> Video:
         """Get video by ID with optional access control"""
