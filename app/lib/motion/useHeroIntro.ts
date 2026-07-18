@@ -7,15 +7,16 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 let pluginRegistered = false;
 
 /**
- * Sequenced load-in for the hero (eyebrow -> headline -> subcopy -> cta),
- * plus a subtle scroll-linked parallax on the backdrop's highlight layer.
- * Both are skipped entirely for prefers-reduced-motion users.
+ * Sequenced load-in for the hero (eyebrow -> headline -> subcopy -> cta ->
+ * device), plus a subtle scroll-linked parallax on the backdrop's highlight
+ * layer. Both are skipped entirely for prefers-reduced-motion users.
  */
 export function useHeroIntro() {
   const eyebrowRef = useRef<HTMLSpanElement | null>(null);
   const headlineRef = useRef<HTMLHeadingElement | null>(null);
   const subcopyRef = useRef<HTMLParagraphElement | null>(null);
   const ctaRef = useRef<HTMLDivElement | null>(null);
+  const deviceRef = useRef<HTMLDivElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function useHeroIntro() {
       headlineRef.current,
       subcopyRef.current,
       ctaRef.current,
+      deviceRef.current,
     ];
     if (elements.every(Boolean)) {
       gsap.from(elements, {
@@ -60,5 +62,5 @@ export function useHeroIntro() {
     };
   }, []);
 
-  return { eyebrowRef, headlineRef, subcopyRef, ctaRef, backdropRef };
+  return { eyebrowRef, headlineRef, subcopyRef, ctaRef, deviceRef, backdropRef };
 }

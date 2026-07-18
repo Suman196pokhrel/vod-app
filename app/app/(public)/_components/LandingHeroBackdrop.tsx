@@ -1,12 +1,14 @@
 import { forwardRef } from "react";
 
-// Static grain + a soft grayscale radial highlight for depth. This is a
-// tonal vignette, not a color gradient — it stays within the "no gradients"
-// rule because it never introduces hue, only light/dark falloff.
+// Static grain, a faint grid, a slow light sweep, and a soft grayscale
+// radial highlight for depth. All tonal (white-on-black), never a color
+// gradient — stays within the "no gradients" rule.
 export const LandingHeroBackdrop = forwardRef<HTMLDivElement>(
   function LandingHeroBackdrop(_props, ref) {
     return (
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-landing-bg">
+        <div className="bg-grid absolute inset-0 opacity-40" />
+        <div className="animate-grid-sweep absolute inset-0" />
         <div
           ref={ref}
           className="absolute inset-0 opacity-[0.06]"
