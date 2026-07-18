@@ -12,9 +12,8 @@ from app.models.users import User
 from app.models.tokens import RefreshToken
 from app.services.email_service import send_password_reset_email
 from app.core.security import hash_password
-import uuid
 import random
-
+import secrets
 
 def generate_otp() -> str:
     """
@@ -23,7 +22,7 @@ def generate_otp() -> str:
     Returns:
         String of 6 digits (e.g., "842719")
     """
-    return str(random.randint(100000, 999999))
+    return str(secrets.randbelow(900_000) + 100_000)
 
 def request_password_reset(email: str, db: Session) -> dict:
     """
