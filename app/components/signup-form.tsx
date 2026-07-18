@@ -98,24 +98,24 @@ export function SignupForm() {
 
   return (
     <div className="w-full max-w-sm animate-fade-in-scale">
-      <div className="rounded-2xl bg-white px-8 py-9 shadow-[0_24px_80px_rgba(15,23,42,0.09)] ring-1 ring-slate-200/70">
+      <div className="rounded-md border border-landing-border bg-landing-elevated px-8 py-9">
         {/* Header */}
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-violet-600 to-indigo-600 shadow-[0_4px_14px_rgba(99,75,229,0.38)]">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-landing-fg">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M10 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm-6 15c0-3.314 2.686-5 6-5s6 1.686 6 5H4z" fill="white" fillOpacity="0.9"/>
-              <path d="M17 7v2m0 2v2" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
-              <path d="M16 9h2" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
+              <path d="M10 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm-6 15c0-3.314 2.686-5 6-5s6 1.686 6 5H4z" fill="#0a0a0a"/>
+              <path d="M17 7v2m0 2v2" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round"/>
+              <path d="M16 9h2" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-slate-900">Create your account</h1>
-          <p className="mt-1 text-sm text-slate-500">Free forever. No credit card required.</p>
+          <h1 className="text-xl font-bold text-landing-fg">Create your account</h1>
+          <p className="mt-1 text-sm text-landing-muted">Free forever. No credit card required.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Username */}
           <div className="space-y-1.5">
-            <label htmlFor="username" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="username" className="block text-sm font-medium text-landing-fg">
               Username
             </label>
             <Input
@@ -125,16 +125,16 @@ export function SignupForm() {
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-xl border-slate-200 bg-slate-50/60 text-sm placeholder:text-slate-400 focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-400/20"
+              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
             />
             {errors.userName && (
-              <p className="text-xs text-rose-600">{errors.userName}</p>
+              <p className="text-xs text-red-400">{errors.userName}</p>
             )}
           </div>
 
           {/* Email */}
           <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="email" className="block text-sm font-medium text-landing-fg">
               Email address
             </label>
             <Input
@@ -144,16 +144,16 @@ export function SignupForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-xl border-slate-200 bg-slate-50/60 text-sm placeholder:text-slate-400 focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-400/20"
+              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
             />
             {errors.email && (
-              <p className="text-xs text-rose-600">{errors.email}</p>
+              <p className="text-xs text-red-400">{errors.email}</p>
             )}
           </div>
 
           {/* Password */}
           <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="password" className="block text-sm font-medium text-landing-fg">
               Password
             </label>
             <Input
@@ -163,16 +163,16 @@ export function SignupForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-xl border-slate-200 bg-slate-50/60 text-sm placeholder:text-slate-400 focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-400/20"
+              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
             />
             {errors.password && (
-              <p className="text-xs text-rose-600">{errors.password}</p>
+              <p className="text-xs text-red-400">{errors.password}</p>
             )}
           </div>
 
           {/* Confirm Password */}
           <div className="space-y-1.5">
-            <label htmlFor="confirm-password" className="block text-sm font-medium text-slate-700">
+            <label htmlFor="confirm-password" className="block text-sm font-medium text-landing-fg">
               Confirm password
             </label>
             <Input
@@ -182,10 +182,10 @@ export function SignupForm() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-xl border-slate-200 bg-slate-50/60 text-sm placeholder:text-slate-400 focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-400/20"
+              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
             />
             {errors.confirmPassword && (
-              <p className="text-xs text-rose-600">{errors.confirmPassword}</p>
+              <p className="text-xs text-red-400">{errors.confirmPassword}</p>
             )}
           </div>
 
@@ -193,7 +193,7 @@ export function SignupForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="mt-1 w-full rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(79,70,229,0.38)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(79,70,229,0.5)] disabled:opacity-60 disabled:hover:scale-100"
+            className="mt-1 w-full rounded-md bg-landing-fg px-4 py-2.5 text-sm font-semibold text-landing-bg transition-opacity duration-200 hover:opacity-80 disabled:opacity-60"
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
@@ -207,14 +207,12 @@ export function SignupForm() {
               "Create account"
             )}
           </button>
-
-          
         </form>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-sm text-slate-500">
+        <p className="mt-6 text-center text-sm text-landing-muted">
           Already have an account?{' '}
-          <Link href="/auth/sign-in" className="font-semibold text-indigo-600 hover:text-indigo-700">
+          <Link href="/auth/sign-in" className="font-semibold text-landing-fg underline decoration-landing-border underline-offset-4 hover:decoration-landing-fg">
             Sign in
           </Link>
         </p>
