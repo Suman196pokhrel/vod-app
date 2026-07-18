@@ -28,7 +28,7 @@ async def create_new_video(
     video: UploadFile = File(..., description="Video file (MP4, MOV, WebM)"),
     thumbnail: Optional[UploadFile] = File(None, description="Thumbnail image (JPEG, PNG)"),
     data: str = Form(..., description="JSON string with video metadata"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -104,7 +104,7 @@ def get_public_videos(
 )
 def delete_video(
     video_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Delete a video (owner only)"""
@@ -119,6 +119,7 @@ def delete_video(
 )
 def increment_video_views(
     video_id: str,
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Increment view count when video is played"""
