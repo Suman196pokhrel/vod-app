@@ -117,30 +117,9 @@ export function LoginForm({
             )}
           </button>
 
-          {/* Divider */}
-          <div className="relative my-1">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-2 text-slate-400">or continue with</span>
-            </div>
-          </div>
+         
 
-          {/* Google */}
-          <button
-            type="button"
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:border-indigo-200 hover:bg-indigo-50/40 hover:text-indigo-800 disabled:opacity-60"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M15.68 8.18c0-.57-.05-1.11-.14-1.64H8v3.1h4.29a3.67 3.67 0 0 1-1.59 2.41v2h2.57c1.5-1.38 2.37-3.42 2.37-5.87z" fill="#4285F4"/>
-              <path d="M8 16c2.16 0 3.97-.72 5.29-1.94l-2.57-2c-.71.48-1.63.76-2.72.76-2.09 0-3.86-1.41-4.49-3.31H.85v2.06A8 8 0 0 0 8 16z" fill="#34A853"/>
-              <path d="M3.51 9.51A4.8 4.8 0 0 1 3.26 8c0-.53.09-1.04.25-1.51V4.43H.85A8 8 0 0 0 0 8c0 1.29.31 2.51.85 3.57l2.66-2.06z" fill="#FBBC05"/>
-              <path d="M8 3.18c1.18 0 2.23.41 3.06 1.2l2.3-2.3A8 8 0 0 0 .85 4.43L3.51 6.5C4.14 4.59 5.91 3.18 8 3.18z" fill="#EA4335"/>
-            </svg>
-            Sign in with Google
-          </button>
+          
         </form>
 
         {/* Footer */}
