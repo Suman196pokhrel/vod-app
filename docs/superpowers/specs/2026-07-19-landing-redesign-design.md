@@ -76,7 +76,9 @@ Landing components are hand-styled with Tailwind utility classes against the new
 
 ## Auth Pages
 
-Light pass only: restyle `AuthPageShell` and any pastel/gradient decoration in `FormFields`/`SuccessCard` to the same near-black/warm-white palette for visual consistency when a user clicks through from the new landing page. No changes to form fields, validation, or submit logic.
+Light pass only: restyle `AuthPageShell` (the shared chrome) and the two forms actually rendered by the routed auth pages — `components/signin-form.tsx` (used by `/auth/sign-in`) and `components/signup-form.tsx` (used by `/auth/sign-up`) — to the same near-black/warm-white palette, since leaving their gradient card visuals in place would sit jarringly on the new dark shell. Only `className` strings and SVG fill colors change; state, `handleSubmit`, validation functions, and API calls are untouched.
+
+**Corrected during planning:** the components under `app/(public)/auth/_components/` named `FormFields.tsx` and `SuccessCard.tsx` are *not* used by sign-in/sign-up (confirmed via import trace) — they belong to `forgot-pw`/`reset-password`/`verify-email`, which stay out of scope for this pass along with `FormFields.tsx`/`SuccessCard.tsx` themselves. This narrows the original wording, it doesn't expand it.
 
 ## Implementation Constraints (user-specified)
 
@@ -90,3 +92,4 @@ Light pass only: restyle `AuthPageShell` and any pastel/gradient decoration in `
 - Home feed (`app/(protected)/home/`) and admin panel redesign — separate follow-up phase.
 - Promoting these tokens into the global `:root`/`.dark` theme.
 - Any change to auth/routing/API logic.
+- `forgot-pw`, `reset-password`, `verify-email` pages and their `FormFields.tsx`/`SuccessCard.tsx` components — not on the primary sign-in/sign-up path, deferred to keep this pass focused.
