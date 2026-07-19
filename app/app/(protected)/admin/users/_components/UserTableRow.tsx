@@ -51,13 +51,13 @@ export function UserTableRow({
   };
 
   const getEngagementColor = (score: number) => {
-    if (score >= 70) return "text-green-600";
-    if (score >= 40) return "text-yellow-600";
-    return "text-red-600";
+    if (score >= 70) return "text-primary";
+    if (score >= 40) return "text-muted-foreground";
+    return "text-destructive";
   };
 
   return (
-    <tr className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+    <tr className="border-b border-border hover:bg-muted/50 transition-colors duration-(--duration-fast)">
       <td className="p-4">
         <div className="flex items-center gap-3">
           <Avatar>
@@ -65,8 +65,8 @@ export function UserTableRow({
             <AvatarFallback>{user.name[0]}</AvatarFallback>
           </Avatar>
           <div>
-            <p className="font-medium text-gray-900">{user.name}</p>
-            <p className="text-sm text-gray-500">{user.email}</p>
+            <p className="font-medium text-foreground">{user.name}</p>
+            <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
         </div>
       </td>
@@ -77,10 +77,10 @@ export function UserTableRow({
         <StatusBadge status={user.status} />
       </td>
       <td className="p-4">
-        <p className="text-sm text-gray-900">{user.videosWatched}</p>
+        <p className="text-sm text-foreground">{user.videosWatched}</p>
       </td>
       <td className="p-4">
-        <p className="text-sm text-gray-900">{user.totalWatchTime}h</p>
+        <p className="text-sm text-foreground">{user.totalWatchTime}h</p>
       </td>
       <td className="p-4">
         <p className={`text-sm font-medium ${getEngagementColor(user.engagementScore)}`}>
@@ -88,10 +88,10 @@ export function UserTableRow({
         </p>
       </td>
       <td className="p-4">
-        <p className="text-sm text-gray-600">{formatDate(user.lastActive)}</p>
+        <p className="text-sm text-muted-foreground">{formatDate(user.lastActive)}</p>
       </td>
       <td className="p-4">
-        <p className="text-sm text-gray-600">{formatDate(user.joinDate)}</p>
+        <p className="text-sm text-muted-foreground">{formatDate(user.joinDate)}</p>
       </td>
       <td className="p-4">
         <div className="flex justify-end">
@@ -101,7 +101,7 @@ export function UserTableRow({
                 <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-white border-gray-200">
+            <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() => onViewDetails(user.id)}
                 className="gap-2"
@@ -113,11 +113,11 @@ export function UserTableRow({
                 <Edit className="w-4 h-4" />
                 Edit User
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-gray-200" />
+              <DropdownMenuSeparator />
               {user.status === "active" ? (
                 <DropdownMenuItem
                   onClick={() => onSuspend(user.id)}
-                  className="gap-2 text-yellow-600"
+                  className="gap-2"
                 >
                   <Ban className="w-4 h-4" />
                   Suspend User
@@ -125,16 +125,16 @@ export function UserTableRow({
               ) : (
                 <DropdownMenuItem
                   onClick={() => onActivate(user.id)}
-                  className="gap-2 text-green-600"
+                  className="gap-2 text-primary focus:text-primary"
                 >
                   <CheckCircle className="w-4 h-4" />
                   Activate User
                 </DropdownMenuItem>
               )}
-              <DropdownMenuSeparator className="bg-gray-200" />
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onDelete(user.id)}
-                className="gap-2 text-red-600"
+                className="gap-2 text-destructive focus:text-destructive"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete User

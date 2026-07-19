@@ -163,12 +163,12 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Users</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl text-foreground">Users</h1>
+          <p className="text-muted-foreground mt-1">
             Manage users and track engagement metrics
           </p>
         </div>
@@ -179,26 +179,21 @@ export default function UsersPage() {
             title="Total Users"
             value={stats.totalUsers}
             icon={Users}
-            iconColor="bg-blue-500"
           />
           <StatCard
             title="Active Users"
             value={stats.activeUsers}
             icon={TrendingUp}
-            iconColor="bg-green-500"
-            valueColor="text-green-600"
           />
           <StatCard
             title="Total Watch Time"
             value={`${stats.totalWatchTime.toFixed(0)}h`}
             icon={Clock}
-            iconColor="bg-purple-500"
           />
           <StatCard
             title="Avg Engagement"
             value={`${stats.avgEngagement.toFixed(0)}%`}
             icon={Activity}
-            iconColor="bg-orange-500"
           />
         </div>
 
@@ -213,36 +208,36 @@ export default function UsersPage() {
         />
 
         {/* Users Table */}
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-card border border-border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     User
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Role
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Status
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Videos Watched
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Watch Time
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Engagement
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Last Active
                   </th>
-                  <th className="text-left p-4 text-sm font-medium text-gray-700">
+                  <th className="text-left p-4 text-sm font-medium text-muted-foreground">
                     Joined
                   </th>
-                  <th className="text-right p-4 text-sm font-medium text-gray-700">
+                  <th className="text-right p-4 text-sm font-medium text-muted-foreground">
                     Actions
                   </th>
                 </tr>
@@ -266,9 +261,9 @@ export default function UsersPage() {
           {/* Empty State */}
           {filteredUsers.length === 0 && (
             <div className="text-center py-12">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 font-medium">No users found</p>
-              <p className="text-sm text-gray-500 mt-1">
+              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-foreground font-medium">No users found</p>
+              <p className="text-sm text-muted-foreground mt-1">
                 Try adjusting your search or filters
               </p>
             </div>
@@ -276,12 +271,12 @@ export default function UsersPage() {
         </div>
 
         {/* Footer Stats */}
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
           <p>
-            Showing <span className="font-medium">{filteredUsers.length}</span>{" "}
-            of <span className="font-medium">{users.length}</span> users
+            Showing <span className="font-medium text-foreground">{filteredUsers.length}</span>{" "}
+            of <span className="font-medium text-foreground">{users.length}</span> users
           </p>
-          <p className="text-gray-500">
+          <p>
             Last updated: {new Date().toLocaleDateString()}
           </p>
         </div>

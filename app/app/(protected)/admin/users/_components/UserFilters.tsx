@@ -26,19 +26,19 @@ export function UserFilters({
   onStatusFilterChange,
 }: UserFiltersProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="bg-card border border-border rounded-lg p-6">
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search users by name or email..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 bg-white border-gray-300 text-gray-900"
+            className="pl-10"
           />
         </div>
         <Select value={roleFilter} onValueChange={onRoleFilterChange}>
-          <SelectTrigger className="w-full md:w-[180px] bg-white border-gray-300 text-gray-900">
+          <SelectTrigger className="w-full md:w-[180px]">
             <SelectValue placeholder="Filter by role" />
           </SelectTrigger>
           <SelectContent>
@@ -48,7 +48,7 @@ export function UserFilters({
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-          <SelectTrigger className="w-full md:w-[180px] bg-white border-gray-300 text-gray-900">
+          <SelectTrigger className="w-full md:w-[180px]">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
