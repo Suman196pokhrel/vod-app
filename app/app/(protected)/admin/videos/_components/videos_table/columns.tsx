@@ -4,40 +4,26 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ProcessingStatusBadge, PublishStatusBadge } from './status-badge';
-import { 
-  formatFileSize, 
-  formatDuration, 
-  formatNumber, 
+import { VideoActionsCell } from './VideoActionsCell';
+import {
+  formatFileSize,
+  formatDuration,
+  formatNumber,
   formatDate,
-  getResolutionLabel 
+  getResolutionLabel
 } from './helper';
 import {
-  MoreHorizontal,
-  Play,
-  Pencil,
-  Trash,
-  Download,
-  Link as LinkIcon,
-  Info,
   Eye,
   Heart,
   Video as VideoIcon,
   AlertCircle,
   ArrowUpDown,
-  Copy
 } from 'lucide-react';
 import { useVideoProcessing } from '@/hooks/video/use-video-processing';
 
@@ -399,70 +385,7 @@ export const columns: ColumnDef<Video>[] = [
   // Actions
   {
     id: 'actions',
-    cell: ({ row }) => {
-      const video = row.original;
-
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Open menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem 
-              onClick={() => console.log('Preview', video.id)}
-              disabled={!video.manifest_url}
-            >
-              <Play className="mr-2 h-4 w-4" />
-              Preview Video
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => console.log('Edit', video.id)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Details
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => console.log('View details', video.id)}>
-              <Info className="mr-2 h-4 w-4" />
-              View Details
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem 
-              onClick={() => console.log('Download', video.id)}
-              disabled={!video.manifest_url}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => {
-                if (video.manifest_url) {
-                  navigator.clipboard.writeText(video.manifest_url);
-                }
-              }}
-              disabled={!video.manifest_url}
-            >
-              <LinkIcon className="mr-2 h-4 w-4" />
-              Copy Link
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => navigator.clipboard.writeText(video.id)}
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Copy ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => console.log('Delete', video.id)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash className="mr-2 h-4 w-4" />
-              Delete Video
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    },
+    cell: ({ row }) => <VideoActionsCell video={row.original} />,
     size: 60,
   },
 ];

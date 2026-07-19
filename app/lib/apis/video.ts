@@ -231,9 +231,17 @@ export const calculatePagination = (response: AdminVideosResponse) => {
 /**
  * Delete video
  */
-export const deleteVideo = async (videoId: string) => {
-  const response = await api.delete(`/videos/${videoId}`);
-  return response.data;
+export const deleteVideo = async (videoId: string): Promise<void> => {
+  try {
+    await api.delete(`/videos/by-id/${videoId}`);
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      throw new Error(
+        error.response?.data?.detail || "Failed to delete video"
+      );
+    }
+    throw new Error("An unexpected error occurred while deleting the video");
+  }
 };
 
 /**

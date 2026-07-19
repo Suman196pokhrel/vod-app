@@ -110,8 +110,8 @@ def delete_video(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a video (owner only)"""
-    video_service.delete_video(db, video_id, current_user.id)
+    """Delete a video (owner or admin — this route already requires admin)"""
+    video_service.delete_video(db, video_id, current_user.id, is_admin=current_user.is_admin())
     return None
 
 

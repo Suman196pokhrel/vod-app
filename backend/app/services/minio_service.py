@@ -249,26 +249,32 @@ class MinIOService:
     
     def delete_video(self, object_name: str):
         """Delete video from MinIO"""
-        logger.info(f"Deleting video: {object_name}")
+        # Stored paths are bucket-prefixed (e.g. "vod-videos/user-x/uuid.mp4",
+        # see upload_video's return value) — strip that leading segment since
+        # bucket_name is already passed separately, or remove_object silently
+        # no-ops on a key that was never uploaded (S3 delete is idempotent).
+        key = "/".join(object_name.split("/")[1:])
+        logger.info(f"Deleting video: {key}")
         try:
             self.client.remove_object(
                 bucket_name=settings.minio_bucket_videos,
-                object_name=object_name
+                object_name=key
             )
-            logger.info(f"Video deleted: {object_name}")
+            logger.info(f"Video deleted: {key}")
         except S3Error as e:
             logger.error(f"Failed to delete video: {str(e)}")
             raise Exception(f"Failed to delete video: {str(e)}")
-    
+
     def delete_thumbnail(self, object_name: str):
         """Delete thumbnail from MinIO"""
-        logger.info(f"Deleting thumbnail: {object_name}")
+        key = "/".join(object_name.split("/")[1:])
+        logger.info(f"Deleting thumbnail: {key}")
         try:
             self.client.remove_object(
                 bucket_name=settings.minio_bucket_thumbnails,
-                object_name=object_name
+                object_name=key
             )
-            logger.info(f"Thumbnail deleted: {object_name}")
+            logger.info(f"Thumbnail deleted: {key}")
         except S3Error as e:
             logger.error(f"Failed to delete thumbnail: {str(e)}")
             raise Exception(f"Failed to delete thumbnail: {str(e)}")

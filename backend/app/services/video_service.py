@@ -366,31 +366,38 @@ class VideoService:
             .all()
         )
     
-    def delete_video(self, db: Session, video_id: str, user_id: str) -> bool:
+    def delete_video(self, db: Session, video_id: str, user_id: str, is_admin: bool = False) -> bool:
         """Delete video and associated files"""
         video = db.query(Video).filter(Video.id == video_id).first()
-        
+
         if not video:
             raise HTTPException(status_code=404, detail="Video not found")
-        
-        # Only owner can delete
-        if video.user_id != user_id:
+
+        # Owner or admin can delete
+        if video.user_id != user_id and not is_admin:
             raise HTTPException(status_code=403, detail="Not authorized to delete this video")
-        
+
+        # Best-effort MinIO cleanup — a missing/already-deleted object must
+        # not block removing the DB row, or the video becomes undeletable.
         try:
-            # Delete files from MinIO
-            minio_service.delete_video(video.video_url)
-            if video.thumbnail_url:
+            minio_service.delete_video(video.raw_video_path)
+        except Exception as e:
+            logger.warning(f"Failed to delete raw video from MinIO for {video_id}: {e}")
+
+        if video.thumbnail_url:
+            try:
                 minio_service.delete_thumbnail(video.thumbnail_url)
-            
-            # Delete database record
+            except Exception as e:
+                logger.warning(f"Failed to delete thumbnail from MinIO for {video_id}: {e}")
+
+        try:
             db.delete(video)
             db.commit()
-            
-            return True
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to delete video: {str(e)}")
+
+        return True
     
     def increment_views(self, db: Session, video_id: str):
         """Increment video view count"""
