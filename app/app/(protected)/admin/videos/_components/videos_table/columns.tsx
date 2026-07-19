@@ -41,6 +41,11 @@ import {
 } from 'lucide-react';
 import { useVideoProcessing } from '@/hooks/video/use-video-processing';
 
+// Stored thumbnail_url is a MinIO object key (e.g. "user-x/uuid.jpg"), not a
+// browser-loadable URL — same helper as VideoCard.tsx / the player.
+const storageUrl = (path: string) =>
+  `${process.env.NEXT_PUBLIC_API_URL}/storage/${path}`;
+
 export const columns: ColumnDef<Video>[] = [
   // Selection column
   {
@@ -90,7 +95,7 @@ export const columns: ColumnDef<Video>[] = [
           <div className="relative w-28 h-16 rounded-md overflow-hidden bg-muted shrink-0 border">
             {video.thumbnail_url ? (
               <img
-                src={video.thumbnail_url}
+                src={storageUrl(video.thumbnail_url)}
                 alt={video.title}
                 className="object-cover w-full h-full"
               />
