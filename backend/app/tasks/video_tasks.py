@@ -234,7 +234,13 @@ def transcode_quality(self, data:dict, quality:str):
             '-threads', f'{settings.FFMPEG_THREADS}',             # THREAD LIMIT HERE
             '-preset', 'medium',         # Encoding speed
             '-crf', '23',                # Quality (lower = better, 18-28 range)
-            '-vf', f"scale={q_settings['width']}:{q_settings['height']}",  # Resolution
+            # Fit within the target box preserving source aspect ratio, then
+            # pad with black to the exact target dimensions (letterbox/pillarbox)
+            # instead of stretching mismatched aspect ratios (e.g. 9:16 phone video).
+            '-vf', (
+                f"scale=w={q_settings['width']}:h={q_settings['height']}:force_original_aspect_ratio=decrease,"
+                f"pad=w={q_settings['width']}:h={q_settings['height']}:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
+            ),
             '-b:v', q_settings['bitrate'], # Target bitrate
             '-c:a', 'aac',               # Audio codec
             '-b:a', '128k',              # Audio bitrate
