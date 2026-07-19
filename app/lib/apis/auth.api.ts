@@ -28,17 +28,24 @@ export const authAPI = {
     });
   },
 
-  // Get current user profile
+  // Get current user profile. Only called from authStore's own
+  // initialize()/refreshToken() flows, which already handle failure
+  // gracefully — skipAuthRedirect prevents the axios interceptor from
+  // racing that with its own hard redirect (would otherwise bounce an
+  // expired-session visitor off public routes like `/` and `/watch/*`).
   getProfile: async () => {
-    const response = await api.get("/user/profile")
+    const response = await api.get("/user/profile", { skipAuthRedirect: true })
     return response.data
   },
 
-  // Refresh
+  // Refresh. Same rationale as getProfile above — authStore.refreshToken()
+  // owns the failure path (logout + clear tokens); it must not be raced by
+  // the interceptor's own redirect-on-refresh-failure handling.
   refresh: async (refreshToken: string) => {
     const response = await api.post("/auth/refresh", {
       refresh_token: refreshToken,
-    }
+    },
+    { skipAuthRedirect: true }
   );
     return response.data;
   },
