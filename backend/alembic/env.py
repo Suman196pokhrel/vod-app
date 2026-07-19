@@ -33,9 +33,11 @@ if config.config_file_name is not None:
 
 
 
-# set the SQLAlchemy URL from our settings
+# set the SQLAlchemy URL from our settings — sync driver, matching the
+# rest of the app (see CLAUDE.md: DATABASE_URL_SYNC is used everywhere,
+# not the async URL; asyncpg isn't even installed in this project)
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_url_sync)
 
 
 # Add your model's MetaData object here for 'autogenerate' support

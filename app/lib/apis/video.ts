@@ -229,7 +229,7 @@ export const calculatePagination = (response: AdminVideosResponse) => {
 };
 
 /**
- * Delete video
+ * Delete video (soft delete — hides it, does not remove files)
  */
 export const deleteVideo = async (videoId: string): Promise<void> => {
   try {
@@ -241,6 +241,28 @@ export const deleteVideo = async (videoId: string): Promise<void> => {
       );
     }
     throw new Error("An unexpected error occurred while deleting the video");
+  }
+};
+
+/**
+ * Toggle a video between public and private
+ */
+export const updateVideoVisibility = async (
+  videoId: string,
+  isPublic: boolean
+): Promise<Video> => {
+  try {
+    const response = await api.patch<Video>(`/videos/by-id/${videoId}/visibility`, {
+      is_public: isPublic,
+    });
+    return response.data;
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      throw new Error(
+        error.response?.data?.detail || "Failed to update video visibility"
+      );
+    }
+    throw new Error("An unexpected error occurred while updating visibility");
   }
 };
 

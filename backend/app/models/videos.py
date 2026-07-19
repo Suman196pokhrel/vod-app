@@ -71,6 +71,11 @@ class Video(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    # Soft delete — non-null means the video is deleted. Actual file/row
+    # cleanup is handled by a separate process; this just hides it from
+    # every listing/lookup path.
+    deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+
     # ADD: For HLS streaming (filled after processing completes)
     manifest_url = Column(String(500), nullable=True)  # Path to master.m3u8
     available_qualities = Column(JSON, nullable=True)  # ["1080p", "720p", "480p", "360p"]

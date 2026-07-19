@@ -52,6 +52,11 @@ class VideoUpdate(BaseModel):
     is_public: Optional[bool] = None
 
 
+class VideoVisibilityUpdate(BaseModel):
+    """Schema for the admin visibility toggle - public vs private only"""
+    is_public: bool
+
+
 # ============== OUTPUT SCHEMAS ==============
 
 class UserBrief(BaseModel):

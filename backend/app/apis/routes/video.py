@@ -8,7 +8,7 @@ from app.services.video_service import video_service
 from app.core.dependencies import get_current_user , get_current_admin_user, get_current_user_optional
 from app.models.users import User  
 from typing import Optional, List
-from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList
+from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList, VideoVisibilityUpdate
 
 
 
@@ -110,9 +110,27 @@ def delete_video(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a video (owner or admin — this route already requires admin)"""
-    video_service.delete_video(db, video_id, current_user.id, is_admin=current_user.is_admin())
+    """Soft delete a video — hides it everywhere without touching its row
+    or files. Permanent cleanup is handled by a separate process."""
+    video_service.soft_delete_video(db, video_id, current_user.id, is_admin=current_user.is_admin())
     return None
+
+
+@video_router.patch(
+    "/by-id/{video_id}/visibility",
+    response_model=VideoResponse,
+    summary="Update video visibility (public/private)"
+)
+def update_video_visibility(
+    video_id: str,
+    payload: VideoVisibilityUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Flip a video between public and private without deleting it."""
+    return video_service.update_video_visibility(
+        db, video_id, payload.is_public, current_user.id, is_admin=current_user.is_admin()
+    )
 
 
 @video_router.post(

@@ -15,7 +15,7 @@ from app.core.dependencies import _check_file_size, _detect_format_from_magic,_v
 from fastapi import HTTPException, UploadFile
 from typing import Optional, List, Tuple
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -332,8 +332,9 @@ class VideoService:
 
         Private videos are indistinguishable from missing ones to anyone
         but the owner/admin — a 403 would confirm the video exists, so
-        denied access returns 404 instead."""
-        video = db.query(Video).filter(Video.id == video_id).first()
+        denied access returns 404 instead. Soft-deleted videos 404 the
+        same way for everyone, owner/admin included."""
+        video = db.query(Video).filter(Video.id == video_id, Video.deleted_at.is_(None)).first()
 
         if not video:
             raise HTTPException(status_code=404, detail="Video not found")
@@ -343,31 +344,33 @@ class VideoService:
             raise HTTPException(status_code=404, detail="Video not found")
 
         return video
-    
+
     def get_user_videos(self, db: Session, user_id: str, skip: int = 0, limit: int = 20) -> List[Video]:
         """Get all videos for a specific user"""
         return (
             db.query(Video)
-            .filter(Video.user_id == user_id)
+            .filter(Video.user_id == user_id, Video.deleted_at.is_(None))
             .order_by(Video.created_at.desc())
             .offset(skip)
             .limit(limit)
             .all()
         )
-    
+
     def get_public_videos(self, db: Session, skip: int = 0, limit: int = 20) -> List[Video]:
         """Get all public videos"""
         return (
             db.query(Video)
-            .filter(Video.is_public == True, Video.status == "published")
+            .filter(Video.is_public == True, Video.status == "published", Video.deleted_at.is_(None))
             .order_by(Video.created_at.desc())
             .offset(skip)
             .limit(limit)
             .all()
         )
-    
+
     def delete_video(self, db: Session, video_id: str, user_id: str, is_admin: bool = False) -> bool:
-        """Delete video and associated files"""
+        """Hard delete video and associated files. Not used by the admin
+        table's delete action (that's a soft delete, see soft_delete_video)
+        — kept for any process that needs to actually purge a video."""
         video = db.query(Video).filter(Video.id == video_id).first()
 
         if not video:
@@ -398,6 +401,38 @@ class VideoService:
             raise HTTPException(status_code=500, detail=f"Failed to delete video: {str(e)}")
 
         return True
+
+    def soft_delete_video(self, db: Session, video_id: str, user_id: str, is_admin: bool = False) -> bool:
+        """Soft delete — marks the video hidden without touching its DB row
+        or MinIO files. Actual cleanup is handled by a separate process."""
+        video = db.query(Video).filter(Video.id == video_id, Video.deleted_at.is_(None)).first()
+
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        if video.user_id != user_id and not is_admin:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this video")
+
+        video.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        return True
+
+    def update_video_visibility(self, db: Session, video_id: str, is_public: bool, user_id: str, is_admin: bool = False) -> Video:
+        """Toggle a video between public and private without deleting it."""
+        video = db.query(Video).filter(Video.id == video_id, Video.deleted_at.is_(None)).first()
+
+        if not video:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        if video.user_id != user_id and not is_admin:
+            raise HTTPException(status_code=403, detail="Not authorized to update this video")
+
+        video.is_public = is_public
+        db.commit()
+        db.refresh(video)
+
+        return video
     
     def increment_views(self, db: Session, video_id: str):
         """Increment video view count"""
@@ -469,9 +504,10 @@ class VideoService:
         Returns tuple of (videos, total_count)
         """
         print("ADMIN VIDEOS API HIT")
-        # BASE QUERY
-        query = db.query(Video).options(joinedload(Video.user))
-        
+        # BASE QUERY — soft-deleted videos never show up here either; the
+        # admin table should look exactly like it did with hard delete.
+        query = db.query(Video).options(joinedload(Video.user)).filter(Video.deleted_at.is_(None))
+
         # Apply filters on BASE QUERY
         if status:
             query = query.filter(Video.status == status)

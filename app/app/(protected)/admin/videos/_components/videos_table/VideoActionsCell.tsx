@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Video } from "@/lib/types/video";
-import { deleteVideo } from "@/lib/apis/video";
+import { deleteVideo, updateVideoVisibility } from "@/lib/apis/video";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,21 +33,39 @@ import {
   Info,
   Copy,
   Loader2,
+  Globe,
+  Lock,
 } from "lucide-react";
 
 export function VideoActionsCell({ video }: { video: Video }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
 
+  const invalidateTable = () =>
+    queryClient.invalidateQueries({ queryKey: ["getAllVideosAdmin"] });
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteVideo(video.id),
     onSuccess: () => {
-      toast.success(`"${video.title}" deleted`);
+      toast.success(`"${video.title}" removed from listings`);
       setConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["getAllVideosAdmin"] });
+      invalidateTable();
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to delete video");
+    },
+  });
+
+  const visibilityMutation = useMutation({
+    mutationFn: () => updateVideoVisibility(video.id, !video.is_public),
+    onSuccess: (updated) => {
+      toast.success(
+        updated.is_public ? `"${video.title}" is now public` : `"${video.title}" is now private`
+      );
+      invalidateTable();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to update visibility");
     },
   });
 
@@ -71,6 +89,22 @@ export function VideoActionsCell({ video }: { video: Video }) {
           <DropdownMenuItem onClick={() => console.log("Edit", video.id)}>
             <Pencil className="mr-2 h-4 w-4" />
             Edit Details
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => visibilityMutation.mutate()}
+            disabled={visibilityMutation.isPending}
+          >
+            {video.is_public ? (
+              <>
+                <Lock className="mr-2 h-4 w-4" />
+                Make Private
+              </>
+            ) : (
+              <>
+                <Globe className="mr-2 h-4 w-4" />
+                Make Public
+              </>
+            )}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => console.log("View details", video.id)}>
             <Info className="mr-2 h-4 w-4" />
@@ -121,8 +155,8 @@ export function VideoActionsCell({ video }: { video: Video }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{video.title}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes the video record, its source file, and its
-              thumbnail. This action cannot be undone.
+              This removes the video from browsing, search, and playback everywhere.
+              The underlying files are kept in storage, not erased.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
