@@ -1,0 +1,182 @@
+/* ==========================================================================
+   VOD — Design tokens (source of truth: DESIGN_SYSTEM.md)
+   Dark-first. Single theme. Tailwind v4 + shadcn/ui variable names.
+
+   NOTE FOR TAILWIND v3 PROJECTS: if tailwind.config.* exists and colors are
+   defined as `hsl(var(--...))`, keep your existing @tailwind directives and
+   config mapping, and port ONLY the :root values below (converted to raw HSL
+   channel triples). The token names and values are the contract; the wiring
+   differs by Tailwind major version.
+   ========================================================================== */
+
+@import "tailwindcss";
+@import "tw-animate-css"; /* remove if not installed */
+
+:root {
+  /* ---- Surfaces ------------------------------------------------------- */
+  --background: oklch(0.15 0.004 285);        /* #0A0A0B app background */
+  --foreground: oklch(0.985 0 0);             /* #FAFAFA */
+  --card: oklch(0.185 0.004 285);             /* #141416 */
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.22 0.005 285);           /* #1C1C1F elevated */
+  --popover-foreground: oklch(0.985 0 0);
+
+  /* Watch page only — "lights off" */
+  --surface-watch: oklch(0 0 0);              /* #000000 */
+
+  /* ---- Text scale (three steps, never more) --------------------------- */
+  --muted: oklch(0.22 0.005 285);
+  --muted-foreground: oklch(0.712 0.013 286); /* #A1A1AA secondary */
+  --text-subtle: oklch(0.442 0.015 286);      /* #52525B tertiary */
+
+  /* ---- Accent: electric cyan ------------------------------------------ */
+  --primary: oklch(0.789 0.154 211);          /* #22D3EE cyan-400 */
+  --primary-foreground: oklch(0.302 0.056 230); /* deep cyan-ink for text on accent */
+  --accent: oklch(0.26 0.02 220);             /* subtle cyan-tinted hover surface */
+  --accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.789 0.154 211);             /* focus = accent */
+
+  /* ---- Functional ------------------------------------------------------ */
+  --secondary: oklch(0.24 0.005 285);
+  --secondary-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.637 0.208 25);       /* red-500 */
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.28 0.006 286);            /* #27272A — use sparingly */
+  --input: oklch(0.28 0.006 286);
+
+  /* ---- Charts (keep sequential, cyan-led) ------------------------------ */
+  --chart-1: oklch(0.789 0.154 211);
+  --chart-2: oklch(0.696 0.17 162);
+  --chart-3: oklch(0.769 0.188 70);
+  --chart-4: oklch(0.627 0.265 304);
+  --chart-5: oklch(0.645 0.246 16);
+
+  /* ---- Shape ----------------------------------------------------------- */
+  --radius: 0.5rem;                            /* cards, media */
+
+  /* ---- Motion (the only allowed values) -------------------------------- */
+  --duration-fast: 150ms;   /* hover, focus, small state */
+  --duration-base: 200ms;   /* overlays, menus, controls reveal */
+  --duration-slow: 300ms;   /* page-level transitions */
+  --ease-out-quart: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---- Ambient (set per watch page by useAmbientColor) ------------------ */
+  --ambient: transparent;
+}
+
+/* Map tokens for Tailwind v4 (bg-background, text-primary, etc.) */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-subtle: var(--text-subtle);
+  --color-surface-watch: var(--surface-watch);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-geist), sans-serif;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+@layer utilities {
+  /* MUBI-style editorial label: SECTION HEADERS · METADATA ROWS */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted-foreground);
+  }
+
+  /* Content-shaped loading state. Apply to a sized element. */
+  .skeleton {
+    background: linear-gradient(
+      100deg,
+      var(--card) 40%,
+      var(--popover) 50%,
+      var(--card) 60%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s var(--ease-out-quart) infinite;
+    border-radius: var(--radius-md);
+  }
+  @keyframes skeleton-shimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+  }
+
+  /* Watch page wrapper */
+  .surface-watch {
+    background: var(--surface-watch);
+  }
+
+  /* Ambient glow layer — pair with useAmbientColor, keep opacity ≤ .2 */
+  .ambient-glow {
+    background: var(--ambient);
+    opacity: 0.16;
+    filter: blur(64px);
+    transition: background var(--duration-slow) var(--ease-out-quart);
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
