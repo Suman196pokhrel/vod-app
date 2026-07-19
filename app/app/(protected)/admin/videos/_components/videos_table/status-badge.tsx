@@ -159,7 +159,7 @@ export function PublishStatusBadge({
     return (
       <Badge variant="outline" className="text-xs bg-muted text-muted-foreground border-border">
         <FileEdit className="w-3 h-3 mr-1" />
-        Draft
+        Draft{!isPublic && " (Private)"}
       </Badge>
     );
   }
