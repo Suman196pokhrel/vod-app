@@ -1,0 +1,148 @@
+# Design System Migration — Progress Tracker
+
+Source of truth: [`docs/DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md). Reconciliation
+decisions and scope: [`docs/superpowers/specs/2026-07-19-frontend-design-system-migration-design.md`](./superpowers/specs/2026-07-19-frontend-design-system-migration-design.md).
+
+All file paths below are relative to the `app/` package (Next.js App Router root
+is `app/app/` on disk — there's a nested `app/` directory — but paths are
+written the way the rest of the docs reference them, e.g. `app/(protected)/...`).
+
+Run the doc's §8 verification checklist against each step before checking it done.
+
+---
+
+## Step 0 — Tokens + fonts land globally ✅ done
+
+- [x] `app/globals.css`: merge new dark/cyan tokens into `:root` (surfaces, 3-step
+      text scale, `--primary` cyan, functional colors, chart-1..5, radius,
+      motion durations/easing, `--ambient`). Drop `.dark {}` block (dead —
+      no `next-themes` provider exists). Drop `--sidebar-*` (confirmed unused
+      by any component). **Keep `--landing-*`** until Step 4 migrates its
+      consumers off it. Add new utilities: `.eyebrow`, `.skeleton` (+shimmer
+      keyframes), `.surface-watch`, `.ambient-glow`, `prefers-reduced-motion`
+      block. Keep existing keyframes/utilities still in use
+      (`animate-shimmer`, `bg-noise`, `bg-grid`, `animate-grid-sweep`,
+      float/spin/gradient/slide/fade/ping keyframes).
+- [x] `app/layout.tsx`: add `Space_Grotesk` via `next/font/google`, variable
+      `--font-space-grotesk`. Keep existing `--font-geist-sans`/`--font-geist-mono`
+      variable names (no rename). Update `@theme inline` in `globals.css` so
+      `--font-sans` → `--font-geist-sans`, `--font-display` →
+      `--font-space-grotesk, --font-geist-sans`.
+- [x] Add `--color-surface-watch`, `--color-subtle` to the `@theme inline`
+      mapping block; remove the `--color-sidebar-*` entries.
+- [x] `pnpm build` succeeds, `pnpm lint` clean (on touched files — repo has
+      pre-existing unrelated lint errors in auth store / video api / hooks).
+- [x] **Browser check:** logged in via claude-in-chrome, checked `/home` and
+      `/admin/videos/upload`. shadcn primitives (button, input, avatar,
+      dropdown, scroll-area) render correctly against the new dark/cyan
+      tokens, admin sidebar + upload dropzones auto-inherited cyan accents
+      with zero code changes, zero console errors.
+
+## Step 1 — Watch page
+
+- [ ] Ambient glow: port `useAmbientColor` hook (from
+      `docs/design-system-reference/useAmbientColor.ts.reference`) into
+      `app/(protected)/home/watch/[video_id]/_components/`, wire into the
+      watch page per doc §6.
+- [ ] Retint the player subsystem (`_components/player/*.tsx`) from violet
+      (`violet-400/500`, raw `rgba(139,92,246,...)` shadows) to `--primary`
+      cyan; replace raw `white`/`black` opacity utilities with
+      `foreground`/`surface-watch`/`popover` tokens: `VideoPlayer.tsx`,
+      `ControlBar.tsx`, `ScrubBar.tsx`, `VolumeControl.tsx`, `SettingsMenu.tsx`,
+      `TheaterButton.tsx`, `CenterPlayButton.tsx`, `PlayPauseFlash.tsx`,
+      `BufferingSpinner.tsx`. Keep the existing overlay-controls UX (more
+      capable than the zip's reference file) — retint only.
+- [ ] Restyle `VideoInfo.tsx`, `VideoStats.tsx`, `CommentSection.tsx`,
+      `RelatedVideos.tsx` to token classes + eyebrow metadata row.
+- [ ] Delete the 5 AI mock widgets from `page.tsx`:
+      `AISceneTimeline`, `AIMoodAnalysis`, `AIRecommendations`,
+      `AIWatchParty`, `AIContentWarnings` (imports + JSX usage).
+- [ ] `pnpm build` + browser check on `/home/watch/[id]` (light/no-glow and
+      real-thumbnail cases).
+
+## Step 2 — Browse/home grid
+
+- [ ] Delete 8 mock components from
+      `app/(protected)/home/page.tsx` (imports + JSX):
+      `DevelopmentHero`, `AIWatchTimeBanner`, `MoodSelector`,
+      `MoodSelectorCompact`, `ContinueWatching`, `Top10ThisWeek`,
+      `ContentJourney`, plus the already-commented `PersonalizedRow` /
+      `QuickAccessSidebar` imports.
+- [ ] Restyle `VideoCard.tsx` to the reference pattern (hover
+      `scale-[1.02]` + accent underline, eyebrow metadata, `VideoCardSkeleton`
+      export) — also strip the stray `console.log` debug lines.
+- [ ] Restyle `VideoGrid.tsx`, `HeroSection.tsx`, `CategoryPills.tsx` to
+      token classes; `HeroSection`'s raw `white`/`black` overlay classes →
+      `foreground`/`surface-watch` tokens.
+- [ ] `pnpm build` + browser check on `/home`.
+
+## Step 3 — Upload / studio flow
+
+- [ ] Restyle `app/(protected)/admin/videos/upload/page.tsx` and
+      `_components/uploadForm/{UploadForm,BasicInformationSection,
+      AdditionalDetailsSection,PublishingSection,FormActions,TagInput,
+      UploadError}.tsx` — these already use shadcn `Card`/`Field`/`Select`
+      primitives, so should token-inherit with minimal changes.
+- [ ] Restyle `ThumbnailUploadZone.tsx`, `VideoUploadZone.tsx` — dropzone
+      states already reference `border-primary`/`bg-primary/5`/`bg-primary/10`
+      (token-driven), verify against cyan.
+- [ ] Rework `_components/multi_step_progress/{phase-item,video-processing-dialog}.tsx`
+      — biggest outliers: hardcoded `bg-white`, `text-gray-*`,
+      purple/blue/green gradients throughout. Convert progress bar and
+      active-phase treatment to `--primary` cyan per doc's "processing status
+      as quiet eyebrow text + progress" rule (§5.4) — no gradients.
+- [ ] `pnpm build` + browser check on `/admin/videos/upload` (idle, dragging,
+      and a real upload if backend is running).
+
+## Step 4 — Auth screens + landing page
+
+- [ ] Migrate `app/(public)/auth/_components/AuthPageShell.tsx` off
+      `--landing-*` onto unified tokens (`bg-background`, `text-foreground`,
+      `border-border`, `text-muted-foreground`).
+- [ ] Migrate `components/signin-form.tsx`, `components/signup-form.tsx` off
+      `--landing-*` onto unified tokens (currently the most-recent monochrome
+      pass — mechanical swap).
+- [ ] Rework `SuccessCard.tsx`, `forgot-pw/page.tsx`, `reset-password/page.tsx`
+      — these are on an **older** hardcoded slate/violet/indigo/emerald/rose
+      palette (raw `rgba()` shadows, `bg-white`), not `--landing-*` at all.
+      Bring onto unified tokens + single cyan primary CTA per doc §5.5.
+- [ ] Rework `verify-email/page.tsx` — third, fully orphaned style
+      (`bg-gray-50`, `blue-600`/`green-600`/`red-600`). Bring onto unified
+      tokens.
+- [ ] Migrate landing components off `--landing-*`: `LandingNav.tsx`,
+      `LandingHero.tsx`, `LandingHeroBackdrop.tsx`, `LandingHeroDevice.tsx`,
+      `LandingFeatures.tsx`, `LandingCTA.tsx`, `app/(public)/page.tsx`.
+      `VibeLogo`'s `mono` prop already uses `currentColor`/`text-current` —
+      no changes needed there, just update the wrapping element's text-color
+      class from `text-landing-fg` to `text-foreground`.
+- [ ] Remove `--landing-*` tokens and their `@theme inline` mappings from
+      `app/globals.css` once the grep for `landing-bg|landing-fg|landing-muted|
+      landing-border|landing-elevated` across `app/` returns zero hits.
+- [ ] `pnpm build` + browser check on `/`, `/auth/sign-in`, `/auth/sign-up`,
+      `/auth/forgot-pw`, `/auth/reset-password`, `/verify-email`.
+
+## Step 5 — Empty / error / loading audit
+
+- [ ] Sweep all surfaces touched in Steps 1–4 for the three states (loading,
+      empty, error) per doc §2 Loading and §3.8 copy rules — skeletons shaped
+      like content, no bare spinners in content areas, empty-state copy
+      invites action.
+- [ ] Run the full doc §8 verification checklist repo-wide:
+      `grep -rn "text-red\|bg-red\|#[0-9a-fA-F]\{6\}" app/` on all changed
+      files (only `globals.css` may match), keyboard-only pass, mobile pass
+      at 390px, cyan count ≤ ~3 per screen at rest.
+- [ ] Correct `CLAUDE.md`'s stale "Known Issues" entries (player is a UI mock
+      / VideoGrid renders 1 hardcoded video) — both are false as of this
+      migration. (Note: `CLAUDE.md` is gitignored/local-only in this repo.)
+
+---
+
+## Deferred (tracked, not part of this task)
+
+- [ ] **Admin dashboard full restyle** (analytics/users/categories/settings
+      widgets, tables, charts) — inherits tokens automatically from Step 0
+      (all confirmed to use semantic classes already, e.g. `bg-background`,
+      `border-b`), but no hand-restyling this pass.
+- [ ] **§7 route restructure** (public browse/watch route groups, auth-guard
+      changes, backend `GET /videos/by-id/{id}` optional-auth change) —
+      separate task; touches the backend.
