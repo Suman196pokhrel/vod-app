@@ -19,6 +19,12 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost", pathname: "/storage/**" },
     ],
   },
+  async redirects() {
+    return [
+      { source: "/home", destination: "/", permanent: true },
+      { source: "/home/watch/:video_id", destination: "/watch/:video_id", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

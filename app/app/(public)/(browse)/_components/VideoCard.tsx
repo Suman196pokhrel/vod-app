@@ -19,7 +19,7 @@ const VideoCard = ({ video }: { video: Video }) => {
   return (
     <button
       type="button"
-      onClick={() => router.push(`/home/watch/${video.id}`)}
+      onClick={() => router.push(`/watch/${video.id}`)}
       className="group block w-full text-left transition-transform duration-(--duration-fast) ease-(--ease-out-quart) hover:scale-[1.02] focus-visible:scale-[1.02]"
     >
       {/* Thumbnail */}

@@ -1,4 +1,3 @@
-// app/(protected)/home/_components/HomeNavbar.tsx
 "use client";
 
 import React, { useState } from "react";
@@ -20,7 +19,7 @@ const HomeNavbar = () => {
       <div className="flex w-full items-center justify-between h-16 px-4 lg:px-8">
         {/* Left: Logo */}
         <div className="flex items-center flex-1">
-          <Link href="/home" className="flex items-center">
+          <Link href="/" className="flex items-center">
             {/* <h1 className="text-5xl font-extrabold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               VOD
             </h1> */}

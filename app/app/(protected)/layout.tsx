@@ -1,7 +1,6 @@
 "use client"
 import React, { useEffect } from "react"
-import HomeNavbar from "./home/_components/HomeNavbar"
-import HomeCarousel from "./home/_components/HomeCarousel"
+import HomeNavbar from "@/components/navbar/HomeNavbar"
 import { useAuthStore } from "@/lib/store"
 import { useRouter } from "next/navigation"
 

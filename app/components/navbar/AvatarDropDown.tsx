@@ -1,4 +1,3 @@
-// app/(protected)/home/_components/AvatarDropDown.tsx
 "use client"
 
 import { Button } from "@/components/ui/button"

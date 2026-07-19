@@ -104,7 +104,7 @@ const RelatedVideos = ({ currentVideoId, category }: RelatedVideosProps) => {
           <Card
             key={video.id}
             className="cursor-pointer hover:bg-accent transition-colors duration-(--duration-fast) ease-(--ease-out-quart)"
-            onClick={() => router.push(`/home/watch/${video.id}`)}
+            onClick={() => router.push(`/watch/${video.id}`)}
           >
             <CardContent className="p-3">
               <div className="flex gap-3">

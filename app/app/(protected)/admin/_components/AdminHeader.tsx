@@ -5,7 +5,7 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Bell, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { AvatarDropDown } from '@/app/(protected)/home/_components/AvatarDropDown'
+import { AvatarDropDown } from '@/components/navbar/AvatarDropDown'
 
 const AdminHeader = () => {
   return (

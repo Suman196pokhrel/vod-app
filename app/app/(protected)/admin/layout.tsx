@@ -21,7 +21,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         router.push("/sign-in");
       } else if (user?.role !== "admin") {
         // Not admin, redirect to home
-        router.push("/home");
+        router.push("/");
       }
     }
   }, [isLoading, isAuthenticated, user, router]);

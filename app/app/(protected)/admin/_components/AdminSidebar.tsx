@@ -135,7 +135,7 @@ const AdminSidebar = () => {
 
       {/* Back to Site Link */}
       <div className="border-t p-4">
-        <Link href="/home">
+        <Link href="/">
           <Button variant="outline" className={cn(
             "w-full gap-2",
             isCollapsed && "px-2"

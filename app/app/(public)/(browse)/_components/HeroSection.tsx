@@ -116,7 +116,7 @@ const HeroSection = () => {
             <Button
               size="lg"
               className="text-lg px-8"
-              onClick={() => router.push(`/home/watch/${currentVideo.id}`)}
+              onClick={() => router.push(`/watch/${currentVideo.id}`)}
             >
               <Play className="mr-2 h-5 w-5 fill-current" />
               Play Now
@@ -125,7 +125,7 @@ const HeroSection = () => {
               size="lg"
               variant="outline"
               className="text-lg px-8 bg-foreground/10 border-foreground/30 text-foreground hover:bg-foreground/20"
-              onClick={() => router.push(`/home/watch/${currentVideo.id}`)}
+              onClick={() => router.push(`/watch/${currentVideo.id}`)}
             >
               <Info className="mr-2 h-5 w-5" />
               More Info
