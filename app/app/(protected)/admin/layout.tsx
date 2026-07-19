@@ -1,10 +1,11 @@
 "use client"
 import React from "react"
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import AdminSidebar from "./_components/AdminSidebar"  
-import AdminHeader from "./_components/AdminHeader"    
+import { useRouter, usePathname } from "next/navigation";
+import AdminSidebar from "./_components/AdminSidebar"
+import AdminHeader from "./_components/AdminHeader"
 import { useAuthStore } from "@/lib/store";
+import { buildSignInUrl } from "@/lib/utils/safeNextPath";
 
 type AdminLayoutProps = {
   children: React.ReactNode
@@ -12,13 +13,14 @@ type AdminLayoutProps = {
 
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isLoading, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     // Wait for auth to initialize
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push("/sign-in");
+        router.push(buildSignInUrl(pathname));
       } else if (user?.role !== "admin") {
         // Not admin, redirect to home
         router.push("/");

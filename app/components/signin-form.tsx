@@ -2,16 +2,18 @@
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuthStore } from "@/lib/store"
-import { useState } from "react"
+import { useState, Suspense } from "react"
+import { getSafeNextPath } from "@/lib/utils/safeNextPath"
 
-export function LoginForm({
+function LoginFormInner({
   className,
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const login = useAuthStore((state) => state.signin)
 
   const [email, setEmail] = useState('')
@@ -27,7 +29,7 @@ export function LoginForm({
     try {
       await login(email, password)
       toast.success("Logged in successfully")
-      router.push("/home")
+      router.push(getSafeNextPath(searchParams.get("next")))
     } catch (err: any) {
       setError(err.message)
       toast.error(err.message)
@@ -130,5 +132,17 @@ export function LoginForm({
         </p>
       </div>
     </div>
+  )
+}
+
+export function LoginForm(props: React.ComponentProps<"div">) {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    }>
+      <LoginFormInner {...props} />
+    </Suspense>
   )
 }

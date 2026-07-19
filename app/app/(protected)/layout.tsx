@@ -2,16 +2,18 @@
 import React, { useEffect } from "react"
 import HomeNavbar from "@/components/navbar/HomeNavbar"
 import { useAuthStore } from "@/lib/store"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { buildSignInUrl } from "@/lib/utils/safeNextPath"
 
 type ProtectedLayoutProps = {
     children: React.ReactNode
-} 
+}
 
 
 
 const ProtectedLayout = ({children}:ProtectedLayoutProps) => {
   const router = useRouter()
+  const pathname = usePathname()
   const {isAuthenticated, isLoading, user,initialize} = useAuthStore()
   
   useEffect(()=>{
@@ -34,7 +36,7 @@ const ProtectedLayout = ({children}:ProtectedLayoutProps) => {
 
   // Redirect to signin if not authenticate
   if (!isAuthenticated) {
-    router.push("/auth/sign-in");
+    router.push(buildSignInUrl(pathname));
     return null;
   }
 
