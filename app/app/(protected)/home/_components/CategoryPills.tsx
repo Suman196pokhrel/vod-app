@@ -31,10 +31,10 @@ const CategoryPills = () => {
             <Badge
               key={category.name}
               variant={selectedCategory === category.name ? "default" : "secondary"}
-              className={`px-4 py-2 text-sm font-medium cursor-pointer transition-all hover:scale-105 ${
-                selectedCategory === category.name 
-                  ? 'shadow-lg bg-primary text-primary-foreground' 
-                  : 'bg-background/80 backdrop-blur-sm border border-border hover:bg-muted text-foreground'
+              className={`px-4 py-2 text-sm font-medium cursor-pointer transition-all duration-(--duration-fast) ease-(--ease-out-quart) hover:scale-105 ${
+                selectedCategory === category.name
+                  ? 'shadow-lg bg-primary text-primary-foreground'
+                  : 'bg-background/80 backdrop-blur-sm border border-border hover:bg-accent text-foreground'
               }`}
               onClick={() => setSelectedCategory(category.name)}
             >

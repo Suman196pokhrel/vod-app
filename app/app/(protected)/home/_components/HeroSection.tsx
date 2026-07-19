@@ -76,8 +76,8 @@ const HeroSection = () => {
           priority
         />
         {/* Gradient Overlays */}
-        <div className="absolute inset-0 bg-linear-to-r from-black via-black/50 to-transparent" />
-        <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-r from-surface-watch via-surface-watch/50 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-surface-watch via-transparent to-transparent" />
       </div>
 
       {/* Content */}
@@ -89,26 +89,24 @@ const HeroSection = () => {
           </Badge>
 
           {/* Title */}
-          <h1 className="text-5xl md:text-7xl font-bold text-white">
+          <h1 className="text-5xl md:text-7xl text-foreground">
             {currentVideo.title}
           </h1>
 
           {/* Meta Info */}
-          <div className="flex items-center gap-4 text-sm text-white/90">
+          <div className="flex items-center gap-4 text-sm text-foreground/90">
             <div className="flex items-center gap-1">
-              <span className="text-yellow-400">★</span>
+              <span className="text-muted-foreground">★</span>
               <span className="font-semibold">{currentVideo.rating}</span>
             </div>
             <span>•</span>
             <span>{currentVideo.year}</span>
             <span>•</span>
-            <Badge variant="outline" className="text-white border-white/30">
-              HD
-            </Badge>
+            <Badge variant="outline">HD</Badge>
           </div>
 
           {/* Description */}
-          <p className="text-lg text-white/80 line-clamp-3 max-w-xl">
+          <p className="text-lg text-muted-foreground line-clamp-3 max-w-xl">
             {currentVideo.description}
           </p>
 
@@ -125,7 +123,7 @@ const HeroSection = () => {
             <Button
               size="lg"
               variant="outline"
-              className="text-lg px-8 bg-white/10 border-white/30 text-white hover:bg-white/20"
+              className="text-lg px-8 bg-foreground/10 border-foreground/30 text-foreground hover:bg-foreground/20"
               onClick={() => router.push(`/home/watch/${currentVideo.id}`)}
             >
               <Info className="mr-2 h-5 w-5" />
@@ -134,7 +132,7 @@ const HeroSection = () => {
             <Button
               size="lg"
               variant="outline"
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              className="bg-foreground/10 border-foreground/30 text-foreground hover:bg-foreground/20"
             >
               <Plus className="h-5 w-5" />
             </Button>
@@ -146,7 +144,7 @@ const HeroSection = () => {
       <Button
         size="icon"
         variant="outline"
-        className="absolute bottom-8 right-8 bg-white/10 border-white/30 text-white hover:bg-white/20"
+        className="absolute bottom-8 right-8 bg-foreground/10 border-foreground/30 text-foreground hover:bg-foreground/20"
         onClick={() => setIsMuted(!isMuted)}
       >
         {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
@@ -157,8 +155,8 @@ const HeroSection = () => {
         {featuredVideos.map((_, index) => (
           <button
             key={index}
-            className={`h-1 transition-all duration-300 rounded-full ${
-              index === currentIndex ? 'w-12 bg-white' : 'w-6 bg-white/50'
+            className={`h-1 transition-all duration-(--duration-base) ease-(--ease-out-quart) rounded-full ${
+              index === currentIndex ? 'w-12 bg-foreground' : 'w-6 bg-foreground/50'
             }`}
             onClick={() => setCurrentIndex(index)}
           />

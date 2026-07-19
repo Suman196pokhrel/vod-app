@@ -72,21 +72,28 @@ Run the doc's §8 verification checklist against each step before checking it do
       tooltip, hover-accent tint on control icons and related-video cards,
       zero console errors.
 
-## Step 2 — Browse/home grid
+## Step 2 — Browse/home grid ✅ done
 
-- [ ] Delete 8 mock components from
-      `app/(protected)/home/page.tsx` (imports + JSX):
-      `DevelopmentHero`, `AIWatchTimeBanner`, `MoodSelector`,
+- [x] Deleted 8 mock components from `app/(protected)/home/page.tsx`
+      (imports + JSX): `DevelopmentHero`, `AIWatchTimeBanner`, `MoodSelector`,
       `MoodSelectorCompact`, `ContinueWatching`, `Top10ThisWeek`,
       `ContentJourney`, plus the already-commented `PersonalizedRow` /
-      `QuickAccessSidebar` imports.
-- [ ] Restyle `VideoCard.tsx` to the reference pattern (hover
+      `QuickAccessSidebar` imports. Page simplified to a single-column
+      HeroSection → CategoryPills → VideoGrid layout (no sidebar left to
+      justify the old 2-column grid).
+- [x] Restyled `VideoCard.tsx` to the reference pattern (hover
       `scale-[1.02]` + accent underline, eyebrow metadata, `VideoCardSkeleton`
-      export) — also strip the stray `console.log` debug lines.
-- [ ] Restyle `VideoGrid.tsx`, `HeroSection.tsx`, `CategoryPills.tsx` to
-      token classes; `HeroSection`'s raw `white`/`black` overlay classes →
-      `foreground`/`surface-watch` tokens.
-- [ ] `pnpm build` + browser check on `/home`.
+      export) — also stripped the stray `console.log` debug lines.
+- [x] Restyled `VideoGrid.tsx` (eyebrow "Browse videos" header, skeleton grid
+      while loading, `gap-6 sm:gap-8`, improved error copy), `HeroSection.tsx`
+      (raw `white`/`black` → `foreground`/`surface-watch` tokens, dropped
+      `font-bold` on the `h1`, star rating → `muted-foreground`),
+      `CategoryPills.tsx` (hover → `accent`, motion tokens) — both already
+      mostly token-driven.
+- [x] `pnpm build` clean. Browser check: mock sections gone, real
+      "Browse videos" grid renders 3 uploaded videos with working hover
+      (scale + cyan underline), cyan selected category pill, zero console
+      errors.
 
 ## Step 3 — Upload / studio flow
 
