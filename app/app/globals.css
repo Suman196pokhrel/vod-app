@@ -33,11 +33,6 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-surface-watch: var(--surface-watch);
-  --color-landing-bg: var(--landing-bg);
-  --color-landing-fg: var(--landing-fg);
-  --color-landing-muted: var(--landing-muted);
-  --color-landing-border: var(--landing-border);
-  --color-landing-elevated: var(--landing-elevated);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -46,15 +41,6 @@
 
 :root {
   --radius: 0.5rem;
-
-  /* Landing/auth marketing surfaces — retired once Step 4 of the design
-     migration (docs/PROGRESS_DESIGN_MIGRATION.md) moves their consumers
-     onto the unified tokens below. */
-  --landing-bg: #0a0a0a;
-  --landing-fg: #fafafa;
-  --landing-muted: #737373;
-  --landing-border: #262626;
-  --landing-elevated: #141414;
 
   /* ---- Surfaces (docs/DESIGN_SYSTEM.md §2) ----------------------------- */
   --background: oklch(0.15 0.004 285);        /* #0A0A0B app background */

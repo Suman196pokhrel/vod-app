@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { AuthPageShell } from '../auth/_components/AuthPageShell';
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -32,7 +33,7 @@ function VerifyEmailContent() {
       const response = await authAPI.verifyEmail(token);
       setStatus('success');
       setMessage(response.message || 'Email verified successfully!');
-      
+
       // Redirect to login after 3 seconds
       setTimeout(() => {
         router.push('/auth/sign-in');
@@ -44,7 +45,7 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <AuthPageShell>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center">Email Verification</CardTitle>
@@ -58,19 +59,19 @@ function VerifyEmailContent() {
           {/* Loading State */}
           {status === 'loading' && (
             <div className="flex flex-col items-center justify-center space-y-4 py-8">
-              <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
-              <p className="text-sm text-gray-600">Please wait...</p>
+              <Loader2 className="h-16 w-16 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Please wait...</p>
             </div>
           )}
 
           {/* Success State */}
           {status === 'success' && (
             <div className="flex flex-col items-center justify-center space-y-4 py-8">
-              <CheckCircle2 className="h-16 w-16 text-green-600" />
+              <CheckCircle2 className="h-16 w-16 text-primary" />
               <div className="text-center space-y-2">
-                <p className="text-lg font-medium text-green-600">Success!</p>
-                <p className="text-sm text-gray-600">{message}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-lg font-medium text-foreground">Success!</p>
+                <p className="text-sm text-muted-foreground">{message}</p>
+                <p className="text-xs text-subtle">
                   Redirecting to login in 3 seconds...
                 </p>
               </div>
@@ -83,10 +84,10 @@ function VerifyEmailContent() {
           {/* Error State */}
           {status === 'error' && (
             <div className="flex flex-col items-center justify-center space-y-4 py-8">
-              <XCircle className="h-16 w-16 text-red-600" />
+              <XCircle className="h-16 w-16 text-destructive" />
               <div className="text-center space-y-2">
-                <p className="text-lg font-medium text-red-600">Verification Failed</p>
-                <p className="text-sm text-gray-600">{message}</p>
+                <p className="text-lg font-medium text-destructive">Verification Failed</p>
+                <p className="text-sm text-muted-foreground">{message}</p>
               </div>
               <div className="w-full space-y-2">
                 <Button asChild variant="outline" className="w-full">
@@ -100,21 +101,21 @@ function VerifyEmailContent() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AuthPageShell>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <AuthPageShell>
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center space-y-4 py-12">
-            <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
-            <p className="text-sm text-gray-600">Loading...</p>
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading...</p>
           </CardContent>
         </Card>
-      </div>
+      </AuthPageShell>
     }>
       <VerifyEmailContent />
     </Suspense>

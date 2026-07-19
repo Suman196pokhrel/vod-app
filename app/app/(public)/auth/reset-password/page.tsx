@@ -96,18 +96,18 @@ function ResetPasswordForm() {
   return (
     <AuthPageShell>
       <div className="w-full max-w-sm animate-fade-in-scale">
-        <div className="rounded-2xl bg-white px-8 py-9 shadow-[0_24px_80px_rgba(15,23,42,0.09)] ring-1 ring-slate-200/70">
+        <div className="rounded-md border border-border bg-card px-8 py-9">
           {/* Header */}
           <div className="mb-7 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-violet-600 to-indigo-600 shadow-[0_4px_14px_rgba(99,75,229,0.38)]">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-foreground">
               <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <rect x="5" y="9" width="10" height="8" rx="1.5" stroke="white" strokeWidth="1.5"/>
-                <path d="M7 9V6a3 3 0 1 1 6 0v3" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="10" cy="13" r="1.2" fill="white"/>
+                <rect x="5" y="9" width="10" height="8" rx="1.5" style={{ stroke: "var(--background)" }} strokeWidth="1.5"/>
+                <path d="M7 9V6a3 3 0 1 1 6 0v3" style={{ stroke: "var(--background)" }} strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="10" cy="13" r="1.2" style={{ fill: "var(--background)" }}/>
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-slate-900">Reset your password</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <h1 className="text-xl text-foreground">Reset your password</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
               Enter the code sent to your email and choose a new password.
             </p>
           </div>
@@ -137,7 +137,7 @@ function ResetPasswordForm() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full rounded-xl bg-linear-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(79,70,229,0.38)] transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_6px_20px_rgba(79,70,229,0.5)] disabled:opacity-60 disabled:hover:scale-100"
+                className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity duration-(--duration-base) hover:opacity-90 disabled:opacity-60"
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -153,13 +153,13 @@ function ResetPasswordForm() {
               </button>
 
               {/* Resend code */}
-              <p className="text-center text-xs text-slate-500">
+              <p className="text-center text-xs text-muted-foreground">
                 Didn&apos;t receive the code?{' '}
                 <button
                   type="button"
                   onClick={handleResendCode}
                   disabled={isLoading}
-                  className="font-semibold text-indigo-600 hover:text-indigo-700 disabled:opacity-60"
+                  className="font-semibold text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground disabled:opacity-60"
                 >
                   Resend code
                 </button>
@@ -171,7 +171,7 @@ function ResetPasswordForm() {
           <div className="mt-6 text-center">
             <Link
               href="/auth/sign-in"
-              className="flex items-center justify-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+              className="flex items-center justify-center gap-1.5 text-sm font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                 <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
@@ -188,8 +188,8 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     }>
       <ResetPasswordForm />

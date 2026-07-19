@@ -25,12 +25,12 @@ const FEATURES = [
 function FeatureBlock({ feature }: { feature: (typeof FEATURES)[number] }) {
   const ref = useScrollReveal<HTMLDivElement>();
   return (
-    <div ref={ref} className="border-t border-landing-border pt-6">
-      <span className="font-mono text-xs text-landing-muted">{feature.number}</span>
-      <h3 className="mt-3 text-xl font-bold tracking-tight text-landing-fg">
+    <div ref={ref} className="border-t border-border pt-6">
+      <span className="font-mono text-xs text-muted-foreground">{feature.number}</span>
+      <h3 className="mt-3 text-xl tracking-tight text-foreground">
         {feature.title}
       </h3>
-      <p className="mt-2 text-sm leading-relaxed text-landing-muted">
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
         {feature.description}
       </p>
     </div>

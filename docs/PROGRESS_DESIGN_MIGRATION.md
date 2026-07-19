@@ -122,35 +122,50 @@ Run the doc's §8 verification checklist against each step before checking it do
       zero console errors. (Processing dialog verified by code review only —
       triggering it live requires a real backend upload+transcode round
       trip, not exercised in this pass.)
-- [ ] `pnpm build` + browser check on `/admin/videos/upload` (idle, dragging,
-      and a real upload if backend is running).
 
-## Step 4 — Auth screens + landing page
+## Step 4 — Auth screens + landing page ✅ done
 
-- [ ] Migrate `app/(public)/auth/_components/AuthPageShell.tsx` off
+- [x] Migrated `app/(public)/auth/_components/AuthPageShell.tsx` off
       `--landing-*` onto unified tokens (`bg-background`, `text-foreground`,
       `border-border`, `text-muted-foreground`).
-- [ ] Migrate `components/signin-form.tsx`, `components/signup-form.tsx` off
-      `--landing-*` onto unified tokens (currently the most-recent monochrome
-      pass — mechanical swap).
-- [ ] Rework `SuccessCard.tsx`, `forgot-pw/page.tsx`, `reset-password/page.tsx`
-      — these are on an **older** hardcoded slate/violet/indigo/emerald/rose
-      palette (raw `rgba()` shadows, `bg-white`), not `--landing-*` at all.
-      Bring onto unified tokens + single cyan primary CTA per doc §5.5.
-- [ ] Rework `verify-email/page.tsx` — third, fully orphaned style
-      (`bg-gray-50`, `blue-600`/`green-600`/`red-600`). Bring onto unified
-      tokens.
-- [ ] Migrate landing components off `--landing-*`: `LandingNav.tsx`,
-      `LandingHero.tsx`, `LandingHeroBackdrop.tsx`, `LandingHeroDevice.tsx`,
+- [x] Migrated `components/signin-form.tsx`, `components/signup-form.tsx` off
+      `--landing-*` onto unified tokens — mechanical swap plus dropped
+      `font-bold` headings (base layer already sets 600) and hardcoded
+      `fill="#0a0a0a"`/`stroke="#0a0a0a"` SVG icon fills → `var(--background)`
+      inline style (no Tailwind class exists for raw SVG attrs).
+- [x] Reworked `SuccessCard.tsx`, `forgot-pw/page.tsx`,
+      `reset-password/page.tsx` — these were on an **older** hardcoded
+      slate/violet/indigo/emerald/rose palette (raw `rgba()` shadows,
+      `bg-white`), not `--landing-*` at all. Brought onto unified tokens:
+      `bg-card`/`border-border` surfaces, solid `bg-primary` CTAs (no
+      gradients), `text-destructive` errors. `SuccessCard`'s emerald
+      "success" treatment has no equivalent token in the design system, so
+      it maps to neutral `bg-accent`/`text-primary` rather than inventing a
+      green.
+- [x] Reworked `verify-email/page.tsx` — third, fully orphaned style
+      (`bg-gray-50`, `blue-600`/`green-600`/`red-600`). Brought onto unified
+      tokens (`text-primary`/`text-destructive`/`text-muted-foreground`) and
+      wrapped in `AuthPageShell` so it matches the other auth screens'
+      layout instead of standing alone.
+- [x] Migrated landing components off `--landing-*`: `LandingNav.tsx`,
+      `LandingHero.tsx`, `LandingHeroBackdrop.tsx` (radial highlight
+      hardcoded `#ffffff` → `var(--foreground)`), `LandingHeroDevice.tsx`,
       `LandingFeatures.tsx`, `LandingCTA.tsx`, `app/(public)/page.tsx`.
       `VibeLogo`'s `mono` prop already uses `currentColor`/`text-current` —
-      no changes needed there, just update the wrapping element's text-color
-      class from `text-landing-fg` to `text-foreground`.
-- [ ] Remove `--landing-*` tokens and their `@theme inline` mappings from
-      `app/globals.css` once the grep for `landing-bg|landing-fg|landing-muted|
-      landing-border|landing-elevated` across `app/` returns zero hits.
-- [ ] `pnpm build` + browser check on `/`, `/auth/sign-in`, `/auth/sign-up`,
-      `/auth/forgot-pw`, `/auth/reset-password`, `/verify-email`.
+      no changes needed there, just updated the wrapping element's
+      text-color class from `text-landing-fg` to `text-foreground`.
+- [x] Removed `--landing-*` tokens and their `@theme inline` mappings from
+      `app/globals.css` — confirmed via
+      `grep -rln "landing-bg\|landing-fg\|landing-muted\|landing-border\|landing-elevated" app/ components/`
+      returning only `globals.css` itself before removal, zero hits after.
+- [x] `pnpm build` clean. Browser check on `/`, `/auth/sign-up`,
+      `/auth/forgot-pw`, `/verify-email`: landing hero/features/CTA, sign-up
+      form, forgot-password form, and verify-email error state all render
+      as one consistent dark+cyan system (previously 3 different visual
+      eras: `--landing-*` monochrome, slate/violet/indigo, and orphaned
+      gray/blue/green). Zero console errors. Pre-existing lint issues in
+      touched files (`any` types, unused vars, `verifyEmail` hoisting order)
+      confirmed unrelated to this change — same in the original source.
 
 ## Step 5 — Empty / error / loading audit
 

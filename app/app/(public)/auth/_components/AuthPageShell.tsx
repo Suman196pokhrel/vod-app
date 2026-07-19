@@ -4,16 +4,16 @@ import { VibeLogo } from "@/components/logos/VibeLogo";
 
 export function AuthPageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-landing-bg text-landing-fg">
+    <div className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="bg-noise pointer-events-none absolute inset-0 opacity-[0.035]" />
 
       <header className="relative flex items-center justify-between px-6 py-4 sm:px-10">
-        <Link href="/" className="text-landing-fg">
+        <Link href="/" className="text-foreground">
           <VibeLogo size="md" animated mono />
         </Link>
         <Link
           href="/"
-          className="flex items-center gap-1.5 rounded-md border border-landing-border px-3.5 py-1.5 text-xs font-medium text-landing-muted transition-colors hover:border-landing-fg hover:text-landing-fg"
+          className="flex items-center gap-1.5 rounded-md border border-border px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors duration-(--duration-fast) hover:border-foreground hover:text-foreground"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
             <path

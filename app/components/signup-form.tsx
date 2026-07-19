@@ -98,24 +98,27 @@ export function SignupForm() {
 
   return (
     <div className="w-full max-w-sm animate-fade-in-scale">
-      <div className="rounded-md border border-landing-border bg-landing-elevated px-8 py-9">
+      <div className="rounded-md border border-border bg-card px-8 py-9">
         {/* Header */}
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-landing-fg">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-foreground">
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M10 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm-6 15c0-3.314 2.686-5 6-5s6 1.686 6 5H4z" fill="#0a0a0a"/>
-              <path d="M17 7v2m0 2v2" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round"/>
-              <path d="M16 9h2" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round"/>
+              <path
+                d="M10 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm-6 15c0-3.314 2.686-5 6-5s6 1.686 6 5H4z"
+                style={{ fill: "var(--background)" }}
+              />
+              <path d="M17 7v2m0 2v2" style={{ stroke: "var(--background)" }} strokeWidth="1.6" strokeLinecap="round"/>
+              <path d="M16 9h2" style={{ stroke: "var(--background)" }} strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-landing-fg">Create your account</h1>
-          <p className="mt-1 text-sm text-landing-muted">Free forever. No credit card required.</p>
+          <h1 className="text-xl text-foreground">Create your account</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Free forever. No credit card required.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Username */}
           <div className="space-y-1.5">
-            <label htmlFor="username" className="block text-sm font-medium text-landing-fg">
+            <label htmlFor="username" className="block text-sm font-medium text-foreground">
               Username
             </label>
             <Input
@@ -125,16 +128,16 @@ export function SignupForm() {
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
+              className="h-11 rounded-md border-border bg-background text-sm text-foreground shadow-none placeholder:text-muted-foreground"
             />
             {errors.userName && (
-              <p className="text-xs text-red-400">{errors.userName}</p>
+              <p className="text-xs text-destructive">{errors.userName}</p>
             )}
           </div>
 
           {/* Email */}
           <div className="space-y-1.5">
-            <label htmlFor="email" className="block text-sm font-medium text-landing-fg">
+            <label htmlFor="email" className="block text-sm font-medium text-foreground">
               Email address
             </label>
             <Input
@@ -144,16 +147,16 @@ export function SignupForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
+              className="h-11 rounded-md border-border bg-background text-sm text-foreground shadow-none placeholder:text-muted-foreground"
             />
             {errors.email && (
-              <p className="text-xs text-red-400">{errors.email}</p>
+              <p className="text-xs text-destructive">{errors.email}</p>
             )}
           </div>
 
           {/* Password */}
           <div className="space-y-1.5">
-            <label htmlFor="password" className="block text-sm font-medium text-landing-fg">
+            <label htmlFor="password" className="block text-sm font-medium text-foreground">
               Password
             </label>
             <Input
@@ -163,16 +166,16 @@ export function SignupForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
+              className="h-11 rounded-md border-border bg-background text-sm text-foreground shadow-none placeholder:text-muted-foreground"
             />
             {errors.password && (
-              <p className="text-xs text-red-400">{errors.password}</p>
+              <p className="text-xs text-destructive">{errors.password}</p>
             )}
           </div>
 
           {/* Confirm Password */}
           <div className="space-y-1.5">
-            <label htmlFor="confirm-password" className="block text-sm font-medium text-landing-fg">
+            <label htmlFor="confirm-password" className="block text-sm font-medium text-foreground">
               Confirm password
             </label>
             <Input
@@ -182,10 +185,10 @@ export function SignupForm() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={isLoading}
-              className="h-11 rounded-md border-landing-border bg-landing-bg text-sm text-landing-fg shadow-none placeholder:text-landing-muted focus-visible:border-landing-fg focus-visible:ring-2 focus-visible:ring-landing-fg/20"
+              className="h-11 rounded-md border-border bg-background text-sm text-foreground shadow-none placeholder:text-muted-foreground"
             />
             {errors.confirmPassword && (
-              <p className="text-xs text-red-400">{errors.confirmPassword}</p>
+              <p className="text-xs text-destructive">{errors.confirmPassword}</p>
             )}
           </div>
 
@@ -193,7 +196,7 @@ export function SignupForm() {
           <button
             type="submit"
             disabled={isLoading}
-            className="mt-1 w-full rounded-md bg-landing-fg px-4 py-2.5 text-sm font-semibold text-landing-bg transition-opacity duration-200 hover:opacity-80 disabled:opacity-60"
+            className="mt-1 w-full rounded-md bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity duration-(--duration-base) hover:opacity-90 disabled:opacity-60"
           >
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
@@ -210,9 +213,9 @@ export function SignupForm() {
         </form>
 
         {/* Footer */}
-        <p className="mt-6 text-center text-sm text-landing-muted">
+        <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/auth/sign-in" className="font-semibold text-landing-fg underline decoration-landing-border underline-offset-4 hover:decoration-landing-fg">
+          <Link href="/auth/sign-in" className="font-semibold text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
             Sign in
           </Link>
         </p>
