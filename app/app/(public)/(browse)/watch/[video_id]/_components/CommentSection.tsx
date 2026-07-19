@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbsUp, ThumbsDown, MessageCircle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { useRequireAuth } from '@/hooks/use-require-auth'
 
 interface CommentSectionProps {
   videoId: string
@@ -40,6 +41,7 @@ const mockComments = [
 ]
 
 const CommentSection = ({ videoId }: CommentSectionProps) => {
+  const { requireAuth } = useRequireAuth()
   const [comment, setComment] = useState('')
 
   return (
@@ -64,7 +66,11 @@ const CommentSection = ({ videoId }: CommentSectionProps) => {
               <Button variant="ghost" size="sm" onClick={() => setComment('')}>
                 Cancel
               </Button>
-              <Button size="sm" disabled={!comment.trim()}>
+              <Button
+                size="sm"
+                disabled={!comment.trim()}
+                onClick={() => requireAuth(() => setComment(''))}
+              >
                 Comment
               </Button>
             </div>

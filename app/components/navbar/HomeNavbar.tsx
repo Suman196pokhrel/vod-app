@@ -6,12 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Search, Bell, X } from "lucide-react";
 import { AvatarDropDown } from "./AvatarDropDown";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { VibeLogo } from "@/components/logos/VibeLogo";
+import { useAuthStore } from "@/lib/store";
+import { buildSignInUrl } from "@/lib/utils/safeNextPath";
 
 
 const HomeNavbar = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [hasNotifications, setHasNotifications] = useState(true);
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading } = useAuthStore();
 
 
   return (
@@ -82,8 +87,16 @@ const HomeNavbar = () => {
             )}
           </Button>
 
-          {/* Avatar Dropdown */}
-          <AvatarDropDown />
+          {/* Avatar Dropdown / Sign in */}
+          {!isLoading && (
+            isAuthenticated ? (
+              <AvatarDropDown />
+            ) : (
+              <Button asChild size="sm" variant="ghost">
+                <Link href={buildSignInUrl(pathname)}>Sign in</Link>
+              </Button>
+            )
+          )}
         </div>
       </div>
 

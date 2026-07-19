@@ -7,15 +7,18 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ThumbsUp, ThumbsDown, Share2, Download, Plus, Check } from 'lucide-react'
 import { Video } from '@/lib/types/video'
+import { useRequireAuth } from '@/hooks/use-require-auth'
 
 interface VideoInfoProps {
   video: Video
 }
 
 const VideoInfo = ({ video }: VideoInfoProps) => {
+  const { requireAuth } = useRequireAuth()
   const [isLiked, setIsLiked] = useState(false)
   const [isDisliked, setIsDisliked] = useState(false)
   const [isInWatchlist, setIsInWatchlist] = useState(false)
+  const [isFollowing, setIsFollowing] = useState(false)
   const [showFullDescription, setShowFullDescription] = useState(false)
 
   return (
@@ -51,10 +54,10 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             size="sm"
             variant={isLiked ? "default" : "ghost"}
             className="rounded-full"
-            onClick={() => {
+            onClick={() => requireAuth(() => {
               setIsLiked(!isLiked)
               if (isDisliked) setIsDisliked(false)
-            }}
+            })}
           >
             <ThumbsUp className="h-4 w-4 mr-1" />
             {isLiked ? "Liked" : "Like"}
@@ -64,10 +67,10 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             size="sm"
             variant={isDisliked ? "default" : "ghost"}
             className="rounded-full"
-            onClick={() => {
+            onClick={() => requireAuth(() => {
               setIsDisliked(!isDisliked)
               if (isLiked) setIsLiked(false)
-            }}
+            })}
           >
             <ThumbsDown className="h-4 w-4" />
           </Button>
@@ -77,7 +80,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
           size="sm"
           variant={isInWatchlist ? "default" : "outline"}
           className="rounded-full"
-          onClick={() => setIsInWatchlist(!isInWatchlist)}
+          onClick={() => requireAuth(() => setIsInWatchlist(!isInWatchlist))}
         >
           {isInWatchlist ? (
             <>
@@ -114,7 +117,13 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             <p className="text-sm text-muted-foreground">Created by</p>
             <p className="font-semibold">{video.director}</p>
           </div>
-          <Button variant="outline" size="sm">Follow</Button>
+          <Button
+            variant={isFollowing ? "default" : "outline"}
+            size="sm"
+            onClick={() => requireAuth(() => setIsFollowing(!isFollowing))}
+          >
+            {isFollowing ? "Following" : "Follow"}
+          </Button>
         </div>
       </div>
 
