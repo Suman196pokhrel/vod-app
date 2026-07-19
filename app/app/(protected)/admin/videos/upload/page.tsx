@@ -194,7 +194,7 @@ const UploadVideoPage = () => {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Upload Video</h1>
+          <h1 className="text-3xl">Upload Video</h1>
           <p className="text-muted-foreground">
             Add a new video to your library
           </p>

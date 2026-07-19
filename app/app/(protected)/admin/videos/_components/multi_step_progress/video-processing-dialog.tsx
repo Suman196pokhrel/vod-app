@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -53,9 +52,9 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
      <DialogContent
         className={cn(
           "sm:max-w-[580px] xl:min-w-4xl gap-6 p-0 overflow-hidden border-0",
-          "bg-white shadow-2xl shadow-purple-500/10"
+          "bg-popover shadow-2xl"
         )}
-        overlayClassName="bg-black/20 backdrop-blur-sm" //  Custom light overlay
+        overlayClassName="bg-surface-watch/20 backdrop-blur-sm" //  Custom light overlay
         onInteractOutside={(e) => {
           if (isInProgress) {
             e.preventDefault();
@@ -72,18 +71,18 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
           <DialogHeader className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2">
-                <DialogTitle className="text-2xl font-bold tracking-tight bg-linear-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                <DialogTitle className="text-2xl font-semibold tracking-tight text-foreground">
                   {isComplete
                     ? "Processing Complete"
                     : isFailed
                     ? "Processing Failed"
                     : "Processing Video"}
                 </DialogTitle>
-                <DialogDescription className="text-base text-gray-600">
+                <DialogDescription className="text-base text-muted-foreground">
                   {fileName ? (
                     <span className="flex items-center gap-2">
-                      <FileVideo className="w-4 h-4 text-purple-500" />
-                      <span className="text-gray-700">{fileName}</span>
+                      <FileVideo className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-foreground">{fileName}</span>
                     </span>
                   ) : (
                     "Your video is being prepared for streaming"
@@ -100,20 +99,20 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
             <>
               {/* Progress Bar */}
               <div className="space-y-2">
-                <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gray-100">
+                <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full bg-linear-to-r from-purple-500 via-purple-600 to-blue-600 transition-all duration-700 ease-out rounded-full shadow-lg shadow-purple-500/30"
+                    className="h-full bg-primary transition-all duration-(--duration-slow) ease-(--ease-out-quart) rounded-full"
                     style={{ width: `${statusMeta.progress}%` }}
                   >
-                    <div className="h-full w-full animate-shimmer bg-linear-to-r from-transparent via-white/30 to-transparent" />
+                    <div className="h-full w-full animate-shimmer bg-linear-to-r from-transparent via-foreground/30 to-transparent" />
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700 font-medium">
+                  <span className="text-foreground font-medium">
                     {statusMeta.message}
                   </span>
-                  <span className="font-bold bg-linear-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent tabular-nums text-base">
+                  <span className="font-semibold text-primary tabular-nums text-base">
                     {statusMeta.progress}%
                   </span>
                 </div>
@@ -138,9 +137,9 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
 
           {/* Success Alert */}
           {isComplete && (
-            <Alert className="border-green-200 bg-green-50 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <AlertDescription className="text-green-900 font-medium">
+            <Alert className="border-border bg-card animate-in fade-in slide-in-from-bottom-4 duration-(--duration-slow)">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              <AlertDescription className="text-foreground font-medium">
                 Your video is ready to stream! All quality versions have been
                 generated successfully.
               </AlertDescription>
@@ -149,13 +148,13 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
 
           {/* Error Alert */}
           {isFailed && (
-            <Alert className="border-red-200 bg-red-50 animate-in fade-in-from-bottom-4 duration-500">
-              <XCircle className="h-5 w-5 text-red-600" />
-              <AlertDescription className="text-red-900">
+            <Alert className="border-destructive/20 bg-destructive/10 animate-in fade-in slide-in-from-bottom-4 duration-(--duration-slow)">
+              <XCircle className="h-5 w-5 text-destructive" />
+              <AlertDescription className="text-foreground">
                 <p className="font-medium mb-2">
                   We encountered an issue processing your video.
                 </p>
-                <p className="text-sm text-red-800">
+                <p className="text-sm text-muted-foreground">
                   Please try uploading again or contact support if the problem
                   persists.
                 </p>
@@ -167,30 +166,20 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
         {/* Footer Actions */}
         <div className="px-6 pb-6 pt-2 flex items-center justify-end gap-3">
           {isFailed && onRetry && (
-            <Button
-              onClick={onRetry}
-              variant="outline"
-              className="gap-2 border-purple-200 text-purple-700 hover:bg-purple-50"
-            >
+            <Button onClick={onRetry} variant="outline" className="gap-2">
               <RefreshCw className="w-4 h-4" />
               Retry
             </Button>
           )}
-          
+
           {!isInProgress && (
-            <Button
-              onClick={handleClose}
-              className={cn(
-                "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/30",
-                isComplete && "from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-green-500/30"
-              )}
-            >
+            <Button onClick={handleClose}>
               {isComplete ? "Done" : "Close"}
             </Button>
           )}
 
           {isInProgress && (
-            <Button disabled variant="outline" className="border-purple-200 text-purple-600">
+            <Button disabled variant="outline">
               Processing...
             </Button>
           )}

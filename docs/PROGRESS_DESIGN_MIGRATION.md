@@ -95,21 +95,33 @@ Run the doc's §8 verification checklist against each step before checking it do
       (scale + cyan underline), cyan selected category pill, zero console
       errors.
 
-## Step 3 — Upload / studio flow
+## Step 3 — Upload / studio flow ✅ done
 
-- [ ] Restyle `app/(protected)/admin/videos/upload/page.tsx` and
-      `_components/uploadForm/{UploadForm,BasicInformationSection,
-      AdditionalDetailsSection,PublishingSection,FormActions,TagInput,
-      UploadError}.tsx` — these already use shadcn `Card`/`Field`/`Select`
-      primitives, so should token-inherit with minimal changes.
-- [ ] Restyle `ThumbnailUploadZone.tsx`, `VideoUploadZone.tsx` — dropzone
+- [x] `upload/page.tsx` and `_components/uploadForm/{UploadForm,
+      BasicInformationSection,AdditionalDetailsSection,PublishingSection,
+      FormActions,TagInput,UploadError}.tsx` — grepped for raw colors, found
+      none (already shadcn `Card`/`Field`/`Select` primitives, fully
+      token-inherited). Only fix needed: dropped `font-bold` on the
+      `upload/page.tsx` `<h1>`.
+- [x] `ThumbnailUploadZone.tsx`, `VideoUploadZone.tsx` — grepped clean, dropzone
       states already reference `border-primary`/`bg-primary/5`/`bg-primary/10`
-      (token-driven), verify against cyan.
-- [ ] Rework `_components/multi_step_progress/{phase-item,video-processing-dialog}.tsx`
-      — biggest outliers: hardcoded `bg-white`, `text-gray-*`,
-      purple/blue/green gradients throughout. Convert progress bar and
-      active-phase treatment to `--primary` cyan per doc's "processing status
-      as quiet eyebrow text + progress" rule (§5.4) — no gradients.
+      tokens, confirmed cyan in browser.
+- [x] Reworked `_components/multi_step_progress/{phase-item,video-processing-dialog}.tsx`
+      — removed all purple/blue/green/gray hardcoded colors. Progress bar
+      and active/complete phase icons → solid `--primary` cyan (no
+      gradients, per accent law); phase label → `.eyebrow`. Dialog surface
+      → `bg-popover`; success alert → neutral `bg-card`/`border-border` with
+      a cyan check icon (no success token exists in the design system, so
+      no color was invented); error alert → `bg-destructive/10` (the
+      sanctioned destructive token). Buttons stripped of hand-rolled
+      gradient overrides to fall back to themed shadcn `Button` variants
+      (rule 4). Removed an unused `Progress` import as a minor cleanup.
+- [x] `pnpm build` clean. Browser check on `/admin/videos/upload`: full form
+      (video/thumbnail dropzones, basic info, additional details,
+      publishing, actions) renders correctly with cyan accents throughout,
+      zero console errors. (Processing dialog verified by code review only —
+      triggering it live requires a real backend upload+transcode round
+      trip, not exercised in this pass.)
 - [ ] `pnpm build` + browser check on `/admin/videos/upload` (idle, dragging,
       and a real upload if backend is running).
 
