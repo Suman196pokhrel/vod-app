@@ -22,7 +22,7 @@ export function SettingsInputItem({
 }: SettingInputItemProps) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-gray-900">
+      <Label htmlFor={id}>
         {label}
       </Label>
       <div className="flex gap-2 items-center">
@@ -32,9 +32,8 @@ export function SettingsInputItem({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="bg-white border-gray-300 text-gray-900"
         />
-        {suffix && <span className="text-sm text-gray-500">{suffix}</span>}
+        {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>
     </div>
   );

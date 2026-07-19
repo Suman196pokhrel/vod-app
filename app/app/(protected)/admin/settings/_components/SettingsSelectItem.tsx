@@ -24,11 +24,11 @@ export function SettingSelectItem({
 }: SettingSelectItemProps) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-gray-900">
+      <Label htmlFor={id}>
         {label}
       </Label>
       <Select value={value} onValueChange={onValueChange}>
-        <SelectTrigger id={id} className="bg-white border-gray-300 text-gray-900">
+        <SelectTrigger id={id}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -15,10 +15,10 @@ export function SettingSwitchItem({
   onCheckedChange,
 }: SettingSwitchItemProps) {
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border border-border">
       <div className="space-y-0.5">
-        <Label className="text-gray-900">{label}</Label>
-        <p className="text-sm text-gray-500">{description}</p>
+        <Label>{label}</Label>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onCheckedChange} />
     </div>

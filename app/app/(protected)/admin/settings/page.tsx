@@ -51,13 +51,13 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-3xl text-foreground">Settings</h1>
+            <p className="text-muted-foreground mt-1">
               Configure your VOD platform preferences
             </p>
           </div>
@@ -70,7 +70,6 @@ export default function SettingsPage() {
         {/* Video Upload Settings */}
         <SettingsSection
           icon={Upload}
-          iconColor="bg-blue-500"
           title="Video Upload Settings"
           description="Configure upload limits and file format restrictions"
         >
@@ -114,7 +113,6 @@ export default function SettingsPage() {
         {/* Content Management */}
         <SettingsSection
           icon={Video}
-          iconColor="bg-purple-500"
           title="Content Management"
           description="Control how videos are published and moderated"
         >
@@ -163,7 +161,6 @@ export default function SettingsPage() {
         {/* Streaming Settings */}
         <SettingsSection
           icon={Play}
-          iconColor="bg-green-500"
           title="Streaming & Playback"
           description="Configure video playback and streaming quality"
         >
@@ -205,7 +202,6 @@ export default function SettingsPage() {
         {/* Storage Management */}
         <SettingsSection
           icon={Database}
-          iconColor="bg-orange-500"
           title="Storage Management"
           description="Manage storage limits and data retention"
         >
@@ -251,7 +247,6 @@ export default function SettingsPage() {
         {/* User Registration */}
         <SettingsSection
           icon={Shield}
-          iconColor="bg-red-500"
           title="User Registration & Access"
           description="Control user registration and account limits"
         >
@@ -293,7 +288,6 @@ export default function SettingsPage() {
         {/* Admin Notifications */}
         <SettingsSection
           icon={Bell}
-          iconColor="bg-yellow-500"
           title="Admin Notifications"
           description="Configure when you receive email notifications"
         >
