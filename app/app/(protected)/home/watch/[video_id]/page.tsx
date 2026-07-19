@@ -29,13 +29,27 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
   if (error)
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface-watch p-8 text-muted-foreground">
-        {error}
+        {error}. Try going back and selecting another video.
       </div>
     );
   if (!video)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-watch p-8 text-muted-foreground">
-        Loading…
+      <div className="min-h-screen bg-surface-watch">
+        <div className="mx-auto w-full max-w-[2000px] px-4 pt-4 lg:px-6">
+          <div className="skeleton aspect-video w-full rounded-xl" />
+        </div>
+        <div className="max-w-[2000px] mx-auto">
+          <div className="grid gap-6 p-4 lg:grid-cols-[1fr_380px] lg:p-6">
+            <div className="space-y-4">
+              <div className="skeleton h-8 w-2/3" />
+              <div className="skeleton h-4 w-1/3" />
+            </div>
+            <div className="space-y-4">
+              <div className="skeleton aspect-video w-full rounded-lg" />
+              <div className="skeleton h-4 w-full" />
+            </div>
+          </div>
+        </div>
       </div>
     );
 

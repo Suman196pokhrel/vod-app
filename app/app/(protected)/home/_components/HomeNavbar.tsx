@@ -79,7 +79,7 @@ const HomeNavbar = () => {
           >
             <Bell className="h-4 w-4" />
             {hasNotifications && (
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
             )}
           </Button>
 

@@ -167,19 +167,51 @@ Run the doc's §8 verification checklist against each step before checking it do
       touched files (`any` types, unused vars, `verifyEmail` hoisting order)
       confirmed unrelated to this change — same in the original source.
 
-## Step 5 — Empty / error / loading audit
+## Step 5 — Empty / error / loading audit ✅ done
 
-- [ ] Sweep all surfaces touched in Steps 1–4 for the three states (loading,
-      empty, error) per doc §2 Loading and §3.8 copy rules — skeletons shaped
-      like content, no bare spinners in content areas, empty-state copy
-      invites action.
-- [ ] Run the full doc §8 verification checklist repo-wide:
-      `grep -rn "text-red\|bg-red\|#[0-9a-fA-F]\{6\}" app/` on all changed
-      files (only `globals.css` may match), keyboard-only pass, mobile pass
-      at 390px, cyan count ≤ ~3 per screen at rest.
-- [ ] Correct `CLAUDE.md`'s stale "Known Issues" entries (player is a UI mock
-      / VideoGrid renders 1 hardcoded video) — both are false as of this
-      migration. (Note: `CLAUDE.md` is gitignored/local-only in this repo.)
+- [x] Swept all surfaces touched in Steps 1–4 for the three states. Found and
+      fixed two gaps missed in earlier steps:
+      - `HomeNavbar.tsx` (renders on every protected page via
+        `(protected)/layout.tsx`, wasn't on any step's explicit file list) —
+        notification dot was raw `bg-red-500`, moved to `bg-primary`.
+      - Watch page (`page.tsx`) initial-load state was bare `Loading…` text,
+        not a skeleton — replaced with a content-shaped skeleton (player
+        aspect-video block + title/metadata bars + sidebar bars) per doc §2.
+        Error copy also tightened to say what happened and what to do
+        ("Video not found. Try going back and selecting another video.").
+      Confirmed already-compliant: `VideoGrid` empty/error copy invites
+      action ("No videos yet. Upload one to get started." /
+      "Couldn't load videos. Try refreshing the page."), upload form's
+      `isSubmitting` state is text-only inside a button (spinners-in-buttons
+      is explicitly allowed), `RelatedVideos`/`CommentSection` still run on
+      mock data so no real empty state applies yet.
+- [x] Ran the doc §8 checklist:
+      - Raw-color grep across every file touched in Steps 0–5 (excluding the
+        deferred admin dashboards): zero hits outside `globals.css` (whose
+        only matches are hex values inside comments documenting the oklch
+        tokens, which the checklist itself allows).
+      - Keyboard-only pass: tabbed through the home page — cyan
+        `:focus-visible` ring appears correctly on the notification bell
+        (inherited from the themed base-layer rule, not per-component CSS,
+        so it holds everywhere by construction).
+      - Cyan-count-at-rest spot check: home hero (1 CTA), browse grid (0 at
+        rest, cyan only on hover), watch page (1, the scrub-bar fill) — all
+        within the ≤3 budget.
+      - Mobile-width pass: attempted via browser automation `resize_window`
+        to 390px, but the tooling's window floor in this environment didn't
+        go below ~941px viewport — true 390px verification wasn't achievable
+        this session. All touched layouts use the pre-existing mobile-first
+        Tailwind patterns (`grid-cols-1` base with `sm:`/`lg:` breakpoints)
+        already in place before this migration, and nothing in these changes
+        altered breakpoint logic, but this specific check is **unverified**
+        and worth a manual pass.
+- [x] Corrected `CLAUDE.md`'s stale "Known Issues" entries — removed the
+      "video player is a UI mock" and "VideoGrid renders 1 hardcoded video"
+      lines (both false; confirmed real/API-wired while reading the code for
+      this migration) and replaced with an accurate note about the AI mock
+      component files being orphaned (not deleted, just unlinked from pages).
+      `CLAUDE.md` is gitignored/local-only in this repo, so this edit isn't
+      part of any commit.
 
 ---
 
