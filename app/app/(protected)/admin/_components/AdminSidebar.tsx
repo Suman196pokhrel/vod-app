@@ -6,15 +6,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { 
-  Video, 
-  Users, 
-  BarChart3, 
-  FolderTree, 
+import {
+  Video,
+  Users,
+  BarChart3,
+  FolderTree,
   Settings,
   ChevronLeft,
   Upload,
-  List
+  List,
+  ArrowLeft
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -57,7 +58,7 @@ const AdminSidebar = () => {
   return (
     <div
       className={cn(
-        "relative border-r bg-background transition-all duration-300",
+        "relative border-r bg-background transition-all duration-(--duration-slow) ease-(--ease-out-quart)",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
@@ -65,10 +66,8 @@ const AdminSidebar = () => {
       <div className="flex h-16 items-center justify-between px-4 border-b">
         {!isCollapsed && (
           <Link href="/admin" className="flex items-center gap-2">
-            <h1 className="text-xl font-extrabold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              VOD
-            </h1>
-            <span className="text-xs font-semibold text-muted-foreground">ADMIN</span>
+            <h1 className="text-xl text-foreground">VOD</h1>
+            <span className="eyebrow">Admin</span>
           </Link>
         )}
         <Button
@@ -78,7 +77,7 @@ const AdminSidebar = () => {
           onClick={() => setIsCollapsed(!isCollapsed)}
         >
           <ChevronLeft className={cn(
-            "h-4 w-4 transition-transform",
+            "h-4 w-4 transition-transform duration-(--duration-fast)",
             isCollapsed && "rotate-180"
           )} />
         </Button>
@@ -138,10 +137,11 @@ const AdminSidebar = () => {
       <div className="border-t p-4">
         <Link href="/home">
           <Button variant="outline" className={cn(
-            "w-full",
+            "w-full gap-2",
             isCollapsed && "px-2"
           )}>
-            {isCollapsed ? "→" : "Back to Site"}
+            <ArrowLeft className="h-4 w-4 shrink-0" />
+            {!isCollapsed && "Back to Site"}
           </Button>
         </Link>
       </div>

@@ -45,13 +45,6 @@ const RecentActivity = () => {
     }
   ]
 
-  const typeColors = {
-    upload: 'bg-blue-500/10 text-blue-500',
-    user: 'bg-green-500/10 text-green-500',
-    comment: 'bg-purple-500/10 text-purple-500',
-    subscription: 'bg-orange-500/10 text-orange-500'
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -80,10 +73,7 @@ const RecentActivity = () => {
                   {activity.time}
                 </p>
               </div>
-              <Badge
-                variant="outline"
-                className={`${typeColors[activity.type as keyof typeof typeColors]} border-0`}
-              >
+              <Badge variant="secondary" className="bg-accent text-primary border-0">
                 {activity.type}
               </Badge>
             </div>

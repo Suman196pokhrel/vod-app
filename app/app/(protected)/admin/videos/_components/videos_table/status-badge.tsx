@@ -28,6 +28,13 @@ type StatusConfig = {
   className: string;
 };
 
+// Three-state visual language (design system has one accent, no per-stage
+// rainbow): neutral+static = queued, cyan+pulsing = actively processing,
+// neutral+static = completed, destructive = failed. The pulse itself (not
+// a distinct hue per stage) is what signals "still working."
+const NEUTRAL = "bg-muted text-muted-foreground border-border";
+const ACTIVE = "bg-accent text-primary border-primary/20 animate-pulse";
+
 export function ProcessingStatusBadge({
   status,
   showIcon = true,
@@ -37,65 +44,63 @@ export function ProcessingStatusBadge({
       label: "Queued",
       variant: "secondary",
       icon: Clock,
-      className: "bg-slate-100 text-slate-700 border-slate-300",
+      className: NEUTRAL,
     },
 
     [ProcessingStatus.PREPARING]: {
       label: "Preparing",
       variant: "secondary",
       icon: Loader2,
-      className: "bg-blue-100 text-blue-700 border-blue-300 animate-pulse",
+      className: ACTIVE,
     },
 
     [ProcessingStatus.TRANSCODING]: {
       label: "Transcoding",
       variant: "secondary",
       icon: Film,
-      className:
-        "bg-purple-100 text-purple-700 border-purple-300 animate-pulse",
+      className: ACTIVE,
     },
 
     [ProcessingStatus.SEGMENTING]: {
       label: "Segmenting",
       variant: "secondary",
       icon: Scissors,
-      className:
-        "bg-indigo-100 text-indigo-700 border-indigo-300 animate-pulse",
+      className: ACTIVE,
     },
 
     [ProcessingStatus.CREATING_MANIFEST]: {
       label: "Creating Manifest",
       variant: "secondary",
       icon: FileText,
-      className: "bg-cyan-100 text-cyan-700 border-cyan-300 animate-pulse",
+      className: ACTIVE,
     },
 
     [ProcessingStatus.UPLOADING_TO_STORAGE]: {
       label: "Uploading",
       variant: "secondary",
       icon: Upload,
-      className: "bg-teal-100 text-teal-700 border-teal-300 animate-pulse",
+      className: ACTIVE,
     },
 
     [ProcessingStatus.FINALIZING]: {
       label: "Finalizing",
       variant: "secondary",
       icon: Sparkles,
-      className: "bg-amber-100 text-amber-700 border-amber-300 animate-pulse",
+      className: ACTIVE,
     },
 
     [ProcessingStatus.COMPLETED]: {
       label: "Completed",
       variant: "secondary",
       icon: CheckCircle2,
-      className: "bg-emerald-100 text-emerald-700 border-emerald-300",
+      className: NEUTRAL,
     },
 
     [ProcessingStatus.FAILED]: {
       label: "Failed",
       variant: "destructive",
       icon: AlertCircle,
-      className: "bg-red-100 text-red-700 border-red-300",
+      className: "bg-destructive/10 text-destructive border-destructive/20",
     },
 
     // OPTIONAL: if you want uploading visible
@@ -103,15 +108,14 @@ export function ProcessingStatusBadge({
       label: "Uploading",
       variant: "secondary",
       icon: Upload,
-      className: "bg-gray-100 text-gray-700 border-gray-300 animate-pulse",
+      className: ACTIVE,
     },
 
     [ProcessingStatus.AGGREGATING]: {
       label: "Aggregating",
       variant: "secondary",
       icon: Loader2,
-      className:
-        "bg-violet-100 text-violet-700 border-violet-300 animate-pulse",
+      className: ACTIVE,
     },
   };
   const { label, variant, icon: Icon, className } = config[status];
@@ -135,7 +139,7 @@ export function PublishStatusBadge({
 }: PublishStatusBadgeProps) {
   if (status === "published" && isPublic) {
     return (
-      <Badge className="text-xs bg-emerald-500 text-white hover:bg-emerald-600 border-0">
+      <Badge className="text-xs bg-accent text-primary border-primary/20">
         <CheckCircle2 className="w-3 h-3 mr-1" />
         Published
       </Badge>
@@ -144,10 +148,7 @@ export function PublishStatusBadge({
 
   if (status === "published" && !isPublic) {
     return (
-      <Badge
-        variant="outline"
-        className="text-xs bg-amber-50 text-amber-700 border-amber-300"
-      >
+      <Badge variant="outline" className="text-xs bg-muted text-muted-foreground border-border">
         <Lock className="w-3 h-3 mr-1" />
         Unlisted
       </Badge>
@@ -156,10 +157,7 @@ export function PublishStatusBadge({
 
   if (status === "draft") {
     return (
-      <Badge
-        variant="outline"
-        className="text-xs bg-slate-100 text-slate-700 border-slate-300"
-      >
+      <Badge variant="outline" className="text-xs bg-muted text-muted-foreground border-border">
         <FileEdit className="w-3 h-3 mr-1" />
         Draft
       </Badge>

@@ -106,7 +106,7 @@ export const columns: ColumnDef<Video>[] = [
             )}
             {/* Duration overlay */}
             {video.processing_metadata && (
-              <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
+              <div className="absolute bottom-1 right-1 bg-surface-watch/80 text-foreground text-xs px-1.5 py-0.5 rounded">
                 {formatDuration(video.processing_metadata.duration_seconds)}
               </div>
             )}
@@ -280,10 +280,13 @@ export const columns: ColumnDef<Video>[] = [
                 </Badge>
               </div>
             </TooltipTrigger>
-            <TooltipContent className="bg-white border border-gray-200 shadow-lg">
+            <TooltipContent className="shadow-lg">
+              {/* TooltipContent is intentionally inverted (bg-foreground/
+                  text-background) — badges need the same inversion to stay
+                  legible against it, not the app's normal-context tokens. */}
               <div className="flex flex-wrap gap-1.5 max-w-[200px]">
                 {qualities.map((quality) => (
-                  <Badge key={quality} variant="outline" className="text-xs bg-slate-50 text-slate-700 border-slate-300">
+                  <Badge key={quality} variant="outline" className="text-xs border-background/20 text-background">
                     {quality}
                   </Badge>
                 ))}

@@ -35,7 +35,7 @@ const UserGrowthChart = () => {
               </div>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all"
+                  className="h-full bg-primary rounded-full transition-all duration-(--duration-slow) ease-(--ease-out-quart)"
                   style={{ width: `${(item.users / maxUsers) * 100}%` }}
                 />
               </div>

@@ -40,7 +40,7 @@ export default function AdminVideosPage() {
     <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Video Management</h1>
+        <h1 className="text-3xl tracking-tight">Video Management</h1>
         <p className="text-muted-foreground">
           Manage and monitor all videos in your VOD platform
         </p>

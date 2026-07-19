@@ -4,8 +4,8 @@ interface RoleBadgeProps {
 
 export function RoleBadge({ role }: RoleBadgeProps) {
   const styles = {
-    admin: "bg-purple-100 text-purple-700 border-purple-300",
-    user: "bg-blue-100 text-blue-700 border-blue-300",
+    admin: "bg-accent text-primary border-primary/20",
+    user: "bg-muted text-muted-foreground border-border",
   };
 
   return (

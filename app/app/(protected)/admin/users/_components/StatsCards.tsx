@@ -9,37 +9,25 @@ const StatsCards = () => {
       title: 'Total Videos',
       value: '1,284',
       change: '+12.5%',
-      trend: 'up',
       icon: Video,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10'
     },
     {
       title: 'Total Users',
       value: '24,832',
       change: '+8.2%',
-      trend: 'up',
       icon: Users,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10'
     },
     {
       title: 'Total Views',
       value: '2.4M',
       change: '+23.1%',
-      trend: 'up',
       icon: Eye,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10'
     },
     {
       title: 'Revenue',
       value: '$48,293',
       change: '+15.3%',
-      trend: 'up',
       icon: TrendingUp,
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10'
     }
   ]
 
@@ -53,14 +41,14 @@ const StatsCards = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                <Icon className={`h-4 w-4 ${stat.color}`} />
+              <div className="p-2 rounded-lg bg-accent">
+                <Icon className="h-4 w-4 text-primary" />
               </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stat.value}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-green-500 font-medium">{stat.change}</span> from last month
+                <span className="text-primary font-medium">{stat.change}</span> from last month
               </p>
             </CardContent>
           </Card>
