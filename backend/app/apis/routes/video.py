@@ -5,7 +5,7 @@ from app.schemas.video import VideoResponse, VideoCreate, VideoList
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.video_service import video_service
-from app.core.dependencies import get_current_user , get_current_admin_user 
+from app.core.dependencies import get_current_user , get_current_admin_user, get_current_user_optional
 from app.models.users import User  
 from typing import Optional, List
 from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList
@@ -57,12 +57,15 @@ async def create_new_video(
 )
 def get_video(
     video_id: str,
-    current_user: Optional[User] = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Get a specific video by ID"""
+    """Get a specific video by ID. Public videos are visible to anyone;
+    private videos are visible only to their owner or an admin — any other
+    caller gets a 404 (not 403) so private video existence isn't leaked."""
     user_id = current_user.id if current_user else None
-    video = video_service.get_video_by_id(db, video_id, user_id)
+    is_admin = current_user.is_admin() if current_user else False
+    video = video_service.get_video_by_id(db, video_id, user_id, is_admin)
     return video
 
 
@@ -119,10 +122,12 @@ def delete_video(
 )
 def increment_video_views(
     video_id: str,
-    current_user: User = Depends(get_current_admin_user),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Increment view count when video is played"""
+    """Increment view count when video is played. Works for anonymous
+    viewers so public watch pages can record a view without requiring
+    sign-in."""
     video_service.increment_views(db, video_id)
     return {"message": "View count incremented"}
 

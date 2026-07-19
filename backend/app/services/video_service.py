@@ -327,17 +327,21 @@ class VideoService:
             is_failed=is_failed,
         )
     
-    def get_video_by_id(self, db: Session, video_id: str, user_id: Optional[str] = None) -> Video:
-        """Get video by ID with optional access control"""
+    def get_video_by_id(self, db: Session, video_id: str, user_id: Optional[str] = None, is_admin: bool = False) -> Video:
+        """Get video by ID with optional access control.
+
+        Private videos are indistinguishable from missing ones to anyone
+        but the owner/admin — a 403 would confirm the video exists, so
+        denied access returns 404 instead."""
         video = db.query(Video).filter(Video.id == video_id).first()
-        
+
         if not video:
             raise HTTPException(status_code=404, detail="Video not found")
-        
-        # If video is private, only owner can access
-        if not video.is_public and video.user_id != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
-        
+
+        # If video is private, only owner or admin can access
+        if not video.is_public and video.user_id != user_id and not is_admin:
+            raise HTTPException(status_code=404, detail="Video not found")
+
         return video
     
     def get_user_videos(self, db: Session, user_id: str, skip: int = 0, limit: int = 20) -> List[Video]:
