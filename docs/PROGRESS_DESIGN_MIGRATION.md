@@ -38,27 +38,39 @@ Run the doc's §8 verification checklist against each step before checking it do
       tokens, admin sidebar + upload dropzones auto-inherited cyan accents
       with zero code changes, zero console errors.
 
-## Step 1 — Watch page
+## Step 1 — Watch page ✅ done
 
-- [ ] Ambient glow: port `useAmbientColor` hook (from
-      `docs/design-system-reference/useAmbientColor.ts.reference`) into
-      `app/(protected)/home/watch/[video_id]/_components/`, wire into the
-      watch page per doc §6.
-- [ ] Retint the player subsystem (`_components/player/*.tsx`) from violet
-      (`violet-400/500`, raw `rgba(139,92,246,...)` shadows) to `--primary`
-      cyan; replace raw `white`/`black` opacity utilities with
-      `foreground`/`surface-watch`/`popover` tokens: `VideoPlayer.tsx`,
-      `ControlBar.tsx`, `ScrubBar.tsx`, `VolumeControl.tsx`, `SettingsMenu.tsx`,
+- [x] Ambient glow: ported `useAmbientColor` hook verbatim into
+      `_components/player/useAmbientColor.ts`; wired into `page.tsx` behind
+      the player with the `.ambient-glow` utility + `--ambient` inline style.
+- [x] Retinted the player subsystem from violet to `--primary` cyan; raw
+      `white`/`black` opacity utilities → `foreground`/`surface-watch`/
+      `popover`/`accent` tokens across `VideoPlayer.tsx`, `ControlBar.tsx`,
+      `ScrubBar.tsx`, `VolumeControl.tsx`, `SettingsMenu.tsx`,
       `TheaterButton.tsx`, `CenterPlayButton.tsx`, `PlayPauseFlash.tsx`,
-      `BufferingSpinner.tsx`. Keep the existing overlay-controls UX (more
-      capable than the zip's reference file) — retint only.
-- [ ] Restyle `VideoInfo.tsx`, `VideoStats.tsx`, `CommentSection.tsx`,
-      `RelatedVideos.tsx` to token classes + eyebrow metadata row.
-- [ ] Delete the 5 AI mock widgets from `page.tsx`:
-      `AISceneTimeline`, `AIMoodAnalysis`, `AIRecommendations`,
-      `AIWatchParty`, `AIContentWarnings` (imports + JSX usage).
-- [ ] `pnpm build` + browser check on `/home/watch/[id]` (light/no-glow and
-      real-thumbnail cases).
+      `BufferingSpinner.tsx`. Kept the existing overlay-controls UX (more
+      capable than the zip's reference file) — retint only. Also fixed a
+      pre-existing bug where `VideoPlayer`'s `className` prop was accepted
+      but never applied (theater-mode sizing was silently ignored). Deleted
+      the dead, unused `_components/VideoPlayer.tsx` (superseded by
+      `_components/player/VideoPlayer.tsx`, confirmed via grep zero
+      importers).
+- [x] Restyled `VideoInfo.tsx` (eyebrow metadata row, `bg-card` surfaces,
+      `.eyebrow` section headers for Cast/Tags), `VideoStats.tsx` (already
+      token-clean, no changes needed), `CommentSection.tsx` (already
+      token-clean), `RelatedVideos.tsx` (hover→`accent`, duration badge→
+      `surface-watch/70`, star rating→`muted-foreground`, dropped stray
+      `font-bold` on headings so the base-layer `h1/h2/h3{font-weight:600}`
+      rule applies instead of 700).
+- [x] Deleted the 5 AI mock widgets from `page.tsx`: `AISceneTimeline`,
+      `AIMoodAnalysis`, `AIRecommendations`, `AIWatchParty`,
+      `AIContentWarnings` (imports + JSX usage removed; component files left
+      in place, per doc §3.5's literal wording).
+- [x] `pnpm build` clean. Browser check via claude-in-chrome on a real
+      uploaded video: pure-black surface, cyan scrub-bar progress + thumb,
+      eyebrow metadata (`ACTION · 0 VIEWS · 2026 · R`), popover scrub-hover
+      tooltip, hover-accent tint on control icons and related-video cards,
+      zero console errors.
 
 ## Step 2 — Browse/home grid
 

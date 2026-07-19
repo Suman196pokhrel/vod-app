@@ -57,20 +57,20 @@ export function ScrubBar({ currentTime, duration, buffered, onScrubStart, onScru
     >
       {hover !== null && duration > 0 && (
         <div
-          className="pointer-events-none absolute -top-8 z-10 -translate-x-1/2 rounded-md bg-black/90 px-2 py-1 text-[11px] font-medium tabular-nums text-white ring-1 ring-white/10"
+          className="pointer-events-none absolute -top-8 z-10 -translate-x-1/2 rounded-md bg-popover/90 px-2 py-1 text-[11px] font-medium tabular-nums text-popover-foreground ring-1 ring-border"
           style={{ left: `${clamp((hover / duration) * 100, 4, 96)}%` }}
         >
           {formatTime(hover)}
         </div>
       )}
 
-      <div className={`absolute top-1/2 w-full -translate-y-1/2 overflow-hidden rounded-full bg-white/20 transition-all duration-200 ${dragging ? "h-[5px]" : "h-[3px] group-hover/bar:h-[5px]"}`}>
-        <div className="absolute inset-y-0 left-0 bg-white/30 transition-[width] duration-300" style={{ width: `${bufPct}%` }} />
-        <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-violet-500 to-violet-400" style={{ width: `${pct}%` }} />
+      <div className={`absolute top-1/2 w-full -translate-y-1/2 overflow-hidden rounded-full bg-foreground/20 transition-all duration-(--duration-base) ${dragging ? "h-[5px]" : "h-[3px] group-hover/bar:h-[5px]"}`}>
+        <div className="absolute inset-y-0 left-0 bg-foreground/30 transition-[width] duration-(--duration-slow)" style={{ width: `${bufPct}%` }} />
+        <div className="absolute inset-y-0 left-0 bg-primary" style={{ width: `${pct}%` }} />
       </div>
 
       <div
-        className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(139,92,246,0.8)] transition-transform duration-150 ${
+        className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_8px_var(--primary)] transition-transform duration-(--duration-fast) ${
           dragging ? "scale-125" : "scale-0 group-hover/bar:scale-100"
         }`}
         style={{ left: `${pct}%` }}

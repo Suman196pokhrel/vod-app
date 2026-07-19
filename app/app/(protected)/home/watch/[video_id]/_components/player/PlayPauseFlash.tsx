@@ -19,10 +19,10 @@ export function PlayPauseFlash({ isPlaying, started }: { isPlaying: boolean; sta
       key={key}
       className="pointer-events-none absolute inset-0 grid place-items-center"
     >
-      <span className="grid h-16 w-16 origin-center animate-[flash_0.5s_ease-out_forwards] place-items-center rounded-full bg-black/50 backdrop-blur-sm">
+      <span className="grid h-16 w-16 origin-center animate-[flash_var(--duration-slow)_var(--ease-out-quart)_forwards] place-items-center rounded-full bg-surface-watch/50 backdrop-blur-sm">
         {isPlaying
-          ? <Play className="h-7 w-7 translate-x-0.5 fill-white text-white" />
-          : <Pause className="h-7 w-7 fill-white text-white" />}
+          ? <Play className="h-7 w-7 translate-x-0.5 fill-foreground text-foreground" />
+          : <Pause className="h-7 w-7 fill-foreground text-foreground" />}
       </span>
       <style jsx>{`
         @keyframes flash {

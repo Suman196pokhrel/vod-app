@@ -18,16 +18,16 @@ export function VolumeControl({ volume, muted, onToggleMute, onVolumeChange }: P
     <div className="group/vol flex items-center">
       <Button
         variant="ghost" size="icon" onClick={onToggleMute}
-        className="h-9 w-9 shrink-0 text-white hover:bg-white/10 hover:text-white"
+        className="h-9 w-9 shrink-0 text-foreground hover:bg-accent hover:text-accent-foreground"
         aria-label={muted ? "Unmute" : "Mute"}
       >
         <Icon className="h-[18px] w-[18px]" />
       </Button>
-      <div className="w-0 overflow-hidden transition-all duration-300 ease-out group-hover/vol:w-[76px] group-hover/vol:pl-1">
-        <div className="relative h-1 w-[68px] rounded-full bg-white/25">
-          <div className="absolute inset-y-0 left-0 rounded-full bg-white" style={{ width: `${shown * 100}%` }} />
+      <div className="w-0 overflow-hidden transition-all duration-(--duration-base) ease-(--ease-out-quart) group-hover/vol:w-[76px] group-hover/vol:pl-1">
+        <div className="relative h-1 w-[68px] rounded-full bg-foreground/25">
+          <div className="absolute inset-y-0 left-0 rounded-full bg-foreground" style={{ width: `${shown * 100}%` }} />
           <div
-            className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+            className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
             style={{ left: `${shown * 100}%` }}
           />
           <input

@@ -36,14 +36,14 @@ export function SettingsMenu({
     >
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon"
-          className="h-9 w-9 text-white transition-transform hover:rotate-45 hover:bg-white/10 hover:text-white"
+          className="h-9 w-9 text-foreground transition-transform hover:rotate-45 hover:bg-accent hover:text-accent-foreground"
           aria-label="Settings">
           <Settings className="h-[18px] w-[18px]" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
         align="end" sideOffset={12}
-        className="w-56 overflow-hidden border-white/10 bg-neutral-900/90 p-1 text-white shadow-2xl backdrop-blur-2xl"
+        className="w-56 overflow-hidden border-border bg-popover/90 p-1 text-popover-foreground shadow-2xl backdrop-blur-2xl"
       >
         {panel === "root" && (
           <div className="space-y-0.5">
@@ -82,9 +82,9 @@ export function SettingsMenu({
 function Row({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-xs transition-colors hover:bg-white/10">
+      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-xs transition-colors hover:bg-accent hover:text-accent-foreground">
       <span>{label}</span>
-      <span className="flex items-center gap-1 text-white/50">
+      <span className="flex items-center gap-1 text-muted-foreground">
         {value}<ChevronRight className="h-3 w-3" />
       </span>
     </button>
@@ -93,9 +93,9 @@ function Row({ label, value, onClick }: { label: string; value: string; onClick:
 
 function Panel({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
   return (
-    <div className="animate-in slide-in-from-right-2 fade-in duration-200">
+    <div className="animate-in slide-in-from-right-2 fade-in duration-(--duration-base)">
       <button onClick={onBack}
-        className="mb-1 flex w-full items-center gap-1.5 border-b border-white/10 px-2 py-2 text-xs font-medium transition-colors hover:bg-white/5">
+        className="mb-1 flex w-full items-center gap-1.5 border-b border-border px-2 py-2 text-xs font-medium transition-colors hover:bg-accent hover:text-accent-foreground">
         <ChevronLeft className="h-3.5 w-3.5" />{title}
       </button>
       <div className="max-h-64 space-y-0.5 overflow-y-auto">{children}</div>
@@ -106,12 +106,12 @@ function Panel({ title, onBack, children }: { title: string; onBack: () => void;
 function Option({ label, hint, active, onClick }: { label: string; hint?: string; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs transition-colors hover:bg-white/10">
+      className="flex w-full items-center justify-between rounded-md px-3 py-1.5 text-xs transition-colors hover:bg-accent hover:text-accent-foreground">
       <span className="flex items-center gap-2">
-        <Check className={`h-3 w-3 text-violet-400 transition-opacity ${active ? "opacity-100" : "opacity-0"}`} />
+        <Check className={`h-3 w-3 text-primary transition-opacity ${active ? "opacity-100" : "opacity-0"}`} />
         {label}
       </span>
-      {hint && <span className="text-white/40">{hint}</span>}
+      {hint && <span className="text-muted-foreground">{hint}</span>}
     </button>
   )
 }

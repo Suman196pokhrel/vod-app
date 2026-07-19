@@ -41,7 +41,7 @@ export function ControlBar(p: Props) {
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-2.5 pt-20 transition-all duration-300 ${
+      className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-surface-watch/90 via-surface-watch/40 to-transparent px-4 pb-2.5 pt-20 transition-all duration-(--duration-base) ease-(--ease-out-quart) ${
         p.visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
       }`}
     >
@@ -56,18 +56,18 @@ export function ControlBar(p: Props) {
 
       <div className="mt-0.5 flex items-center gap-0.5">
         <Button variant="ghost" size="icon" onClick={p.onTogglePlay}
-          className="h-9 w-9 text-white hover:bg-white/10 hover:text-white" aria-label={p.isPlaying ? "Pause" : "Play"}>
+          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label={p.isPlaying ? "Pause" : "Play"}>
           {p.isPlaying
-            ? <Pause className="h-[18px] w-[18px] fill-white" />
-            : <Play className="h-[18px] w-[18px] translate-x-px fill-white" />}
+            ? <Pause className="h-[18px] w-[18px] fill-foreground" />
+            : <Play className="h-[18px] w-[18px] translate-x-px fill-foreground" />}
         </Button>
 
         <Button variant="ghost" size="icon" onClick={() => p.onSeekBy(-10)}
-          className="h-9 w-9 text-white hover:bg-white/10 hover:text-white" aria-label="Back 10 seconds">
+          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label="Back 10 seconds">
           <RotateCcw className="h-[17px] w-[17px]" />
         </Button>
         <Button variant="ghost" size="icon" onClick={() => p.onSeekBy(10)}
-          className="h-9 w-9 text-white hover:bg-white/10 hover:text-white" aria-label="Forward 10 seconds">
+          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label="Forward 10 seconds">
           <RotateCw className="h-[17px] w-[17px]" />
         </Button>
 
@@ -76,9 +76,9 @@ export function ControlBar(p: Props) {
           onToggleMute={p.onToggleMute} onVolumeChange={p.onVolumeChange}
         />
 
-        <span className="ml-2 select-none text-xs font-medium tabular-nums text-white">
-          {formatTime(p.currentTime)}
-          <span className="text-white/40"> / {formatTime(p.duration)}</span>
+        <span className="eyebrow ml-2 select-none tabular-nums">
+          <span className="text-foreground">{formatTime(p.currentTime)}</span>
+          {" / "}{formatTime(p.duration)}
         </span>
 
         <div className="flex-1" />
@@ -93,7 +93,7 @@ export function ControlBar(p: Props) {
 
 
         <Button variant="ghost" size="icon" onClick={p.onToggleFullscreen}
-          className="h-9 w-9 text-white hover:bg-white/10 hover:text-white"
+          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground"
           aria-label={p.fullscreen ? "Exit fullscreen" : "Fullscreen"}>
           {p.fullscreen ? <Minimize className="h-[18px] w-[18px]" /> : <Maximize className="h-[18px] w-[18px]" />}
         </Button>

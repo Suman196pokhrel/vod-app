@@ -22,28 +22,26 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
     <div className="space-y-4">
       {/* Title and Badges */}
       <div className="space-y-3">
-        <h1 className="text-3xl font-bold">{video.title}</h1>
+        <h1 className="text-3xl">{video.title}</h1>
 
-        {/* Metadata Row */}
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <Badge variant="secondary" className="font-normal">
-            {video.category}
-          </Badge>
-          <span>•</span>
+        {/* Metadata Row — eyebrow treatment (docs/DESIGN_SYSTEM.md §5.2) */}
+        <p className="eyebrow flex flex-wrap items-center gap-x-2">
+          <span>{video.category}</span>
+          <span aria-hidden>·</span>
           <span>{video.views_count} views</span>
           {video.release_date && (
             <>
-              <span>•</span>
+              <span aria-hidden>·</span>
               <span>{new Date(video.release_date).getFullYear()}</span>
             </>
           )}
           {video.age_rating && (
             <>
-              <span>•</span>
-              <Badge variant="outline">{video.age_rating}</Badge>
+              <span aria-hidden>·</span>
+              <span>{video.age_rating}</span>
             </>
           )}
-        </div>
+        </p>
       </div>
 
       {/* Action Buttons */}
@@ -106,7 +104,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       </div>
 
       {/* Director/Creator Info Card */}
-      <div className="bg-muted/50 rounded-lg p-4 border">
+      <div className="bg-card rounded-lg p-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-12 w-12">
             <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${video.director}`} />
@@ -121,7 +119,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       </div>
 
       {/* Description */}
-      <div className="bg-muted/30 rounded-lg p-4">
+      <div className="bg-card rounded-lg p-4">
         <p className={`text-sm leading-relaxed ${!showFullDescription && 'line-clamp-3'}`}>
           {video.description}
         </p>
@@ -137,7 +135,7 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       {/* Cast */}
       {video.cast && video.cast.length > 0 && (
         <div>
-          <h3 className="font-semibold mb-2">Cast</h3>
+          <h3 className="eyebrow mb-2">Cast</h3>
           <div className="flex flex-wrap gap-2">
             {video.cast.map((actor, index) => (
               <Badge key={index} variant="secondary" className="font-normal">
@@ -151,10 +149,10 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
       {/* Tags */}
       {video.tags && video.tags.length > 0 && (
         <div>
-          <h3 className="font-semibold mb-2">Tags</h3>
+          <h3 className="eyebrow mb-2">Tags</h3>
           <div className="flex flex-wrap gap-2">
             {video.tags.map((tag, index) => (
-              <Badge key={index} variant="outline" className="font-normal cursor-pointer hover:bg-muted">
+              <Badge key={index} variant="outline" className="font-normal cursor-pointer hover:bg-accent">
                 #{tag}
               </Badge>
             ))}

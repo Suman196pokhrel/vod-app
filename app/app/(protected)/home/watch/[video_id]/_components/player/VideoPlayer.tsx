@@ -56,7 +56,7 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
 
   if (!video.manifest_url) {
     return (
-      <div className="flex aspect-video items-center justify-center rounded-xl bg-neutral-950 text-sm text-neutral-400">
+      <div className="flex aspect-video items-center justify-center rounded-xl bg-card text-sm text-muted-foreground">
         This video is still processing. Check back shortly.
       </div>
     )
@@ -64,7 +64,7 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
 
   if (fatalError) {
     return (
-      <div className="flex aspect-video items-center justify-center rounded-xl bg-neutral-950 text-sm text-neutral-400">
+      <div className="flex aspect-video items-center justify-center rounded-xl bg-card text-sm text-muted-foreground">
         Playback failed. Try reloading the page.
       </div>
     )
@@ -76,9 +76,9 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
       tabIndex={0}
       onPointerMove={nudge}
       onPointerLeave={hideNow}
-      className={`group relative aspect-video w-full select-none overflow-hidden bg-black outline-none transition-[border-radius] focus-visible:ring-2 focus-visible:ring-violet-500/50 ${
+      className={`group relative select-none overflow-hidden bg-surface-watch outline-none transition-[border-radius] duration-(--duration-fast) ease-(--ease-out-quart) focus-visible:ring-2 focus-visible:ring-ring/50 ${
         fullscreen ? "rounded-none" : "rounded-xl"
-      } ${visible ? "cursor-default" : "cursor-none"}`}
+      } ${visible ? "cursor-default" : "cursor-none"} ${className ?? "aspect-video w-full"}`}
     >
       <video
         ref={videoRef}

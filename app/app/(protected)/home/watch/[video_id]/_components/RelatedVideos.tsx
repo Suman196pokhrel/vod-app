@@ -97,18 +97,18 @@ const RelatedVideos = ({ currentVideoId, category }: RelatedVideosProps) => {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">Related Videos</h2>
+      <h2 className="text-xl">Related Videos</h2>
       <div className="space-y-3">
         {relatedVideos.map((video) => (
           <Card
             key={video.id}
-            className="cursor-pointer hover:bg-muted/50 transition-colors"
+            className="cursor-pointer hover:bg-accent transition-colors duration-(--duration-fast) ease-(--ease-out-quart)"
             onClick={() => router.push(`/home/watch/${video.id}`)}
           >
             <CardContent className="p-3">
               <div className="flex gap-3">
                 {/* Thumbnail */}
-                <div className="relative w-40 aspect-video rounded overflow-hidden flex-shrink-0">
+                <div className="relative w-40 aspect-video rounded overflow-hidden flex-shrink-0 bg-card">
                   <Image
                     src={video.thumbnail}
                     alt={video.title}
@@ -117,7 +117,7 @@ const RelatedVideos = ({ currentVideoId, category }: RelatedVideosProps) => {
                   />
                   <Badge
                     variant="secondary"
-                    className="absolute bottom-1 right-1 text-xs bg-black/70 text-white border-none"
+                    className="absolute bottom-1 right-1 text-xs bg-surface-watch/70 text-foreground border-none backdrop-blur-sm"
                   >
                     <Clock className="w-2.5 h-2.5 mr-1" />
                     {video.duration}
@@ -136,7 +136,7 @@ const RelatedVideos = ({ currentVideoId, category }: RelatedVideosProps) => {
                     <span>{video.views} views</span>
                     <span>•</span>
                     <div className="flex items-center gap-0.5">
-                      <span className="text-yellow-500">★</span>
+                      <span className="text-muted-foreground">★</span>
                       <span>{video.rating}</span>
                     </div>
                   </div>

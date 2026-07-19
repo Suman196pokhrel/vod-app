@@ -45,7 +45,7 @@ const CommentSection = ({ videoId }: CommentSectionProps) => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-4">Comments ({mockComments.length})</h2>
+        <h2 className="text-2xl mb-4">Comments ({mockComments.length})</h2>
 
         {/* Add Comment */}
         <div className="flex gap-3 mb-6">
