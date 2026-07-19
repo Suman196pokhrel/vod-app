@@ -6,9 +6,6 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import inspect
-from alembic.config import Config
-from alembic import command
 
 # Database
 from app.models import User, Video
@@ -59,21 +56,16 @@ async def lifespan(app: FastAPI):
     # Startup: create DB tables if they don't exist yet.
     # This is equivalent to the old bare `Base.metadata.create_all(bind=engine)`
     # but called in the right place — after the app is initialized, not at import time.
+    #
+    # NOTE: create_all() only creates tables that don't exist yet — it never
+    # ALTERs an existing table to add a new column. On a DB that already has
+    # these tables (e.g. from a prior deploy) but no Alembic history, adding
+    # a column to a model here does nothing until `alembic upgrade head` is
+    # run explicitly. Don't auto-stamp/auto-migrate from here — a previous
+    # attempt at that stamped a legacy DB straight to "head" without ever
+    # running the migration, leaving Alembic believing a column existed that
+    # was never actually added. Run migrations as an explicit deploy step.
     Base.metadata.create_all(bind=engine)
-
-    # create_all() builds tables straight from the current models, bypassing
-    # Alembic's migration history — so on a genuinely fresh DB, alembic_version
-    # never gets created. A later `alembic upgrade head` would then start from
-    # an empty history and collide with tables create_all() already made
-    # (starting with the very first migration). Stamp to head right after
-    # create_all() so Alembic knows this schema already reflects head; if
-    # alembic_version already exists, this is a no-op and real migration
-    # history is left alone.
-    inspector = inspect(engine)
-    if "alembic_version" not in inspector.get_table_names():
-        alembic_cfg = Config(os.path.join(os.path.dirname(os.path.dirname(__file__)), "alembic.ini"))
-        command.stamp(alembic_cfg, "head")
-
     yield
     # Shutdown: nothing needed here for now, but this is where you'd
     # close connection pools, flush caches, etc. if required later.
