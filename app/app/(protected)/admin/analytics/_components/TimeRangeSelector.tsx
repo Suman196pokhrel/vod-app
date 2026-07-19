@@ -16,18 +16,13 @@ const timeRanges: { value: TimeRange; label: string }[] = [
 
 export function TimeRangeSelector({ selected, onChange }: TimeRangeSelectorProps) {
   return (
-    <div className="flex gap-2 bg-white border border-gray-200 rounded-lg p-1">
+    <div className="flex gap-2 bg-card border border-border rounded-lg p-1">
       {timeRanges.map((range) => (
         <Button
           key={range.value}
           variant={selected === range.value ? "default" : "ghost"}
           size="sm"
           onClick={() => onChange(range.value)}
-          className={`${
-            selected === range.value
-              ? "bg-blue-500 text-white hover:bg-blue-600"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
         >
           {range.label}
         </Button>

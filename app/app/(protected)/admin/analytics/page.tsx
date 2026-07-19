@@ -19,7 +19,6 @@ const mockMetrics: Metric[] = [
     change: 12.5,
     changeLabel: "vs last period",
     icon: Users,
-    iconColor: "bg-blue-500",
   },
   {
     title: "Total Videos",
@@ -27,7 +26,6 @@ const mockMetrics: Metric[] = [
     change: 8.2,
     changeLabel: "vs last period",
     icon: Video,
-    iconColor: "bg-purple-500",
   },
   {
     title: "Total Views",
@@ -35,7 +33,6 @@ const mockMetrics: Metric[] = [
     change: 18.7,
     changeLabel: "vs last period",
     icon: Eye,
-    iconColor: "bg-green-500",
   },
   {
     title: "Watch Time",
@@ -43,7 +40,6 @@ const mockMetrics: Metric[] = [
     change: 15.3,
     changeLabel: "vs last period",
     icon: Clock,
-    iconColor: "bg-orange-500",
   },
 ];
 
@@ -130,14 +126,14 @@ const mockTopVideos: TopVideo[] = [
 ];
 
 const mockCategoryData: CategoryData[] = [
-  { name: "Drama", views: 45200, videos: 52, color: "bg-purple-500" },
-  { name: "Action", views: 38900, videos: 45, color: "bg-red-500" },
-  { name: "Comedy", views: 34500, videos: 38, color: "bg-yellow-500" },
-  { name: "Documentary", views: 31200, videos: 29, color: "bg-blue-500" },
-  { name: "Thriller", views: 28700, videos: 34, color: "bg-gray-700" },
-  { name: "Sci-Fi", views: 25100, videos: 27, color: "bg-indigo-500" },
-  { name: "Romance", views: 22400, videos: 31, color: "bg-pink-500" },
-  { name: "Horror", views: 18900, videos: 22, color: "bg-orange-500" },
+  { name: "Drama", views: 45200, videos: 52 },
+  { name: "Action", views: 38900, videos: 45 },
+  { name: "Comedy", views: 34500, videos: 38 },
+  { name: "Documentary", views: 31200, videos: 29 },
+  { name: "Thriller", views: 28700, videos: 34 },
+  { name: "Sci-Fi", views: 25100, videos: 27 },
+  { name: "Romance", views: 22400, videos: 31 },
+  { name: "Horror", views: 18900, videos: 22 },
 ];
 
 export default function AnalyticsPage() {
@@ -155,13 +151,13 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-3xl text-foreground">Analytics</h1>
+            <p className="text-muted-foreground mt-1">
               Track your platform's performance and insights
             </p>
           </div>
@@ -185,7 +181,7 @@ export default function AnalyticsPage() {
         {/* Time Range Selector */}
         <div className="flex justify-between items-center">
           <TimeRangeSelector selected={timeRange} onChange={setTimeRange} />
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Last updated: {new Date().toLocaleTimeString()}
           </p>
         </div>
@@ -218,14 +214,14 @@ export default function AnalyticsPage() {
         <TopVideosTable videos={mockTopVideos} />
 
         {/* Footer Info */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-accent border border-primary/20 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Activity className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-card rounded-lg">
+              <Activity className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h4 className="font-semibold text-blue-900">Analytics Tips</h4>
-              <p className="text-sm text-blue-700 mt-1">
+              <h4 className="font-semibold text-foreground">Analytics Tips</h4>
+              <p className="text-sm text-muted-foreground mt-1">
                 Track your peak usage times to schedule content releases. Focus on
                 categories with high engagement. Monitor completion rates to improve
                 content quality.

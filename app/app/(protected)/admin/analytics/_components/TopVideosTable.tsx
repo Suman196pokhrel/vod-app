@@ -22,40 +22,40 @@ export function TopVideosTable({ videos }: TopVideosTableProps) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className="p-6 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">Top Performing Videos</h3>
-        <p className="text-sm text-gray-500 mt-1">Videos with the most views this period</p>
+    <div className="bg-card border border-border rounded-lg overflow-hidden">
+      <div className="p-6 border-b border-border">
+        <h3 className="text-lg font-semibold text-foreground">Top Performing Videos</h3>
+        <p className="text-sm text-muted-foreground mt-1">Videos with the most views this period</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="text-left p-4 text-xs font-medium text-gray-700 uppercase tracking-wider">
+            <tr className="border-b border-border bg-muted/50">
+              <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Rank
               </th>
-              <th className="text-left p-4 text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Video
               </th>
-              <th className="text-left p-4 text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Category
               </th>
-              <th className="text-left p-4 text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Views
               </th>
-              <th className="text-left p-4 text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Watch Time
               </th>
-              <th className="text-left p-4 text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="text-left p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Completion
               </th>
             </tr>
           </thead>
           <tbody>
             {videos.map((video, index) => (
-              <tr key={video.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+              <tr key={video.id} className="border-b border-border hover:bg-muted/50 transition-colors duration-(--duration-fast)">
                 <td className="p-4">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-700 font-semibold text-sm">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground font-semibold text-sm">
                     {index + 1}
                   </div>
                 </td>
@@ -64,39 +64,39 @@ export function TopVideosTable({ videos }: TopVideosTableProps) {
                     <img
                       src={video.thumbnail}
                       alt={video.title}
-                      className="w-20 h-12 object-cover rounded border border-gray-200"
+                      className="w-20 h-12 object-cover rounded border border-border"
                     />
                     <div>
-                      <p className="font-medium text-gray-900 line-clamp-1">{video.title}</p>
+                      <p className="font-medium text-foreground line-clamp-1">{video.title}</p>
                     </div>
                   </div>
                 </td>
                 <td className="p-4">
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-300">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-accent text-primary border border-primary/20">
                     {video.category}
                   </span>
                 </td>
                 <td className="p-4">
-                  <div className="flex items-center gap-2 text-gray-900">
-                    <Eye className="w-4 h-4 text-gray-400" />
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Eye className="w-4 h-4 text-muted-foreground" />
                     <span className="font-medium">{formatNumber(video.views)}</span>
                   </div>
                 </td>
                 <td className="p-4">
-                  <div className="flex items-center gap-2 text-gray-900">
-                    <Clock className="w-4 h-4 text-gray-400" />
+                  <div className="flex items-center gap-2 text-foreground">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
                     <span>{video.watchTime.toFixed(1)}h</span>
                   </div>
                 </td>
                 <td className="p-4">
                   <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
+                    <div className="flex-1 bg-muted rounded-full h-2 max-w-[100px]">
                       <div
-                        className="bg-green-500 h-2 rounded-full"
+                        className="bg-primary h-2 rounded-full"
                         style={{ width: `${video.avgCompletion}%` }}
                       />
                     </div>
-                    <span className="text-sm text-gray-700 font-medium">
+                    <span className="text-sm text-muted-foreground font-medium">
                       {video.avgCompletion}%
                     </span>
                   </div>

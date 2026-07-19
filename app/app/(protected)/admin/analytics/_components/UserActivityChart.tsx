@@ -8,38 +8,39 @@ interface UserActivityChartProps {
 
 export function UserActivityChart({ data }: UserActivityChartProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="bg-card border border-border rounded-lg p-6">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">User Activity</h3>
-        <p className="text-sm text-gray-500 mt-1">Daily active and new users</p>
+        <h3 className="text-lg font-semibold text-foreground">User Activity</h3>
+        <p className="text-sm text-muted-foreground mt-1">Daily active and new users</p>
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis 
-            dataKey="date" 
-            stroke="#6b7280"
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+          <XAxis
+            dataKey="date"
+            stroke="var(--muted-foreground)"
             style={{ fontSize: "12px" }}
           />
-          <YAxis 
-            stroke="#6b7280"
+          <YAxis
+            stroke="var(--muted-foreground)"
             style={{ fontSize: "12px" }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "white",
-              border: "1px solid #e5e7eb",
+              backgroundColor: "var(--popover)",
+              border: "1px solid var(--border)",
               borderRadius: "8px",
               padding: "8px 12px",
+              color: "var(--popover-foreground)",
             }}
           />
           <Area
             type="monotone"
             dataKey="activeUsers"
             stackId="1"
-            stroke="#3b82f6"
-            fill="#3b82f6"
+            stroke="var(--chart-1)"
+            fill="var(--chart-1)"
             fillOpacity={0.6}
             name="Active Users"
           />
@@ -47,8 +48,8 @@ export function UserActivityChart({ data }: UserActivityChartProps) {
             type="monotone"
             dataKey="newUsers"
             stackId="2"
-            stroke="#10b981"
-            fill="#10b981"
+            stroke="var(--chart-2)"
+            fill="var(--chart-2)"
             fillOpacity={0.6}
             name="New Users"
           />
@@ -58,12 +59,12 @@ export function UserActivityChart({ data }: UserActivityChartProps) {
       {/* Legend */}
       <div className="flex items-center justify-center gap-6 mt-4">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-blue-500 rounded-full" />
-          <span className="text-sm text-gray-600">Active Users</span>
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "var(--chart-1)" }} />
+          <span className="text-sm text-muted-foreground">Active Users</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-500 rounded-full" />
-          <span className="text-sm text-gray-600">New Users</span>
+          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: "var(--chart-2)" }} />
+          <span className="text-sm text-muted-foreground">New Users</span>
         </div>
       </div>
     </div>

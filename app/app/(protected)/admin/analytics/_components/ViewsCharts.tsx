@@ -9,34 +9,35 @@ interface ViewsChartProps {
 
 export function ViewsChart({ data, title }: ViewsChartProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
-      <h3 className="text-lg font-semibold text-gray-900 mb-6">{title}</h3>
+    <div className="bg-card border border-border rounded-lg p-6">
+      <h3 className="text-lg font-semibold text-foreground mb-6">{title}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis 
-            dataKey="date" 
-            stroke="#6b7280"
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+          <XAxis
+            dataKey="date"
+            stroke="var(--muted-foreground)"
             style={{ fontSize: "12px" }}
           />
-          <YAxis 
-            stroke="#6b7280"
+          <YAxis
+            stroke="var(--muted-foreground)"
             style={{ fontSize: "12px" }}
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: "white",
-              border: "1px solid #e5e7eb",
+              backgroundColor: "var(--popover)",
+              border: "1px solid var(--border)",
               borderRadius: "8px",
               padding: "8px 12px",
+              color: "var(--popover-foreground)",
             }}
           />
           <Line
             type="monotone"
             dataKey="views"
-            stroke="#3b82f6"
+            stroke="var(--chart-1)"
             strokeWidth={2}
-            dot={{ fill: "#3b82f6", r: 4 }}
+            dot={{ fill: "var(--chart-1)", r: 4 }}
             activeDot={{ r: 6 }}
           />
         </LineChart>
