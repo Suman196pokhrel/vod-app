@@ -1,7 +1,4 @@
-// thumbnail_url is stored without a leading slash, manifest_url with one —
-// strip and re-add a single slash so both produce a valid URL.
-export const storageUrl = (path: string) =>
-  `${process.env.NEXT_PUBLIC_API_URL}/storage/${path.replace(/^\/+/, "")}`
+export { storageUrl } from "@/lib/utils/storage"
 
 export const formatTime = (s: number) => {
   if (!Number.isFinite(s)) return "0:00"

@@ -1,7 +1,7 @@
 import api from "./client";
 import { VideoFormData } from "@/app/(protected)/admin/videos/_components/uploadForm/formSchema";
 import { AxiosError } from "axios";
-import { ProcessingStatus, Video } from "../types/video";
+import { ProcessingStatus, Video, VideoDetailsUpdatePayload } from "../types/video";
 import { VideoPublicationStatus } from "@/lib/types/video";
 
 export interface VideoUploadPayload {
@@ -263,6 +263,50 @@ export const updateVideoVisibility = async (
       );
     }
     throw new Error("An unexpected error occurred while updating visibility");
+  }
+};
+
+/**
+ * Update a video's metadata (admin "Edit Details" form). Partial update —
+ * only send the fields that changed.
+ */
+export const updateVideoDetails = async (
+  videoId: string,
+  payload: VideoDetailsUpdatePayload
+): Promise<Video> => {
+  try {
+    const response = await api.patch<Video>(`/videos/by-id/${videoId}`, payload);
+    return response.data;
+  } catch (error) {
+    console.error("[updateVideoDetails] failed", { videoId, payload, error });
+    if (error instanceof AxiosError) {
+      throw new Error(
+        error.response?.data?.detail || "Failed to update video details"
+      );
+    }
+    throw new Error("An unexpected error occurred while updating video details");
+  }
+};
+
+/**
+ * Get a short-lived presigned URL for downloading a video's original
+ * source file. The URL carries Content-Disposition: attachment set by
+ * MinIO itself, so navigating to it downloads the file instead of playing
+ * it inline - a plain <a download> doesn't work since storage is served
+ * from a different origin than the frontend.
+ */
+export const getVideoDownloadUrl = async (videoId: string): Promise<string> => {
+  try {
+    const response = await api.get<{ url: string }>(`/videos/by-id/${videoId}/download-url`);
+    return response.data.url;
+  } catch (error) {
+    console.error("[getVideoDownloadUrl] failed", { videoId, error });
+    if (error instanceof AxiosError) {
+      throw new Error(
+        error.response?.data?.detail || "Failed to get download link"
+      );
+    }
+    throw new Error("An unexpected error occurred while preparing the download");
   }
 };
 

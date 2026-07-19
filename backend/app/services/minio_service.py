@@ -243,6 +243,68 @@ class MinIOService:
             logger.error(f"Failed to generate video URL: {str(e)}")
             raise Exception(f"Failed to generate video URL: {str(e)}")
 
+    def get_video_download_url(
+        self,
+        object_name: str,
+        download_filename: str,
+        public_host: str,
+        public_scheme: str,
+        expires: timedelta = timedelta(minutes=15),
+    ) -> str:
+        """Presigned URL that forces a browser download (not inline playback).
+
+        A plain <a download> on the raw video URL doesn't work — that file
+        is served from a different origin than the frontend (Caddy's
+        /storage proxy to MinIO), and browsers ignore the `download`
+        attribute cross-origin. Content-Disposition: attachment set here,
+        on MinIO's own response, forces the save-as dialog regardless of
+        origin.
+
+        The signature is bound to a `host` header (S3 SigV4 signs it), and
+        the browser will hit this through Caddy's /storage proxy under the
+        API's own public domain (e.g. api.vod.example.com), not the internal
+        `minio:9000` this service's default client talks to — signing with
+        the internal host produces a URL Caddy forwards with a *different*
+        Host header, which MinIO then rejects as SignatureDoesNotMatch. So
+        this signs with a client built against the public host/scheme the
+        admin's own request just came in on (passed in from the route,
+        derived from the request's Host / X-Forwarded-Proto), then splices
+        the /storage prefix into the resulting URL so it actually resolves
+        through Caddy instead of a bare (unreachable, unproxied) MinIO host.
+        """
+        key = "/".join(object_name.split("/")[1:])
+        try:
+            # region= is required here, not just an optimization: without
+            # it minio-py makes a real network call to public_host to look
+            # up the bucket's region before it can sign anything — and
+            # public_host (the admin's own request host, e.g. "localhost"
+            # or the public domain) isn't reachable *from this container*,
+            # only from the browser. "us-east-1" is MinIO's own default
+            # single-region setup (matches the credential scope already
+            # produced by the internal client).
+            public_client = Minio(
+                public_host,
+                access_key=settings.minio_access_key,
+                secret_key=settings.minio_secret_key,
+                secure=public_scheme == "https",
+                region="us-east-1",
+            )
+            signed_url = public_client.presigned_get_object(
+                bucket_name=settings.minio_bucket_videos,
+                object_name=key,
+                expires=expires,
+                response_headers={
+                    "response-content-disposition": f'attachment; filename="{download_filename}"'
+                },
+            )
+        except S3Error as e:
+            logger.error(f"Failed to generate download URL for {key}: {str(e)}")
+            raise Exception(f"Failed to generate download URL: {str(e)}")
+
+        scheme, _, rest = signed_url.partition("://")
+        netloc, _, path_and_query = rest.partition("/")
+        return f"{scheme}://{netloc}/storage/{path_and_query}"
+
     def get_thumbnail_url(self, object_name: str) -> str:
         """Generate public thumbnail URL"""
         return f"http://{settings.minio_endpoint}/{settings.minio_bucket_thumbnails}/{object_name}"

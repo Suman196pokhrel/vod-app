@@ -1,6 +1,6 @@
 # /backend/app/apis/routes/video.py
 
-from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Query
+from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Query, Request
 from app.schemas.video import VideoResponse, VideoCreate, VideoList
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -8,7 +8,7 @@ from app.services.video_service import video_service
 from app.core.dependencies import get_current_user , get_current_admin_user, get_current_user_optional
 from app.models.users import User  
 from typing import Optional, List
-from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList, VideoVisibilityUpdate
+from app.schemas.video import VideoProcessingStatusResponse,PaginatedResponse, AdminVideoList, VideoVisibilityUpdate, VideoUpdate
 
 
 
@@ -131,6 +131,54 @@ def update_video_visibility(
     return video_service.update_video_visibility(
         db, video_id, payload.is_public, current_user.id, is_admin=current_user.is_admin()
     )
+
+
+@video_router.patch(
+    "/by-id/{video_id}",
+    response_model=VideoResponse,
+    summary="Update video metadata (admin Edit Details form)"
+)
+def update_video_details(
+    video_id: str,
+    payload: VideoUpdate,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Partial update of a video's metadata - title, description, category,
+    age rating, release date, director, cast, tags, status. Only fields
+    present in the request body are changed."""
+    return video_service.update_video_details(
+        db, video_id, payload, current_user.id, is_admin=current_user.is_admin()
+    )
+
+
+@video_router.get(
+    "/by-id/{video_id}/download-url",
+    summary="Get a short-lived download URL for the original source file"
+)
+def get_video_download_url(
+    video_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Returns a presigned MinIO URL (15 min expiry) with
+    Content-Disposition: attachment already set, so the browser downloads
+    the file instead of playing it inline - a plain frontend <a download>
+    doesn't work here since storage is served from a different origin.
+
+    host/scheme are read from this request (Caddy forwards Host unchanged
+    and sets X-Forwarded-Proto) rather than any static config, since the
+    presigned signature must be bound to whatever public host the browser
+    will actually use to reach /storage - that's this same request's own
+    host, dev or prod, without needing to hardcode it.
+    """
+    host = request.headers.get("host", "localhost")
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    url = video_service.get_video_download_url(
+        db, video_id, current_user.id, host, scheme, is_admin=current_user.is_admin()
+    )
+    return {"url": url}
 
 
 @video_router.post(

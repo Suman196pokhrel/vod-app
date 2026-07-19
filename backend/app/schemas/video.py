@@ -1,7 +1,7 @@
 # /app/schemas/videos.py 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime, date
-from typing import Optional, List, TypeVar, Generic, Any
+from typing import Optional, List, Literal, TypeVar, Generic, Any
 from app.utils.video_helpers import ProcessingStatus
 
 
@@ -45,11 +45,22 @@ class VideoCreate(BaseModel):
 
 
 class VideoUpdate(BaseModel):
-    """Schema for updating video metadata - all fields optional"""
+    """Schema for the admin 'Edit Details' form - every field optional so a
+    partial payload only touches the fields the admin actually changed
+    (see VideoService.update_video_details, which uses exclude_unset)."""
     title: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=5000)
     thumbnail_url: Optional[str] = Field(None, max_length=500)
     is_public: Optional[bool] = None
+    category: Optional[str] = Field(None, min_length=1, max_length=50)
+    age_rating: Optional[str] = Field(None, max_length=10)
+    release_date: Optional[date] = None
+    director: Optional[str] = Field(None, max_length=200)
+    # Stored as a raw comma-separated string on the model, matching how
+    # VideoMetadata (the create-time schema) accepts cast — not a list.
+    cast: Optional[str] = Field(None, max_length=500)
+    tags: Optional[List[str]] = Field(None, max_length=10)
+    status: Optional[Literal["draft", "published", "scheduled"]] = None
 
 
 class VideoVisibilityUpdate(BaseModel):

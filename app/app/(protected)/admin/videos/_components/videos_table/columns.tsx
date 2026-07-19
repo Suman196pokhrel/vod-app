@@ -1,5 +1,6 @@
 import { ColumnDef } from '@tanstack/react-table';
 import { Video } from '@/lib/types/video';
+import { storageUrl } from '@/lib/utils/storage';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,11 +27,6 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import { useVideoProcessing } from '@/hooks/video/use-video-processing';
-
-// Stored thumbnail_url is a MinIO object key (e.g. "user-x/uuid.jpg"), not a
-// browser-loadable URL — same helper as VideoCard.tsx / the player.
-const storageUrl = (path: string) =>
-  `${process.env.NEXT_PUBLIC_API_URL}/storage/${path}`;
 
 export const columns: ColumnDef<Video>[] = [
   // Selection column

@@ -44,6 +44,22 @@ export interface Video {
   manifest_url: string | null;
   available_qualities: string[];
   user_id: string;
+  user_email?: string | null;
+  user_username?: string | null;
+}
+
+// Partial update payload for the admin "Edit Details" form — every field
+// optional, only the ones actually changed need to be sent.
+export interface VideoDetailsUpdatePayload {
+  title?: string;
+  description?: string;
+  category?: string;
+  age_rating?: string;
+  release_date?: string;
+  director?: string;
+  cast?: string;
+  tags?: string[];
+  status?: "draft" | "published" | "scheduled";
 }
 
 // For the upload/create request
