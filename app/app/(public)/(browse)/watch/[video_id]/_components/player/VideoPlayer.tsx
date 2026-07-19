@@ -76,13 +76,13 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
       tabIndex={0}
       onPointerMove={nudge}
       onPointerLeave={hideNow}
-      className={`group relative select-none overflow-hidden bg-surface-watch outline-none transition-[border-radius] duration-(--duration-fast) ease-(--ease-out-quart) focus-visible:ring-2 focus-visible:ring-ring/50 ${
-        fullscreen ? "rounded-none" : "rounded-xl"
+      className={`group relative select-none overflow-hidden bg-card outline-none transition-[border-radius] duration-(--duration-fast) ease-(--ease-out-quart) focus-visible:ring-2 focus-visible:ring-ring/50 ${
+        fullscreen ? "rounded-none" : "rounded-xl border border-border/60"
       } ${visible ? "cursor-default" : "cursor-none"} ${className ?? "aspect-video w-full"}`}
     >
       <video
         ref={videoRef}
-        className="h-full w-full"
+        className="h-full w-full object-contain"
         poster={video.thumbnail_url ? storageUrl(video.thumbnail_url) : undefined}
         playsInline
         onClick={s.togglePlay}

@@ -54,10 +54,14 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
     );
 
   return (
-    <div className="min-h-screen bg-surface-watch">
+    <div className="min-h-screen overflow-x-clip bg-surface-watch">
       {/* Player band — full-bleed in theater, contained otherwise. Ambient
           glow (docs/DESIGN_SYSTEM.md §6) tints the space behind the player
-          with the video's own artwork. */}
+          with the video's own artwork. overflow-x-clip above clips the
+          glow's intentional -inset-8 bleed so it can't push the page into
+          horizontal scroll — `clip` (not `hidden`) so this div doesn't
+          become a scroll container, which would break the sidebar's
+          lg:sticky positioning below. */}
       <div className={theater ? "w-full" : ""}>
         <div
           className={
