@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Clock } from 'lucide-react'
+import { RatingStar } from '@/components/icons/RatingStar'
 
 interface RelatedVideosProps {
   currentVideoId: string
@@ -136,7 +137,7 @@ const RelatedVideos = ({ currentVideoId, category }: RelatedVideosProps) => {
                     <span>{video.views} views</span>
                     <span>•</span>
                     <div className="flex items-center gap-0.5">
-                      <span className="text-muted-foreground">★</span>
+                      <RatingStar className="text-muted-foreground" />
                       <span>{video.rating}</span>
                     </div>
                   </div>

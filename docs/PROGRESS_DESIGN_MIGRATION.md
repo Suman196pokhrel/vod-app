@@ -215,12 +215,65 @@ Run the doc's §8 verification checklist against each step before checking it do
 
 ---
 
+## Step 6 — Icon & micro-animation system (emoji removal) ✅ done
+
+Separate follow-up task, not part of the original §5 rollout: replaced
+childish/arbitrary emoji with a themed lucide-react icon system, with true
+SVG shape-morphing on hover/select via GSAP `MorphSVGPlugin` (now fully free,
+bundled in the `gsap` package already installed — confirmed via GSAP/Webflow's
+2025 licensing change, no Club GSAP token needed).
+
+- [x] New dependency: `@gsap/react` (official GSAP React hook).
+- [x] `lib/motion/MorphIcon.tsx` — true path-to-path morph between two lucide
+      icons. Multi-shape icons are merged into one `<path>` first (via
+      `MorphSVGPlugin.convertToPath(..., true)`, `swap: true` required —
+      `false` silently no-ops the DOM replacement, was a real bug caught in
+      browser verification) so every morph is a clean single-path tween
+      regardless of source icon complexity. Falls back to an instant swap
+      for `prefers-reduced-motion`.
+- [x] `lib/motion/IconSwap.tsx` — GSAP scale+rotate+fade crossfade (not a
+      true morph) for icons too structurally different to morph predictably
+      — lucide's player-control icons (Play/Pause, Volume2/1/X) have varying
+      compound-shape counts, so a tuned pop-swap reads smoother than forcing
+      point-correspondence morphing on them.
+- [x] `lib/icons/categoryIcons.ts` — shared 12-icon genre registry
+      (`CATEGORY_ICONS`, `CATEGORY_ICON_LABELS`) used by both the home
+      CategoryPills filter and the admin category manager.
+- [x] `home/_components/CategoryPills.tsx` — 12 emoji → lucide icons, each
+      morphing into a `Check` on hover/selected.
+- [x] `HeroSection.tsx` + watch page `RelatedVideos.tsx` — `★` text glyph →
+      `components/icons/RatingStar.tsx` (Star morphs into Sparkles on hover).
+- [x] Player `ControlBar.tsx` (Play/Pause) and `VolumeControl.tsx`
+      (mute/low/high) — wired through `IconSwap`.
+- [x] `admin/categories/` — larger scope expansion, confirmed with the user
+      first: this surface was still on the pre-migration hardcoded light
+      palette (`bg-gray-50`/`bg-white`/`text-gray-900` throughout), so an
+      emoji-only swap would've put dark morphing icons on a white page.
+      Brought `page.tsx`, `CategoryCard.tsx`, `CategoryDialog.tsx`,
+      `CategoryStats.tsx`, `EmptyState.tsx` onto the unified tokens (same
+      mechanical pattern as every other surface), replaced the Category
+      type's free-form `emoji: string` field with `icon: CategoryIconKey`,
+      and swapped the 48-emoji-and-8-color picker for a 12-icon morph-picker
+      drawing from the same shared registry. **Product-behavior change:**
+      per-category custom color is gone — the design system has exactly one
+      accent (cyan) and bans raw palette classes in components, so "pick any
+      of 8 colors" was incompatible with the system, not just unstyled; all
+      category badges now render with a consistent `bg-accent` surface.
+- [x] `pnpm build` clean, zero emoji and zero raw palette classes across
+      every touched file (grep-verified). Browser-verified: CategoryPills
+      morph (including a real bug fix — the initially-selected "All" pill
+      wasn't morphing on mount until the `swap:true` fix above), star
+      rating morph, player Play/Pause and Volume crossfades, and the full
+      admin category create/edit dialog with live icon-picker + preview.
+      Zero console errors throughout.
+
 ## Deferred (tracked, not part of this task)
 
-- [ ] **Admin dashboard full restyle** (analytics/users/categories/settings
-      widgets, tables, charts) — inherits tokens automatically from Step 0
-      (all confirmed to use semantic classes already, e.g. `bg-background`,
-      `border-b`), but no hand-restyling this pass.
+- [ ] **Admin dashboard full restyle** (analytics/users/settings widgets,
+      tables, charts — categories is now done, see Step 6 above) — inherits
+      tokens automatically from Step 0 (all confirmed to use semantic
+      classes already, e.g. `bg-background`, `border-b`), but no
+      hand-restyling this pass.
 - [ ] **§7 route restructure** (public browse/watch route groups, auth-guard
       changes, backend `GET /videos/by-id/{id}` optional-auth change) —
       separate task; touches the backend.

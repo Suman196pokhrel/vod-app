@@ -8,6 +8,7 @@ import { SettingsMenu } from "./SettingsMenu"
 import { formatTime } from "./utils"
 import type { QualityLevel } from "./types"
 import { TheaterButton } from "./TheaterButton"
+import { IconSwap } from "@/lib/motion/IconSwap"
 
 interface Props {
   visible: boolean
@@ -57,9 +58,11 @@ export function ControlBar(p: Props) {
       <div className="mt-0.5 flex items-center gap-0.5">
         <Button variant="ghost" size="icon" onClick={p.onTogglePlay}
           className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label={p.isPlaying ? "Pause" : "Play"}>
-          {p.isPlaying
-            ? <Pause className="h-[18px] w-[18px] fill-foreground" />
-            : <Play className="h-[18px] w-[18px] translate-x-px fill-foreground" />}
+          <IconSwap
+            icon={p.isPlaying ? Pause : Play}
+            size={18}
+            className={p.isPlaying ? "fill-foreground" : "translate-x-px fill-foreground"}
+          />
         </Button>
 
         <Button variant="ghost" size="icon" onClick={() => p.onSeekBy(-10)}

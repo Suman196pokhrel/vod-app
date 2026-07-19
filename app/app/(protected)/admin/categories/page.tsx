@@ -16,8 +16,7 @@ const mockCategories: Category[] = [
     name: "Action",
     slug: "action",
     description: "High-octane thrills, intense sequences, and adrenaline-pumping adventures",
-    emoji: "💥",
-    color: "bg-red-500",
+    icon: "action",
     videoCount: 45,
     totalViews: 125400,
     isActive: true,
@@ -28,8 +27,7 @@ const mockCategories: Category[] = [
     name: "Comedy",
     slug: "comedy",
     description: "Laugh-out-loud moments and feel-good entertainment",
-    emoji: "😄",
-    color: "bg-yellow-500",
+    icon: "comedy",
     videoCount: 38,
     totalViews: 98200,
     isActive: true,
@@ -40,8 +38,7 @@ const mockCategories: Category[] = [
     name: "Drama",
     slug: "drama",
     description: "Compelling stories with emotional depth and character development",
-    emoji: "🎭",
-    color: "bg-purple-500",
+    icon: "drama",
     videoCount: 52,
     totalViews: 145800,
     isActive: true,
@@ -52,8 +49,7 @@ const mockCategories: Category[] = [
     name: "Documentary",
     slug: "documentary",
     description: "Real-life stories, educational content, and factual programming",
-    emoji: "📽️",
-    color: "bg-blue-500",
+    icon: "documentary",
     videoCount: 29,
     totalViews: 67300,
     isActive: true,
@@ -64,8 +60,7 @@ const mockCategories: Category[] = [
     name: "Thriller",
     slug: "thriller",
     description: "Suspenseful narratives that keep you on the edge of your seat",
-    emoji: "😱",
-    color: "bg-gray-700",
+    icon: "thriller",
     videoCount: 34,
     totalViews: 89500,
     isActive: true,
@@ -76,8 +71,7 @@ const mockCategories: Category[] = [
     name: "Sci-Fi",
     slug: "sci-fi",
     description: "Futuristic worlds, space exploration, and technological wonders",
-    emoji: "🚀",
-    color: "bg-indigo-500",
+    icon: "sci-fi",
     videoCount: 27,
     totalViews: 78900,
     isActive: true,
@@ -88,8 +82,7 @@ const mockCategories: Category[] = [
     name: "Horror",
     slug: "horror",
     description: "Spine-chilling scares and supernatural mysteries",
-    emoji: "👻",
-    color: "bg-orange-500",
+    icon: "horror",
     videoCount: 22,
     totalViews: 54200,
     isActive: false,
@@ -100,8 +93,7 @@ const mockCategories: Category[] = [
     name: "Romance",
     slug: "romance",
     description: "Heartwarming love stories and romantic adventures",
-    emoji: "💕",
-    color: "bg-pink-500",
+    icon: "romance",
     videoCount: 31,
     totalViews: 71800,
     isActive: true,
@@ -157,8 +149,7 @@ export default function CategoriesPage() {
         name: categoryData.name!,
         slug: categoryData.slug!,
         description: categoryData.description!,
-        emoji: categoryData.emoji!,
-        color: categoryData.color!,
+        icon: categoryData.icon!,
         videoCount: 0,
         totalViews: 0,
         isActive: true,
@@ -186,13 +177,13 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-3xl font-bold text-foreground">Categories</h1>
+            <p className="text-muted-foreground mt-1">
               Organize your content with categories and genres
             </p>
           </div>
@@ -212,14 +203,14 @@ export default function CategoriesPage() {
 
         {/* Search */}
         {categories.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-card border border-border rounded-lg p-6">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search categories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white border-gray-300 text-gray-900"
+                className="pl-10"
               />
             </div>
           </div>
@@ -229,8 +220,8 @@ export default function CategoriesPage() {
         {categories.length === 0 ? (
           <EmptyState onAddCategory={handleAddCategory} />
         ) : filteredCategories.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
-            <p className="text-gray-500">
+          <div className="bg-card border border-border rounded-lg p-12 text-center">
+            <p className="text-muted-foreground">
               No categories found matching "{searchQuery}"
             </p>
           </div>
@@ -250,12 +241,12 @@ export default function CategoriesPage() {
 
         {/* Footer */}
         {categories.length > 0 && (
-          <div className="flex items-center justify-between text-sm text-gray-600">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
             <p>
-              Showing <span className="font-medium">{filteredCategories.length}</span> of{" "}
-              <span className="font-medium">{categories.length}</span> categories
+              Showing <span className="font-medium text-foreground">{filteredCategories.length}</span> of{" "}
+              <span className="font-medium text-foreground">{categories.length}</span> categories
             </p>
-            <p className="text-gray-500">
+            <p>
               Last updated: {new Date().toLocaleDateString()}
             </p>
           </div>

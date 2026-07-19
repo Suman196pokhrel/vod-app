@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Play, Info, Plus, Volume2, VolumeX } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import { RatingStar } from '@/components/icons/RatingStar'
 
 interface FeaturedVideo {
   id: string
@@ -96,7 +97,7 @@ const HeroSection = () => {
           {/* Meta Info */}
           <div className="flex items-center gap-4 text-sm text-foreground/90">
             <div className="flex items-center gap-1">
-              <span className="text-muted-foreground">★</span>
+              <RatingStar className="text-muted-foreground" />
               <span className="font-semibold">{currentVideo.rating}</span>
             </div>
             <span>•</span>

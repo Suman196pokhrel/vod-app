@@ -2,6 +2,7 @@
 
 import { Volume2, Volume1, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { IconSwap } from "@/lib/motion/IconSwap"
 
 interface Props {
   volume: number
@@ -21,7 +22,7 @@ export function VolumeControl({ volume, muted, onToggleMute, onVolumeChange }: P
         className="h-9 w-9 shrink-0 text-foreground hover:bg-accent hover:text-accent-foreground"
         aria-label={muted ? "Unmute" : "Mute"}
       >
-        <Icon className="h-[18px] w-[18px]" />
+        <IconSwap icon={Icon} size={18} />
       </Button>
       <div className="w-0 overflow-hidden transition-all duration-(--duration-base) ease-(--ease-out-quart) group-hover/vol:w-[76px] group-hover/vol:pl-1">
         <div className="relative h-1 w-[68px] rounded-full bg-foreground/25">

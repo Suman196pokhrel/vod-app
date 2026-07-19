@@ -11,6 +11,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Category } from "./CategoryCard";
+import { CATEGORY_ICONS, CATEGORY_ICON_KEYS, CATEGORY_ICON_LABELS, type CategoryIconKey } from "@/lib/icons/categoryIcons";
+import { MorphIcon } from "@/lib/motion/MorphIcon";
+import { Check } from "lucide-react";
 
 interface CategoryDialogProps {
   open: boolean;
@@ -19,38 +22,22 @@ interface CategoryDialogProps {
   onSave: (categoryData: Partial<Category>) => void;
 }
 
-const emojiOptions = [
-  "🎬", "🎭", "🎪", "🎨", "🎮", "🎯", "🎲", "🎵",
-  "🎸", "🎺", "🎻", "🎤", "🎧", "📺", "📽️", "📹",
-  "🏃", "⚽", "🏀", "🎾", "🏈", "⚾", "🎳", "🎿",
-  "🎃", "🎄", "🎆", "🎇", "✨", "🎉", "🎊", "🎁",
-  "❤️", "💙", "💚", "💛", "🧡", "💜", "🖤", "🤍",
-  "🌍", "🌊", "🌙", "⭐", "🌈", "🔥", "💎", "🏆",
-];
-
-const colorOptions = [
-  { name: "Blue", value: "bg-blue-500" },
-  { name: "Purple", value: "bg-purple-500" },
-  { name: "Green", value: "bg-green-500" },
-  { name: "Red", value: "bg-red-500" },
-  { name: "Orange", value: "bg-orange-500" },
-  { name: "Pink", value: "bg-pink-500" },
-  { name: "Indigo", value: "bg-indigo-500" },
-  { name: "Teal", value: "bg-teal-500" },
-];
-
 export function CategoryDialog({
   open,
   onOpenChange,
   category,
   onSave,
 }: CategoryDialogProps) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    slug: string;
+    description: string;
+    icon: CategoryIconKey;
+  }>({
     name: "",
     slug: "",
     description: "",
-    emoji: "🎬",
-    color: "bg-blue-500",
+    icon: "all",
   });
 
   useEffect(() => {
@@ -59,16 +46,14 @@ export function CategoryDialog({
         name: category.name,
         slug: category.slug,
         description: category.description,
-        emoji: category.emoji,
-        color: category.color,
+        icon: category.icon,
       });
     } else {
       setFormData({
         name: "",
         slug: "",
         description: "",
-        emoji: "🎬",
-        color: "bg-blue-500",
+        icon: "all",
       });
     }
   }, [category, open]);
@@ -86,9 +71,11 @@ export function CategoryDialog({
     onOpenChange(false);
   };
 
+  const PreviewIcon = CATEGORY_ICONS[formData.icon];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-white border-gray-200 max-w-2xl">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {category ? "Edit Category" : "Add New Category"}
@@ -109,7 +96,6 @@ export function CategoryDialog({
               value={formData.name}
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="e.g., Action, Comedy, Documentary"
-              className="bg-white border-gray-300 text-gray-900"
             />
           </div>
 
@@ -120,9 +106,9 @@ export function CategoryDialog({
               id="slug"
               value={formData.slug}
               readOnly
-              className="bg-gray-50 border-gray-300 text-gray-600"
+              className="bg-muted text-muted-foreground"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Used in URLs: /category/{formData.slug || "action"}
             </p>
           </div>
@@ -137,65 +123,47 @@ export function CategoryDialog({
                 setFormData({ ...formData, description: e.target.value })
               }
               placeholder="Brief description of this category..."
-              className="w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full min-h-[80px] px-3 py-2 border border-input rounded-md bg-transparent text-foreground text-sm shadow-xs focus-visible:outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
             />
           </div>
 
-          {/* Emoji Selection */}
+          {/* Icon Selection */}
           <div className="space-y-2">
-            <Label>Category Icon (Emoji)</Label>
-            <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-md bg-gray-50 max-h-32 overflow-y-auto">
-              {emojiOptions.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, emoji })}
-                  className={`text-2xl p-2 rounded-md transition-colors ${
-                    formData.emoji === emoji
-                      ? "bg-blue-500 ring-2 ring-blue-600"
-                      : "hover:bg-gray-200"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Color Selection */}
-          <div className="space-y-2">
-            <Label>Category Color</Label>
-            <div className="flex flex-wrap gap-3">
-              {colorOptions.map((colorOption) => (
-                <button
-                  key={colorOption.value}
-                  type="button"
-                  onClick={() =>
-                    setFormData({ ...formData, color: colorOption.value })
-                  }
-                  className={`w-12 h-12 ${colorOption.value} rounded-lg transition-transform ${
-                    formData.color === colorOption.value
-                      ? "ring-4 ring-gray-400 scale-110"
-                      : "hover:scale-105"
-                  }`}
-                  title={colorOption.name}
-                />
-              ))}
+            <Label>Category Icon</Label>
+            <div className="flex flex-wrap gap-2 p-3 border border-border rounded-md bg-muted/50">
+              {CATEGORY_ICON_KEYS.map((key) => {
+                const selected = formData.icon === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setFormData({ ...formData, icon: key })}
+                    aria-label={CATEGORY_ICON_LABELS[key]}
+                    title={CATEGORY_ICON_LABELS[key]}
+                    aria-pressed={selected}
+                    className={`flex h-10 w-10 items-center justify-center rounded-md transition-colors duration-(--duration-fast) ${
+                      selected
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    }`}
+                  >
+                    <MorphIcon from={CATEGORY_ICONS[key]} to={Check} active={selected} size={18} />
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Preview */}
           <div className="space-y-2">
             <Label>Preview</Label>
-            <div className="flex items-center gap-3 p-4 border border-gray-300 rounded-lg bg-gray-50">
-              <div
-                className={`w-12 h-12 ${formData.color} rounded-lg flex items-center justify-center text-2xl`}
-              >
-                {formData.emoji}
+            <div className="flex items-center gap-3 p-4 border border-border rounded-lg bg-muted/50">
+              <div className="w-12 h-12 bg-accent rounded-lg flex items-center justify-center">
+                <PreviewIcon className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="font-semibold text-gray-900">{formData.name || "Category Name"}</p>
-                <p className="text-sm text-gray-500">{formData.slug || "url-slug"}</p>
+                <p className="font-semibold text-foreground">{formData.name || "Category Name"}</p>
+                <p className="text-sm text-muted-foreground">{formData.slug || "url-slug"}</p>
               </div>
             </div>
           </div>
