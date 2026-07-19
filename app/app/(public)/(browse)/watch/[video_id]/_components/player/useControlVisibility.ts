@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 
-export function useControlsVisibility(isPlaying: boolean, delay = 2600) {
+export function useControlsVisibility(isPlaying: boolean, delay = 5000) {
   const [visible, setVisible] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lockRef = useRef(false)

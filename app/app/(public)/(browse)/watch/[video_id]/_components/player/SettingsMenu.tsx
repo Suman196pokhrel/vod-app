@@ -15,12 +15,13 @@ interface Props {
   autoHeight: number | null
   onQualityChange: (i: number) => void
   onOpenChange: (open: boolean) => void
+  container?: HTMLElement | null
 }
 
 type Panel = "root" | "speed" | "quality"
 
 export function SettingsMenu({
-  speed, onSpeedChange, qualities, quality, autoHeight, onQualityChange, onOpenChange,
+  speed, onSpeedChange, qualities, quality, autoHeight, onQualityChange, onOpenChange, container,
 }: Props) {
   const [panel, setPanel] = useState<Panel>("root")
 
@@ -36,13 +37,14 @@ export function SettingsMenu({
     >
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon"
-          className="h-9 w-9 text-foreground transition-transform hover:rotate-45 hover:bg-accent hover:text-accent-foreground"
+          className="h-10 w-10 text-foreground transition-transform hover:rotate-45 hover:bg-accent hover:text-accent-foreground"
           aria-label="Settings">
-          <Settings className="h-[18px] w-[18px]" />
+          <Settings className="h-5 w-5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        align="end" sideOffset={12}
+        container={container}
+        side="top" align="end" sideOffset={12}
         className="w-56 overflow-hidden border-border bg-popover/90 p-1 text-popover-foreground shadow-2xl backdrop-blur-2xl"
       >
         {panel === "root" && (

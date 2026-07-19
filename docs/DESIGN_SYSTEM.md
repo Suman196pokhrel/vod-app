@@ -80,8 +80,9 @@ Full-round for avatars only.
 | `--ease-out-quart` | `cubic-bezier(0.2, 0, 0, 1)` | the ONLY easing curve |
 
 Rules: every interactive element has a visible hover/focus response within 150ms.
-Card hover = `scale-[1.02]` + accent underline on title. No parallax, no bounce,
-no Netflix mega-expand. Respect `prefers-reduced-motion` (handled in globals).
+Card hover = `scale-[1.02]` + `bg-accent/60` wash + accent underline on title +
+pointer cursor. No parallax, no bounce, no Netflix mega-expand. Respect
+`prefers-reduced-motion` (handled in globals).
 
 ### Loading
 Never spinners for content areas — **skeletons** (`.skeleton` utility) shaped like

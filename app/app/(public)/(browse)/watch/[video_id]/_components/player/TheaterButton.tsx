@@ -6,10 +6,10 @@ export function TheaterButton({ theater, onToggle }: { theater: boolean; onToggl
   return (
     <Button
       variant="ghost" size="icon" onClick={onToggle}
-      className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground"
+      className="h-10 w-10 text-foreground hover:bg-accent hover:text-accent-foreground"
       aria-label={theater ? "Default view" : "Theater mode"}
     >
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8}>
         {theater ? (
           <rect x="5" y="7" width="14" height="10" rx="1.5" />
         ) : (

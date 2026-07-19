@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbsUp, ThumbsDown, MessageCircle } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
 import { useRequireAuth } from '@/hooks/use-require-auth'
 
 interface CommentSectionProps {
@@ -77,39 +76,35 @@ const CommentSection = ({ videoId }: CommentSectionProps) => {
           </div>
         </div>
 
-        {/* Comments List */}
-        <div className="space-y-4">
+        {/* Comments List — separated by space + a hairline, not a box each */}
+        <div className="divide-y divide-border/60">
           {mockComments.map((comm) => (
-            <Card key={comm.id}>
-              <CardContent className="p-4">
-                <div className="flex gap-3">
-                  <Avatar>
-                    <AvatarImage src={comm.avatar} />
-                    <AvatarFallback>{comm.author.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold">{comm.author}</span>
-                      <span className="text-xs text-muted-foreground">{comm.timestamp}</span>
-                    </div>
-                    <p className="text-sm mb-3">{comm.comment}</p>
-                    <div className="flex items-center gap-4">
-                      <Button variant="ghost" size="sm" className="h-8 gap-2">
-                        <ThumbsUp className="h-4 w-4" />
-                        {comm.likes}
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-8">
-                        <ThumbsDown className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-8 gap-2">
-                        <MessageCircle className="h-4 w-4" />
-                        Reply
-                      </Button>
-                    </div>
-                  </div>
+            <div key={comm.id} className="flex gap-3 py-4 first:pt-0">
+              <Avatar>
+                <AvatarImage src={comm.avatar} />
+                <AvatarFallback>{comm.author.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-semibold">{comm.author}</span>
+                  <span className="text-xs text-muted-foreground">{comm.timestamp}</span>
                 </div>
-              </CardContent>
-            </Card>
+                <p className="text-sm mb-2">{comm.comment}</p>
+                <div className="flex items-center gap-4">
+                  <Button variant="ghost" size="sm" className="h-8 gap-2">
+                    <ThumbsUp className="h-4 w-4" />
+                    {comm.likes}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8">
+                    <ThumbsDown className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Reply
+                  </Button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </div>

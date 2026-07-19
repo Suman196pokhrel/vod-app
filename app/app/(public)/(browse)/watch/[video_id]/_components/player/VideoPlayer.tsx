@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useHls } from "./useHls"
 import { usePlayerState } from "./usePlayerState"
 import { useControlsVisibility } from "./useControlVisibility"
@@ -34,6 +34,16 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
   const s = usePlayerState(videoRef, scrubbing)
   const { visible, nudge, hideNow, setLock } = useControlsVisibility(s.isPlaying)
   const { fullscreen, toggle: toggleFullscreen } = useFullscreen(shellRef)
+
+  // The settings popover must portal inside the fullscreen element itself —
+  // the Fullscreen API only paints that element's subtree, so a portal to
+  // document.body (the default) is invisible while fullscreen is active.
+  // Read via effect, not inline during render, since refs aren't safe to
+  // read during render.
+  const [menuContainer, setMenuContainer] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setMenuContainer(fullscreen ? shellRef.current : null)
+  }, [fullscreen])
 
   useKeyboardShortcuts(shellRef, {
     togglePlay: s.togglePlay,
@@ -119,6 +129,7 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
         onSpeedChange={applySpeed}
         onQualityChange={applyQuality}
         onMenuOpenChange={setLock}
+        menuContainer={menuContainer}
       />
     </div>
   )

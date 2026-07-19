@@ -106,8 +106,8 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
         </Button>
       </div>
 
-      {/* Director/Creator Info Card */}
-      <div className="bg-card rounded-lg p-4">
+      {/* Creator + description — one panel, not two stacked boxes */}
+      <div className="space-y-3 rounded-lg bg-card p-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-12 w-12">
             <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${video.director}`} />
@@ -125,20 +125,19 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
             {isFollowing ? "Following" : "Follow"}
           </Button>
         </div>
-      </div>
 
-      {/* Description */}
-      <div className="bg-card rounded-lg p-4">
-        <p className={`text-sm leading-relaxed ${!showFullDescription && 'line-clamp-3'}`}>
-          {video.description}
-        </p>
-        <Button
-          variant="link"
-          className="mt-2 p-0 h-auto"
-          onClick={() => setShowFullDescription(!showFullDescription)}
-        >
-          {showFullDescription ? 'Show less' : 'Show more'}
-        </Button>
+        <div className="border-t border-border/60 pt-3">
+          <p className={`text-sm leading-relaxed ${!showFullDescription && 'line-clamp-3'}`}>
+            {video.description}
+          </p>
+          <Button
+            variant="link"
+            className="mt-1 h-auto p-0"
+            onClick={() => setShowFullDescription(!showFullDescription)}
+          >
+            {showFullDescription ? 'Show less' : 'Show more'}
+          </Button>
+        </div>
       </div>
 
       {/* Cast */}

@@ -19,10 +19,10 @@ export function VolumeControl({ volume, muted, onToggleMute, onVolumeChange }: P
     <div className="group/vol flex items-center">
       <Button
         variant="ghost" size="icon" onClick={onToggleMute}
-        className="h-9 w-9 shrink-0 text-foreground hover:bg-accent hover:text-accent-foreground"
+        className="h-10 w-10 shrink-0 text-foreground hover:bg-accent hover:text-accent-foreground"
         aria-label={muted ? "Unmute" : "Mute"}
       >
-        <IconSwap icon={Icon} size={18} />
+        <IconSwap icon={Icon} size={20} />
       </Button>
       <div className="w-0 overflow-hidden transition-all duration-(--duration-base) ease-(--ease-out-quart) group-hover/vol:w-[76px] group-hover/vol:pl-1">
         <div className="relative h-1 w-[68px] rounded-full bg-foreground/25">

@@ -36,6 +36,7 @@ interface Props {
   onSpeedChange: (s: number) => void
   onQualityChange: (i: number) => void
   onMenuOpenChange: (open: boolean) => void
+  menuContainer?: HTMLElement | null
 }
 
 export function ControlBar(p: Props) {
@@ -57,21 +58,21 @@ export function ControlBar(p: Props) {
 
       <div className="mt-0.5 flex items-center gap-0.5">
         <Button variant="ghost" size="icon" onClick={p.onTogglePlay}
-          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label={p.isPlaying ? "Pause" : "Play"}>
+          className="h-10 w-10 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label={p.isPlaying ? "Pause" : "Play"}>
           <IconSwap
             icon={p.isPlaying ? Pause : Play}
-            size={18}
+            size={20}
             className={p.isPlaying ? "fill-foreground" : "translate-x-px fill-foreground"}
           />
         </Button>
 
         <Button variant="ghost" size="icon" onClick={() => p.onSeekBy(-10)}
-          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label="Back 10 seconds">
-          <RotateCcw className="h-[17px] w-[17px]" />
+          className="h-10 w-10 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label="Back 10 seconds">
+          <RotateCcw className="h-[19px] w-[19px]" />
         </Button>
         <Button variant="ghost" size="icon" onClick={() => p.onSeekBy(10)}
-          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label="Forward 10 seconds">
-          <RotateCw className="h-[17px] w-[17px]" />
+          className="h-10 w-10 text-foreground hover:bg-accent hover:text-accent-foreground" aria-label="Forward 10 seconds">
+          <RotateCw className="h-[19px] w-[19px]" />
         </Button>
 
         <VolumeControl
@@ -90,15 +91,16 @@ export function ControlBar(p: Props) {
           speed={p.speed} onSpeedChange={p.onSpeedChange}
           qualities={p.qualities} quality={p.quality} autoHeight={p.autoHeight}
           onQualityChange={p.onQualityChange} onOpenChange={p.onMenuOpenChange}
+          container={p.menuContainer}
         />
 
         {!p.fullscreen && <TheaterButton theater={p.theater} onToggle={p.onToggleTheater} />}
 
 
         <Button variant="ghost" size="icon" onClick={p.onToggleFullscreen}
-          className="h-9 w-9 text-foreground hover:bg-accent hover:text-accent-foreground"
+          className="h-10 w-10 text-foreground hover:bg-accent hover:text-accent-foreground"
           aria-label={p.fullscreen ? "Exit fullscreen" : "Fullscreen"}>
-          {p.fullscreen ? <Minimize className="h-[18px] w-[18px]" /> : <Maximize className="h-[18px] w-[18px]" />}
+          {p.fullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
         </Button>
       </div>
     </div>

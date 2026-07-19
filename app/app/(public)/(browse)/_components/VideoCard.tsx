@@ -20,7 +20,7 @@ const VideoCard = ({ video }: { video: Video }) => {
     <button
       type="button"
       onClick={() => router.push(`/watch/${video.id}`)}
-      className="group block w-full text-left transition-transform duration-(--duration-fast) ease-(--ease-out-quart) hover:scale-[1.02] focus-visible:scale-[1.02]"
+      className="group -m-2 block w-full cursor-pointer rounded-xl p-2 text-left transition-all duration-(--duration-fast) ease-(--ease-out-quart) hover:scale-[1.02] hover:bg-accent/60 focus-visible:scale-[1.02] focus-visible:bg-accent/60"
     >
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden rounded-lg bg-card">

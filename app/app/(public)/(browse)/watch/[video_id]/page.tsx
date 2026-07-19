@@ -2,7 +2,6 @@
 // app/home/watch/[id]/page.tsx
 import VideoPlayer from "./_components/player/VideoPlayer";
 import VideoInfo from "./_components/VideoInfo";
-import VideoStats from "./_components/VideoStats";
 import RelatedVideos from "./_components/RelatedVideos";
 import CommentSection from "./_components/CommentSection";
 import { use, useEffect, useState } from "react";
@@ -100,7 +99,6 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
           {/* Left Column */}
           <div className="space-y-6">
             <VideoInfo video={video} />
-            <VideoStats video={video} />
             <CommentSection videoId={video.id} />
           </div>
 
