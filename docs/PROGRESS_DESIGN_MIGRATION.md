@@ -9,6 +9,10 @@ written the way the rest of the docs reference them, e.g. `app/(protected)/...`)
 
 Run the doc's §8 verification checklist against each step before checking it done.
 
+**Status: every user-facing surface in the app (public, protected, and admin)
+is now on the unified dark/cyan design system.** Steps 0–7 below are all
+done. Only the backend-touching §7 route restructure remains deferred.
+
 ---
 
 ## Step 0 — Tokens + fonts land globally ✅ done
@@ -267,13 +271,68 @@ bundled in the `gsap` package already installed — confirmed via GSAP/Webflow's
       admin category create/edit dialog with live icon-picker + preview.
       Zero console errors throughout.
 
+## Step 7 — Admin dashboard full restyle ✅ done
+
+Separate follow-up task (previously deferred): hand-restyled every remaining
+admin surface — dashboard shell, video management, analytics, users,
+settings — onto the unified dark/cyan tokens. Categories was already done in
+Step 6. Executed in 5 sub-passes, each built + browser-verified +
+committed independently:
+
+- [x] **Shell**: `AdminSidebar.tsx` (dropped a hardcoded gradient "VOD" logo
+      text and a raw `→` glyph for `ArrowLeft`, added motion tokens),
+      `admin/layout.tsx` (loading-spinner colors), `admin/page.tsx`,
+      dashboard widgets (`QuickActions`, `RecentActivity`, `RoleBadge`,
+      `UserGrowthChart`, `StatsCards`) — all per-widget rainbow icon colors
+      (`text-blue-500`, `text-green-500`, `text-purple-500`,
+      `text-orange-500`, etc.) collapsed to the single `bg-accent`/
+      `text-primary` cyan treatment. `RoleBadge` keeps a real two-way
+      distinction (cyan for admin/elevated vs neutral for default) since
+      that one carries actual meaning.
+- [x] **Videos list**: `VideoTable.tsx`, `data-table.tsx` (already clean),
+      `columns.tsx`, `status-badge.tsx`. `status-badge.tsx` was the largest
+      single-file color reduction — 11 rainbow-coded pipeline-stage colors
+      collapsed to a three-state visual language (neutral+static = queued,
+      cyan+pulsing = actively processing, neutral+static = completed,
+      destructive = failed) using the pulse itself, not hue, to signal
+      "still working." **Also caught a real contrast bug**: the shadcn
+      `Tooltip` primitive is intentionally inverted (`bg-foreground`/
+      `text-background`), so the qualities-list badges inside it needed the
+      same inversion (`border-background/20 text-background`) to stay
+      legible — removing the old hardcoded slate override without
+      accounting for that made the tooltip's text briefly invisible
+      (light-on-light), caught via browser screenshot before commit.
+- [x] **Analytics**: `page.tsx` + 6 components. Recharts fills/strokes now
+      reference `var(--chart-1)` through `var(--chart-5)` (defined since
+      Step 0, confirmed to resolve correctly in SVG presentation attributes
+      via browser verification) instead of raw hex. `RealtimeStats.tsx` was
+      the single flashiest offender in the whole codebase — a purple/blue
+      glassmorphism hero panel with blurred glow orbs and a different raw
+      color per stat card — rebuilt as a plain card matching every other
+      stat block in this migration; the "LIVE" pulse is the one legitimate
+      accent-law use of cyan as a live indicator.
+- [x] **Users**: `page.tsx` + `StatCard`/`StatsCards`/`StatusBadge`/
+      `UserFilters`/`UserTableRow`. Status/role/engagement-score badges all
+      collapse to the same three-state language established in videos'
+      status-badge (positive→cyan, negative→destructive, neutral→muted).
+- [x] **Settings**: `page.tsx` + `SettingsSection`/`SettingsInputItem`/
+      `SettingsSelectItem`/`SettingsSwitchItem`. Removed the `iconColor`
+      prop entirely (6 sections each had a different raw color) — every
+      section icon now renders identically via the themed
+      `SettingsSection` component itself.
+- [x] Repo-wide verification: zero emoji, zero raw palette color classes
+      across every live (non-orphaned) admin file — confirmed by grep.
+      The only two remaining hits are legitimately inert: `AdminHeader.tsx`'s
+      `bg-red-500` sits inside a commented-out JSX block (dead), and
+      `VideoStats.tsx`/`VideoFilters.tsx` have zero importers anywhere in
+      the app (orphaned, never rendered) — consistent with this migration's
+      established policy of not restyling dead code. `pnpm build` clean,
+      lint shows only pre-existing unrelated issues (verified via
+      `git diff` — same lines flagged before these changes), zero console
+      errors across every route re-checked in the browser.
+
 ## Deferred (tracked, not part of this task)
 
-- [ ] **Admin dashboard full restyle** (analytics/users/settings widgets,
-      tables, charts — categories is now done, see Step 6 above) — inherits
-      tokens automatically from Step 0 (all confirmed to use semantic
-      classes already, e.g. `bg-background`, `border-b`), but no
-      hand-restyling this pass.
 - [ ] **§7 route restructure** (public browse/watch route groups, auth-guard
       changes, backend `GET /videos/by-id/{id}` optional-auth change) —
       separate task; touches the backend.
