@@ -281,18 +281,18 @@ export const getVideoStatus = async (
 
 
 export async function getPublicVideos(skip=0, limit=20){
-  const {data} =  await api.get("/videos/",{params: {skip:skip, limit: limit}})
+  const {data} =  await api.get("/videos/",{params: {skip:skip, limit: limit}, skipAuthRedirect: true})
   return data
 }
 
 
 export async function getVideoById(videoId:string){
-  const {data} = await api.get(`/videos/by-id/${videoId}`)
+  const {data} = await api.get(`/videos/by-id/${videoId}`, {skipAuthRedirect: true})
   return data
 }
 
 
 export async function incrementVideoView(videoId:string){
-  const {data} = await api.post(`/videos/${videoId}/view`)
+  const {data} = await api.post(`/videos/${videoId}/view`, undefined, {skipAuthRedirect: true})
   return data
 }

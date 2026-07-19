@@ -1,6 +1,13 @@
 import axios from "axios"
 import { shouldAttemptTokenRefresh } from "../utils/tokenManager";
 
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    /** Public fetches: a 401 here means "not found"/"private", not a session problem. */
+    skipAuthRedirect?: boolean;
+  }
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost'
 
 // simple axios instance
@@ -50,9 +57,15 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Public fetches (unauthenticated video browsing/watching) must never
+    // trigger a refresh-then-redirect — a 401 there is just "not found"/
+    // "private", not a session problem.
+    if (originalRequest?.skipAuthRedirect) {
+      return Promise.reject(error);
+    }
 
     // Only attempt for specific conditions
-    if (error.response?.status === 401 && 
+    if (error.response?.status === 401 &&
       !originalRequest._retry &&
       shouldAttemptTokenRefresh(error)
     ) {
