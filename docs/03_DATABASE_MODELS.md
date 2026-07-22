@@ -84,8 +84,15 @@ The most complex table, defined in `backend/app/models/videos.py`. It tracks a v
 - `thumbnail_url` — object name in the thumbnails bucket
 - `manifest_url` — path to `master.m3u8` in the processed bucket. Set after processing completes.
 - `available_qualities` — JSON array like `["1440p", "1080p", "720p", "480p"]`. Set after processing.
+- `storyboard_url` — object name of the scrubbing-preview `storyboard.vtt` in the thumbnails bucket. Nullable; only populated for videos processed after the storyboard feature shipped (no backfill for older videos). See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md).
 
 We store object names (not full URLs) so that changing the MinIO endpoint doesn't require a database migration.
+
+**Publishing and lifecycle:**
+- `is_public` — boolean, defaults `True`. Toggled independently of `status` from the admin videos table (a video can be `published` but flipped private without changing its publication status).
+- `status` — string: `draft`, `published`, or `scheduled`. Set at upload time; editable via the admin "Edit Details" form.
+- `deleted_at` — nullable timestamp. **Soft delete**: a non-null value means the video is hidden from every listing and lookup path, but its database row and MinIO files are left untouched. There is no separate `is_deleted` boolean — presence of a timestamp *is* the flag. A genuine hard-delete helper (`VideoService.delete_video`) still exists for a future cleanup process, but nothing in the running application calls it today; the admin table's delete action calls `soft_delete_video` instead.
+- `views_count`, `likes_count` — engagement counters. `views_count` increments via `POST /videos/{id}/view`, which works for anonymous viewers (no auth required) — though as of this writing the frontend watch page doesn't call it yet, so it's plumbed but unused.
 
 **Processing lifecycle:**
 
@@ -102,8 +109,8 @@ The `processing_status` field tracks exactly where the video is in the pipeline:
 | `creating_manifest` | Writing master.m3u8 and quality playlists |
 | `uploading_to_storage` | Uploading HLS files to MinIO processed bucket |
 | `finalizing` | Updating DB, cleaning up temp files |
-| `completed` | Video is ready to stream ✅ |
-| `failed` | Something went wrong ❌ |
+| `completed` | Video is ready to stream |
+| `failed` | Something went wrong |
 
 `processing_metadata` is a JSON field that stores what FFprobe extracted about the raw video: `{"duration_seconds": 3600, "width": 1920, "height": 1080, "codec": "h264", "bitrate": 5000000}`. The worker uses this to skip transcoding to qualities higher than the source resolution (no upscaling).
 
@@ -167,13 +174,15 @@ All foreign keys reference `users.id` (UUID string).
 
 The Alembic migrations tell the story of how the schema evolved:
 
-1. **`e28f8af22e7f`** — initial tables: users, videos, refresh_tokens
-2. **`34419c05503e`** — added email_verification_tokens table
-3. **`c8a105f8d90a`** — added video metadata fields (director, cast, age_rating, tags, etc.)
-4. **`2944b960c15e`** — added video processing status fields and processing_metadata
-5. **`4838fc1c2ea9`** — added celery_task_id to videos table
+1. **`e28f8af22e7f`** — initial tables: `users`, `refresh_tokens`, `videos`. The original `videos` table looked quite different: `video_url` (not `raw_video_path`), an integer `duration` column, plus `is_public`, `status`, `views_count`, `likes_count` — no category, no metadata, no processing fields yet.
+2. **`34419c05503e`** — added `email_verification_tokens` table
+3. **`c8a105f8d90a`** — added video metadata fields: `category`, `age_rating`, `release_date`, `director`, `cast`, `tags` (JSON). Backfills `category='uncategorized'` and `tags='[]'` for existing rows before making `category` `NOT NULL`.
+4. **`2944b960c15e`** — added `raw_video_path` (`NOT NULL`), `processing_status`, `processing_metadata`, `processing_error`, `manifest_url`, `available_qualities` — and **dropped** the old `video_url` and `duration` columns. This is the migration that retired `video_url` in favor of `raw_video_path`; any documentation or code still referencing `video_url` predates this and is describing dead schema.
+5. **`4838fc1c2ea9`** — added `celery_task_id` to `videos`
+6. **`4933c49d2a23`** — added `deleted_at` (soft-delete marker) to `videos`
+7. **`bdc80bbbc0c9`** — added `storyboard_url` to `videos` (current head)
 
-Each migration represents a feature being added to the system. Reading them in order is a useful way to understand what was built and when.
+Each migration represents a feature being added to the system. Reading them in order is a useful way to understand what was built and when — notably, the `is_public` column has been present since migration 1 and was simply unused by the UI until the admin visibility toggle was built; no schema change was needed to add that feature, only a new endpoint and a frontend control.
 
 ---
 

@@ -37,25 +37,31 @@ This is the main form component. It uses React Hook Form for state management an
 - **Cast** — optional free text (comma-separated names; the backend stores and normalizes this)
 - **Release Date** — date picker
 - **Tags** — tag input, supports adding and removing individual tags
-- **Is Public** — there is **no** `is_public` toggle in the current form, despite the Video model having a `is_public` field. All uploads default to private/draft until this is wired up.
+- **Is Public** — there is **no** `is_public` toggle in this form. The `Video` model's `is_public` field defaults to `True` at creation and can only be flipped afterward, from the admin videos table's row-actions menu (`PATCH /videos/by-id/{video_id}/visibility` — see [10_FRONTEND_ADMIN_PANEL.md](./10_FRONTEND_ADMIN_PANEL.md)). There's no way to set a video private at the moment of upload itself.
 
 ### Form Actions
 
 **`_components/FormActions.tsx`** — renders the Submit and Save Draft buttons.
 
 **Submit** — calls `onSubmit`, triggers the API call
-**Save Draft** — calls `onSaveDraft`, which is currently a **1-second simulated delay** with no actual API call:
+**Save Draft** — still a **1-second simulated delay**, no real API call:
 
 ```typescript
-const onSaveDraft = async () => {
-  setIsSaving(true)
-  await new Promise(resolve => setTimeout(resolve, 1000))  // fake delay
-  setIsSaving(false)
-  toast.success("Draft saved!")
+const handleSaveDraft = async () => {
+  setUploadError(null)
+  setIsSubmitting(true)
+  try {
+    form.setValue('status', 'draft')
+    const values = form.getValues()
+    // TODO: Implement actual draft saving API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    toast.success("Draft saved successfully!")
+  }
+  // ...
 }
 ```
 
-This is placeholder UI — the toast appears and the button shows a loading spinner, but nothing is saved to the backend.
+This is placeholder UI — the toast appears and the button shows a loading spinner, but nothing is saved to the backend. What's changed since an earlier revision of this document: the API-side plumbing for a real implementation partially exists now — `lib/apis/video.ts` exports a `saveDraft()` function that posts to `POST /videos/draft` — but two things stop it from being a two-line fix. First, `handleSaveDraft` above never calls it. Second, and more fundamentally, `/videos/draft` isn't a route that exists anywhere in the backend's `video.py` — so even wiring the button to call `saveDraft()` as it stands today would just trade a fake success toast for a real 404. Building this out means adding the missing endpoint (or pointing `saveDraft()` at a route that does exist), then wiring the button to call it.
 
 ---
 
@@ -152,9 +158,9 @@ When `status === "completed"`, `onComplete` is called, the dialog shows a succes
 ## Future Upgrades
 
 - **Upload progress bar** — currently no indication of how far through the file upload we are. Implementing this requires tracking XHR upload progress (available via Axios's `onUploadProgress` option).
-- **Save Draft (real implementation)** — call `POST /videos/create` with `status: "draft"` and no file yet (or a separate draft endpoint)
+- **Save Draft (real implementation)** — build the missing `POST /videos/draft` backend route (or repoint the existing `saveDraft()` frontend function at a route that exists), then call it from `handleSaveDraft`
 - **Multi-file queue** — allow queuing multiple video uploads that process sequentially or in parallel
-- **Is Public toggle** — expose the `is_public` field in the form
+- **Is Public toggle at creation time** — expose the `is_public` field in the form itself, instead of only after the fact from the admin table
 - **Accept more video formats** — update the drop zone to accept MOV, MKV, and AVI (the backend already accepts them)
 - **Resumable upload** — for very large files, implement chunked upload that can resume after a network interruption
 

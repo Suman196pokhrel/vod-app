@@ -23,21 +23,26 @@ The frontend is a **Next.js 16** app using the **App Router** (not the older Pag
 ```
 app/
 ├── app/
-│   ├── (public)/        ← No auth required: landing page, all auth routes
-│   └── (protected)/     ← All authenticated routes
-│       ├── home/        ← Main feed and watch page
-│       └── admin/       ← Admin panel
+│   ├── (public)/            ← No auth required
+│   │   ├── auth/            ← sign-in, sign-up, verify-email, forgot/reset password
+│   │   └── (browse)/        ← nested group, contributes no path segment
+│   │       ├── page.tsx           ← the video feed — this IS the root route "/"
+│   │       └── watch/[video_id]/  ← watch page, public — /watch/[video_id]
+│   └── (protected)/         ← Client-side auth-guarded
+│       └── admin/           ← Admin panel — the ONLY thing under (protected)
 ├── lib/
 │   ├── apis/            ← Typed API function modules + shared Axios client
 │   ├── store/           ← Zustand stores
 │   ├── types/           ← TypeScript type definitions
-│   └── utils/           ← tokenManager, constants, helpers
+│   └── utils/           ← tokenManager, safeNextPath, constants, helpers
 ├── hooks/               ← Custom React hooks
 └── components/
     └── ui/              ← shadcn/ui components
 ```
 
-The parentheses in `(public)` and `(protected)` are Next.js route groups — they don't appear in URLs but let you apply different layouts to different sections of the app without affecting the route structure.
+The parentheses in `(public)`, `(protected)`, and `(browse)` are Next.js route groups — they don't appear in URLs but let you apply different layouts to different sections of the app without affecting the route structure. `(browse)` is nested inside `(public)` purely to give the feed and watch page their own layout file without adding a URL segment.
+
+This reflects a deliberate route restructure: the app used to guard everything under `(protected)`, including the home feed and watch page. It now follows a "content is public, actions require auth" model — browsing and watching never touch an auth check. Only `/admin` is guarded, plus a handful of specific interactive controls gated by the `useRequireAuth` hook (see [09_FRONTEND_HOME_AND_WATCH.md](./09_FRONTEND_HOME_AND_WATCH.md)). Permanent redirects in `next.config.ts` send the old `/home` and `/home/watch/:video_id` paths to `/` and `/watch/:video_id`.
 
 ---
 
@@ -153,26 +158,43 @@ This means the auth state is derived from localStorage + backend validation ever
 
 ## Route Protection
 
-**`app/(protected)/layout.tsx`** — the layout component that wraps all authenticated routes.
+**`app/(protected)/layout.tsx`** — the layout component that wraps `/admin` (the only thing left under `(protected)` since the route restructure):
 
 ```typescript
-export default function ProtectedLayout({ children }) {
-  const { isAuthenticated, isLoading, initialize } = useAuthStore()
-  
-  useEffect(() => {
-    initialize()
-  }, [])
+useEffect(() => {
+  initialize()
+}, [])
 
-  if (isLoading) return <LoadingSpinner />
-  if (!isAuthenticated) {
-    redirect('/auth/sign-in')
-  }
-  
-  return <>{children}</>
+if (isLoading) { /* spinner */ }
+
+if (!isAuthenticated) {
+  router.push(buildSignInUrl(pathname))
+  return null
 }
+
+return (
+  <div className="w-full border">
+    <HomeNavbar />
+    {children}
+  </div>
+)
 ```
 
-Every route under `app/(protected)/` is automatically protected by this layout. There is no Next.js middleware involved — this is purely client-side. It works fine in practice for this use case, but a middleware-based approach would protect routes at the edge (faster and more secure). See Future Upgrades.
+`app/(protected)/admin/layout.tsx` layers a role check on top of this:
+
+```typescript
+useEffect(() => {
+  if (!isLoading) {
+    if (!isAuthenticated) {
+      router.push(buildSignInUrl(pathname))
+    } else if (user?.role !== "admin") {
+      router.push("/")
+    }
+  }
+}, [isLoading, isAuthenticated, user, router])
+```
+
+`buildSignInUrl` (in `lib/utils/safeNextPath.ts`) builds `/auth/sign-in?next=<current-path>` so the user lands back where they were after signing in — see [09_FRONTEND_HOME_AND_WATCH.md](./09_FRONTEND_HOME_AND_WATCH.md) for `getSafeNextPath`'s open-redirect guard. There is **no Next.js `middleware.ts`** anywhere in this codebase — this is purely a client-side layout guard, same mechanism as before the route restructure, just narrowed in scope now that browse/watch are public. (A commit in the project's history is titled "middleware allows public routes"; despite the name, its diff only touches these layout files — there's no `middleware.ts` to find.) A real middleware-based approach would protect `/admin` at the edge instead of after a client render. See Future Upgrades.
 
 ---
 
@@ -180,10 +202,10 @@ Every route under `app/(protected)/` is automatically protected by this layout. 
 
 The `lib/apis/` directory has one file per domain:
 
-- **`client.ts`** — the shared Axios instance (don't import Axios directly elsewhere)
+- **`client.ts`** — the shared Axios instance (don't import Axios directly elsewhere). Requests can pass a `skipAuthRedirect: true` config flag; the response interceptor checks it before attempting a token refresh or redirecting to sign-in on a 401. Public browse/watch calls set this flag so an expired or missing token never bounces an anonymous viewer to the login page.
 - **`auth.ts`** — `signin()`, `signup()`, `refreshToken()`, `logout()`, `forgotPassword()`, `resetPassword()`, `verifyEmail()`, `resendVerification()`
-- **`video.ts`** — `createVideo()`, `deleteVideo()`, `getVideoStatus()`, `incrementVideoView()`, etc. Note: `getPublicVideos()` and `getVideoById()` functions are **not yet implemented** in this file — the home feed and watch page don't have the API functions wired up yet.
-- **`user.ts`** — `getCurrentUser()`, `updateProfile()`, admin user management
+- **`video.ts`** — `createVideo()`, `deleteVideo()`, `getVideoStatus()`, `incrementVideoView()`, `getPublicVideos()`, `getVideoById()`, `updateVideoVisibility()`, `getVideoDownloadUrl()`, and `saveDraft()`. `getPublicVideos()` and `getVideoById()` are real, implemented, and used by the home feed and watch page (an earlier revision of this document, and of the app, had them missing — that gap is closed). `saveDraft()` is the exception: it's implemented and exported, but posts to a `POST /videos/draft` backend route that doesn't exist, and the upload form doesn't call it yet anyway (see [11_FRONTEND_VIDEO_UPLOAD.md](./11_FRONTEND_VIDEO_UPLOAD.md)).
+- **`user.ts`** — `getCurrentUser()`. Nothing else — there is no admin user-management API on either side yet.
 
 All functions return typed promises and let Axios errors propagate to the caller (which handles them with try/catch).
 

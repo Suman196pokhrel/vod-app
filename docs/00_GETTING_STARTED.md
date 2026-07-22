@@ -90,7 +90,7 @@ This points at Caddy on port 80. You can also use `http://localhost:8000` to byp
 
 ## Verifying Everything Works
 
-1. **http://localhost:3000** — the landing page should appear
+1. **http://localhost:3000** — the browse feed should appear (the root route is the public video feed; it'll be empty until an admin uploads something)
 2. **http://localhost/docs** — Swagger UI loads with all API endpoints
 3. Hit `GET /health` in Swagger — it should return `{"status": "ok"}`
 4. **http://localhost:9001** — MinIO console loads with the minioadmin credentials

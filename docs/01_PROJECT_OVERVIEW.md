@@ -16,30 +16,27 @@ A viewer signs up, verifies their email, logs in, and lands on a home feed. They
 
 ## Architecture Overview
 
+```mermaid
+flowchart LR
+    Browser["Browser<br/>Next.js :3000"]
+    Caddy["Caddy :80<br/>reverse proxy"]
+    API["FastAPI :8000"]
+    DB[("PostgreSQL :5432<br/>users, videos, tokens")]
+    Redis[("Redis :6379<br/>broker + result backend")]
+    Worker["Celery Worker"]
+    MinIO[("MinIO :9000<br/>raw · thumbnails · processed")]
+
+    Browser -- "REST + JWT Bearer" --> Caddy
+    Caddy --> API
+    API <--> DB
+    API -- "enqueue workflow" --> Redis
+    API -- "upload/read files" --> MinIO
+    Redis --> Worker
+    Worker -- "FFmpeg + ffprobe" --> MinIO
+    Worker -- "status updates" --> DB
 ```
-Browser (Next.js :3000)
-        │
-        │  REST API + JWT Bearer token
-        ▼
-  Caddy (:80)  ──────────────────────────────► FastAPI (:8000)
-  reverse proxy                                       │
-                                                      ├──► PostgreSQL (:5432)
-                                                      │    (users, videos, tokens)
-                                                      │
-                                                      ├──► MinIO (:9000)
-                                                      │    (video files, thumbnails)
-                                                      │
-                                                      └──► Redis (:6379)
-                                                               │
-                                                               ▼
-                                                        Celery Worker
-                                                               │
-                                                        FFmpeg (transcoding)
-                                                               │
-                                                               ▼
-                                                        MinIO (:9000)
-                                                        (HLS segments + manifests)
-```
+
+Two request shapes flow through Caddy: synchronous CRUD/auth calls that FastAPI answers directly against PostgreSQL, and the video-processing path, where FastAPI's only job is to validate the upload, persist the raw file, enqueue a Celery workflow, and return immediately — the actual transcoding happens later, off the request/response cycle entirely.
 
 **Caddy** is the front door. All requests from the browser go through Caddy at port 80. In production, Caddy also handles TLS termination (HTTPS) automatically via Let's Encrypt.
 
@@ -81,39 +78,42 @@ Here's the complete journey a video takes:
 2. **API validates and stores** — FastAPI validates the files, uploads the raw video to MinIO's raw bucket, saves the video metadata to PostgreSQL with `processing_status = "queued"`, then enqueues a Celery workflow task and returns the new video record immediately.
 3. **Frontend polls for status** — the upload page opens a progress dialog that calls `GET /videos/{id}/status` every 3 seconds to track processing.
 4. **Worker downloads and prepares** — the Celery worker picks up the task, downloads the raw video from MinIO to a local temp directory, and extracts metadata (resolution, duration, codec) using FFprobe.
-5. **Parallel transcoding** — seven FFmpeg processes run in parallel (via Celery's `chord`/`group` primitives), each transcoding the video to a different quality level: 1440p, 1080p, 720p, 480p, 360p, 240p, and 144p. 4K (2160p) is available but commented out to speed up dev.
-6. **HLS segmentation** — each quality's MP4 is split into 6-second `.ts` segments with a `.m3u8` playlist file.
-7. **Manifest creation** — a master `.m3u8` playlist is created that references all the quality-specific playlists. This is what the video player loads first.
-8. **Upload to MinIO** — all HLS files (master manifest, quality playlists, thousands of segment files) are uploaded to MinIO's processed bucket.
-9. **Finalization** — the database record is updated to `processing_status = "completed"` with the manifest URL. Temp files are deleted.
-10. **Viewer plays the video** — the watch page loads the master manifest URL from the video record. The player (once HLS.js is integrated — currently a mock) loads the manifest, picks the best quality, and streams segments.
+5. **Storyboard generation** — before transcoding starts, a `generate_storyboard` task tiles the source video into sprite-sheet images (one frame every 5 seconds) and writes a WebVTT file mapping timestamps to sprite coordinates. This is what powers the scrubbing-preview thumbnails on the watch page's timeline. It's best-effort: any failure here is logged and swallowed, never blocking the rest of the pipeline.
+6. **Parallel transcoding** — seven FFmpeg processes run in parallel (via Celery's `chord`/`group` primitives, one parameterized `transcode_quality` task invoked once per quality), each transcoding the video to a different quality level: 1440p, 1080p, 720p, 480p, 360p, 240p, and 144p. 4K (2160p) is available but commented out to speed up dev.
+7. **HLS segmentation** — each quality's MP4 is split into 6-second `.ts` segments with a `.m3u8` playlist file.
+8. **Manifest creation** — a master `.m3u8` playlist is created that references all the quality-specific playlists. This is what the video player loads first.
+9. **Upload to MinIO** — all HLS files (master manifest, quality playlists, thousands of segment files) are uploaded to MinIO's processed bucket.
+10. **Finalization** — the database record is updated to `processing_status = "completed"` with the manifest URL. Temp files are deleted.
+11. **Viewer plays the video** — the browse feed and watch page are public routes; no sign-in is required to watch. The watch page loads the master manifest URL into a custom `@videojs/react`-based player, which handles adaptive HLS quality switching and renders the scrubbing-preview thumbnails parsed from the storyboard WebVTT.
 
 ---
 
 ## What's Done vs. What's Not
 
-This is important for anyone resuming work on this project. The backend is production-grade; the frontend is roughly 40% complete.
+This is important for anyone resuming work on this project. The platform has reached **MVP**: a viewer can land on the site with no account, browse real uploaded videos, and watch them with adaptive-quality HLS playback and scrubbing thumbnail previews. An admin can log in, upload a video, and manage its full lifecycle. The backend has been production-grade since early on; the frontend's core viewer and admin-video journeys are now real and API-wired. What remains is genuinely secondary: comments, watch history, admin user/analytics management, and a handful of documented bugs and gaps (see [13_KNOWN_BUGS_AND_NEXT_STEPS.md](./13_KNOWN_BUGS_AND_NEXT_STEPS.md) for the exhaustive, current list).
 
 **Done and working:**
 - Full auth system: signup, email verification, signin, token refresh, logout, password reset
 - Video upload endpoint with MinIO integration
-- Complete Celery processing pipeline (all 6 stages)
-- Admin video management API with filtering, sorting, pagination
+- Complete Celery processing pipeline (storyboard generation + all 6 transcoding/packaging stages)
+- Public browse feed and watch page — real API data, no mock content, no sign-in required
+- Real video playback — custom `@videojs/react` player with adaptive HLS quality and scrubbing-preview thumbnails
+- Admin video management: upload, list/filter/sort/paginate, edit details, toggle public/private visibility, soft delete, presigned-URL download
 - Frontend auth pages (all auth flows work end to end)
 - Frontend video upload form with real-time processing status
 
-**UI built but mocked (not wired to API):**
-- Home feed video grid — hardcoded single mock video
-- Video player — shows a thumbnail image, fake controls, no actual streaming
-- Watch page — uses mock data instead of fetching real video
-- All AI features — fully designed UI, all hardcoded data
-- Admin analytics, categories, settings pages
+**UI built but mocked or half-wired:**
+- Comments section on the watch page — real UI, hardcoded comment data, no backend
+- `incrementVideoView` — implemented and anonymous-friendly on the backend, but the frontend watch page never calls it, so view counts don't actually move yet
+- "Save Draft" in the upload form — still a fake delay; a real `saveDraft()` frontend function exists but points at a backend route (`POST /videos/draft`) that doesn't exist
+- All AI features (scene timeline, mood analysis, recommendations, etc.) — fully designed components, all hardcoded data, and as of the design-system migration no longer even imported into any page (orphaned files, not rendered anywhere)
+- Admin analytics, users, and settings pages — UI only, no backing endpoints (categories management is real, backed by a shared icon registry, but categories themselves are still a string field on `Video`, not a database table)
 
 **Not started:**
-- HLS.js integration in the video player
-- Comments system (no backend)
-- Watch history (no backend)
-- Google OAuth (button exists, no implementation)
+- Comments backend (table + endpoints)
+- Watch history (no backend) — also the prerequisite for any real recommendations
+- Admin user-management backend (`GET /admin/users` and friends don't exist)
+- Google OAuth (the button was removed entirely during the auth redesign — there's nothing to wire up, it would need to be rebuilt)
 - Real analytics endpoints
 
 ---
@@ -132,14 +132,19 @@ core/             ← database.py, config.py, jwt.py, security.py, dependencies.
 ## Frontend Structure (`app/`)
 
 ```
-app/(public)/           ← Landing page, all auth routes (no login required)
-app/(protected)/        ← All authenticated routes, guarded by ProtectedLayout
-  home/                 ← Main feed + watch page
+app/(public)/           ← No login required
+  auth/                 ← sign-in, sign-up, verify-email, forgot/reset password
+  (browse)/             ← The video feed — this IS the root page ("/")
+    page.tsx            ← Home/browse feed
+    watch/[video_id]/   ← Watch page, public — /watch/[video_id]
+app/(protected)/        ← Client-side auth-guarded — admin only
   admin/                ← Admin panel (videos, users, analytics, etc.)
 lib/apis/               ← Typed API functions using the shared Axios client
 lib/store/              ← Zustand stores (authStore is the main one)
-hooks/                  ← Custom React hooks (useVideoProcessing for polling)
+hooks/                  ← Custom React hooks (useVideoProcessing for polling, useRequireAuth for action-gating)
 ```
+
+This route layout is the result of a deliberate restructure: content is public, actions require auth (the YouTube model, not the Netflix one). Browsing and watching never touch an auth check; only reaching `/admin` or performing a gated action (like, comment, follow, watchlist) does.
 
 ---
 

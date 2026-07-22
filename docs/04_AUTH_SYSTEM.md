@@ -132,9 +132,9 @@ async def create_video(
 
 `get_current_user` (defined in `core/dependencies.py`) reads the `Authorization: Bearer <token>` header, decodes the JWT, validates it, and fetches the user from the database.
 
-`get_current_admin_user` extends this to also check that `user.role == ADMIN`, returning 403 for regular users. Note a subtle bug in the current code: it checks `current_user.is_admin` (the bound method itself, which is always truthy) instead of `current_user.is_admin()` (calling the method). In practice, the role check in `get_current_admin_user` uses a direct comparison, so admin protection still works — but it's worth knowing about if you extend this.
+`get_current_admin_user` extends this by calling `current_user.is_admin()` and raising 403 if it returns `False`. Every admin-only video endpoint (delete, visibility toggle, edit details, download URL, `list-all`) depends on this — it's the single choke point for admin authorization on the video surface. There is currently no equivalent for user management, because no admin user-management endpoints exist yet (see [13_KNOWN_BUGS_AND_NEXT_STEPS.md](./13_KNOWN_BUGS_AND_NEXT_STEPS.md)).
 
-There's also `get_current_user_optional` for endpoints that work with or without authentication (e.g., public video feeds that show extra info if you're logged in).
+There's also `get_current_user_optional`, which returns the user if a valid token is present and `None` otherwise — it never raises. This is the dependency that makes the public browse/watch experience possible: `GET /videos/by-id/{video_id}` uses it to decide whether a private video's owner is asking (200) or a stranger is (404, not 403 — see [05_VIDEO_UPLOAD.md](./05_VIDEO_UPLOAD.md)), and `POST /videos/{id}/view` uses it to let anonymous viewers count as views without requiring sign-in.
 
 ---
 
@@ -172,7 +172,7 @@ Receives: `{email, code, new_password}`
 
 - **Refresh token rotation** — issue a new refresh token on each refresh, invalidate the old one. Reduces the window of risk if a refresh token is stolen.
 - **httpOnly cookies** — move token storage from localStorage to httpOnly cookies to prevent XSS-based token theft. Requires backend changes to set cookies in the response.
-- **Google OAuth** — the sign-in/sign-up pages have placeholder buttons. Integration requires a Google Cloud project, OAuth credentials, a backend callback endpoint, and frontend redirect logic.
+- **Google OAuth** — the "Continue with Google" button was removed entirely during the auth-screens redesign; there's no placeholder left to wire up. Adding it back requires a Google Cloud project, OAuth credentials, a backend callback endpoint, and frontend redirect logic, plus a UI decision on where the button goes in the new design system.
 - **Rate limiting on sign-in** — prevent credential stuffing attacks
 - **Multi-factor authentication** — TOTP (Google Authenticator) as a second factor
 

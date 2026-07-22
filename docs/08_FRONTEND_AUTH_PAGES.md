@@ -64,10 +64,12 @@ The page handles three states: loading (verifying in progress), success, and err
 Collects email and password. On submit:
 1. Calls `authStore.signin(email, password)`
 2. The store calls `POST /auth/signin`, stores both tokens via `tokenManager`, updates the store with the user object, and sets `isAuthenticated = true`
-3. On success: redirects to `/home`
+3. On success: redirects to the `?next=` path if one was passed in the URL (see below), otherwise to `/`
 4. On error: displays the error inline
 
-Notable: the sign-in page has a "Continue with Google" button that has **no implementation** — no `onClick` handler, no backend OAuth endpoint. It's a placeholder UI only.
+Notable: there is no "Continue with Google" button anymore. It existed as a placeholder in an earlier revision of this page and was removed entirely during the auth-screens dark/cyan redesign — there's no `onClick` to wire up, it would need to be rebuilt from scratch.
+
+**The `?next=` redirect.** Since browse and watch are public, sign-in is now something a user is bounced to *mid-task* (clicking Like while logged out, or hitting `/admin` without a session) rather than a starting point. `signin-form.tsx` reads `useSearchParams().get("next")`, passes it through `getSafeNextPath()` (rejects anything that isn't a same-origin absolute path — no `//evil.com` open-redirect), and pushes there after a successful login instead of hardcoding `/`. Every place that redirects to sign-in (`(protected)/layout.tsx`, `admin/layout.tsx`, the logged-out "Sign in" nav link, `useRequireAuth`) builds its URL through the shared `buildSignInUrl(pathname)` helper so this round-trips consistently.
 
 The error handling distinguishes between cases:
 - 401: "Invalid email or password"
@@ -154,7 +156,7 @@ Here's the complete happy path for a new user:
 2. Fill out the form, submit → API creates user, sends verification email
 3. Success card shown → redirect to `/auth/sign-in`
 4. Click verification link in email → `/auth/verify-email?token=uuid` → account verified
-5. Sign in at `/auth/sign-in` → tokens stored, redirect to `/home`
+5. Sign in at `/auth/sign-in` → tokens stored, redirect to `/` (or back to whatever page triggered the sign-in, via `?next=`)
 6. 30 minutes later: access token expires → Axios interceptor auto-refreshes → user stays logged in
 7. 7 days later: refresh token expires → interceptor fails → redirect to `/auth/sign-in`
 
@@ -162,7 +164,7 @@ Here's the complete happy path for a new user:
 
 ## Future Upgrades
 
-- **Google OAuth** — wire up the existing UI button with a real OAuth flow
+- **Google OAuth** — the button was removed, not just unwired; reintroducing it means designing the UI treatment from scratch plus the full backend OAuth flow
 - **Remember me** — optionally extend session duration; currently the 7-day refresh token expiry is fixed
 - **Email change flow** — allow users to update their email address (requires re-verification)
 - **Account deletion** — self-service account deletion (GDPR compliance)
@@ -171,4 +173,4 @@ Here's the complete happy path for a new user:
 
 ## What's Next
 
-Auth is done. Users can create accounts, verify them, and sign in. Once they're logged in, they land on the home feed. The next document covers the two most important authenticated pages: the home feed and the video watch page — and importantly, explains which parts are real and which are currently mocked.
+Auth is done. Users can create accounts, verify them, and sign in — but signing in is no longer the gate it used to be for the app's two most important pages. The next document covers the home feed and the video watch page, both public now, and explains what's real (most of it) and what's still mocked or half-wired (a shrinking but honestly-documented list).

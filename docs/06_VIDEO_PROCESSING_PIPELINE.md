@@ -6,7 +6,7 @@ The raw video is uploaded. Now begins the most complex and CPU-intensive part of
 
 ## Why a Background Pipeline?
 
-Transcoding a one-hour video to six quality levels takes minutes of CPU time, even on powerful hardware. You can't do that in an HTTP request — the connection would time out, the user's browser would give up, and you'd have no way to report progress.
+Transcoding a one-hour video to seven quality levels takes minutes of CPU time, even on powerful hardware. You can't do that in an HTTP request — the connection would time out, the user's browser would give up, and you'd have no way to report progress.
 
 The solution: as soon as the upload finishes, the API enqueues a job and returns immediately. A separate Celery worker process picks up the job and does the heavy lifting. The frontend polls a status endpoint every 3 seconds to show progress.
 
@@ -23,28 +23,41 @@ Celery was chosen for this because:
 Defined in `backend/app/tasks/workflows.py`. The full pipeline is a Celery chain:
 
 ```python
-chain(
+workflow = chain(
     prepare_video.s(video_id),
+    generate_storyboard.s(),
     chord(
         group(
-            transcode_1440p.s(video_id),
-            transcode_1080p.s(video_id),
-            transcode_720p.s(video_id),
-            transcode_480p.s(video_id),
-            transcode_360p.s(video_id),
-            transcode_240p.s(video_id),
-            transcode_144p.s(video_id),
+            # transcode_quality.s("2160p"),  # 4K — commented out, testing takes too long
+            transcode_quality.s("1440p"),
+            transcode_quality.s("1080p"),
+            transcode_quality.s("720p"),
+            transcode_quality.s("480p"),
+            transcode_quality.s("360p"),
+            transcode_quality.s("240p"),
+            transcode_quality.s("144p"),
         ),
-        on_transcode_complete.s(video_id)
+        on_transcode_complete.s()
     ),
-    segment_videos.s(video_id),
-    create_manifest.s(video_id),
-    upload_to_minio.s(video_id),
-    finalize_processing.s(video_id),
+    segment_videos.s(),
+    create_manifest.s(),
+    upload_to_minio.s(),
+    finalize_processing.s()
 )
 ```
 
-This is sequential at the top level — each stage runs after the previous one completes — except for the transcoding step, which runs all seven quality levels in parallel simultaneously (via `chord` + `group`). 4K (2160p) transcoding is commented out to speed up local development.
+This is sequential at the top level — each stage runs after the previous one completes — except for the transcoding step, which runs all seven quality levels in parallel simultaneously (via `chord` + `group`). Note that transcoding is now a single **parameterized** task, `transcode_quality`, invoked once per quality level with a string argument (`"1440p"`, `"1080p"`, ...) — earlier revisions of this pipeline had seven separate task functions (`transcode_1440p`, `transcode_1080p`, etc.); they were consolidated into one task. 4K (2160p) transcoding is commented out to speed up local development.
+
+```mermaid
+flowchart TD
+    A["prepare_video<br/>download + ffprobe"] --> B["generate_storyboard<br/>sprite sheets + WebVTT<br/>(best-effort, never fails the chain)"]
+    B --> C{"chord: transcode_quality<br/>×7 qualities, in parallel"}
+    C --> D["on_transcode_complete<br/>chord callback"]
+    D --> E["segment_videos<br/>HLS .ts segments"]
+    E --> F["create_manifest<br/>master.m3u8"]
+    F --> G["upload_to_minio"]
+    G --> H["finalize_processing<br/>status → completed"]
+```
 
 Let's walk through each stage.
 
@@ -62,6 +75,39 @@ This task:
 5. Determines which quality levels to transcode — skips any quality higher than the source resolution (no upscaling; transcoding 480p source to 1440p makes no sense)
 
 The retry config uses `max_requests=3` (not `max_retries` — this is a Celery-specific kwarg name). If the task fails (MinIO is unavailable, FFprobe crashes), it retries up to 3 times with exponential backoff.
+
+---
+
+## Stage 1.5: `generate_storyboard` (scrubbing-preview thumbnails)
+
+**Task:** `backend/app/tasks/video_tasks.py` → `generate_storyboard`
+
+This runs immediately after `prepare_video` and before the transcode chord — it only needs the raw downloaded file and the `duration_seconds` that `prepare_video` already extracted, so it doesn't wait on any transcoded output. It produces the same kind of scrubbing thumbnail strip you'd see hovering the timeline on YouTube or Netflix.
+
+FFmpeg tiles the source video into sprite sheets, sampling one frame every 5 seconds:
+
+```bash
+ffmpeg -i <input> -vf "fps=1/5,scale=160:-2,tile=10x10" \
+  -vsync 0 -start_number 0 -q:v 4 sprite_%03d.jpg
+```
+
+Each sheet holds a 10×10 grid (100 tiles); once a sheet fills, FFmpeg's `image2` muxer automatically rolls over into the next numbered sheet. The task then runs `ffprobe` on the first sheet to measure the *actual* tile pixel dimensions — `scale=160:-2` rounds height to preserve aspect ratio, and getting that rounding wrong by even a pixel would silently misalign every cue's crop coordinates, so the code measures rather than computes. It then writes a `storyboard.vtt` file with one cue per 5-second window:
+
+```
+WEBVTT
+
+00:00:00.000 --> 00:00:05.000
+sprite_000.jpg#xywh=0,0,160,90
+
+00:00:05.000 --> 00:00:10.000
+sprite_000.jpg#xywh=160,0,160,90
+```
+
+All sprite sheets and the VTT file are uploaded to the thumbnails MinIO bucket at `{video_id}/storyboard/...`, and `video.storyboard_url` is set to the VTT's object path.
+
+**This stage is best-effort by design.** Its entire body runs inside one `try/except Exception` that logs a warning and returns the pipeline's data unchanged on any failure — modeled on `transcode_quality`'s "skip, don't break the workflow" pattern, deliberately *not* on `segment_videos`/`create_manifest`, which raise and fail the whole pipeline. A missing scrubbing preview is a cosmetic gap; a broken transcode is not. Existing videos processed before this stage existed are not backfilled — `storyboard_url` is simply `null` for them, and the player renders without a preview strip in that case.
+
+On the frontend, the watch page's player fetches this VTT and hand-parses its cues itself (`useStoryboardThumbnails`) rather than relying on a `<track kind="metadata">` element — the design spec originally proposed the `<track>` approach, but it proved unreliable against a cross-origin storage host in practice. See [09_FRONTEND_HOME_AND_WATCH.md](./09_FRONTEND_HOME_AND_WATCH.md) for the player side of this feature.
 
 ---
 
@@ -98,20 +144,27 @@ ffmpeg -i input.mp4 \
 
 H.264 codec is used for maximum compatibility. The `fast` preset is a balance between encoding speed and compression efficiency. `FFMPEG_THREADS` is configurable — defaults to half of available CPU threads.
 
-Each transcode task outputs a single MP4 file per quality level into the temp directory.
+Each transcode task outputs a single MP4 file per quality level into the temp directory. `transcode_quality` is one task parameterized by a quality-name string, not seven separate task functions — the `group()` above simply calls it seven times with a different argument each time.
 
 ---
 
 ## Stage 2.5: `on_transcode_complete` (Chord Callback — status: `aggregating`)
 
-This is the callback of the `chord`. When ALL parallel transcoding tasks complete, this task runs.
+This is the callback of the `chord`, signature `on_transcode_complete(self, results: list)`. When ALL parallel transcoding tasks complete, this task runs with the list of their results.
 
-It receives the list of results from all parallel tasks and:
-1. Updates status to `"aggregating"`
-2. Counts how many qualities succeeded
-3. Logs failures
+```python
+successful_results = [r for r in results if r is not None and not r.get('skipped', False)]
 
-**Known Bug:** In the failure-handling branch around line 317–327 of `video_tasks.py`, the code references `video_id` before it's assigned in that branch. If every single quality level fails (total failure), this causes a `NameError: name 'video_id' is not defined` rather than a clean failure message. This is documented in Known Bugs.
+if not successful_results:
+    logger.error("All transcoding tasks failed!")
+    with get_db_session() as db:
+        update_video_processing_status(db, video_id, "Failed", "All transcoding tasks failed!")
+    raise Exception("No successful transcodes - cannot continue workflow")
+
+video_id = successful_results[0]['video_id']
+```
+
+**Known bug, still live:** `video_id` is only assigned on the line *after* the `if not successful_results:` block — but that block itself references `video_id` when every quality fails. The intended behavior (log a clean `"failed"` status, then raise) never gets that far: Python raises `NameError: name 'video_id' is not defined` first, so a total transcoding failure surfaces as an unhandled exception in Celery instead of a tidy failed-status update. This only triggers when all 7 quality levels fail simultaneously — rare (a corrupted source file is the realistic trigger), but confirmed still present. The fix is to pull `video_id` out of the first result *before* the failure check, e.g. `video_id = results[0]['video_id'] if results else None`.
 
 ---
 
@@ -210,7 +263,10 @@ You can also check MinIO directly at http://localhost:9001 — if processing com
 
 ## Future Upgrades
 
+- **Fix the `on_transcode_complete` NameError** — trivial, see Stage 2.5 above
 - **Enable 4K transcoding** — uncomment the 2160p step in `workflows.py` (adds significant processing time)
+- **Backfill storyboards** — a standalone task/admin action to generate scrubbing thumbnails for videos processed before the storyboard stage existed
+- **Configurable storyboard interval/grid** — currently fixed constants (5s interval, 10×10 grid, 160px tiles); could become per-video or per-quality settings
 - **Webhook notifications** — push a webhook when processing completes instead of requiring the client to poll
 - **Multiple workers** — scale horizontally by running more Celery worker containers
 - **Progress percentage** — expose per-stage progress within each task (e.g., FFmpeg progress parsing)

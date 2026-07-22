@@ -199,9 +199,10 @@ Public video feed.
 
 Fetch a single video by ID.
 
-- **Auth:** Optional
+- **Auth:** Optional (`get_current_user_optional` — never raises, just resolves to `None` for anonymous/invalid tokens)
 - **Path param:** `video_id`
-- **Response:** `VideoResponse` — the full video record. Returns `404` if not found.
+- **Response:** `VideoResponse` — the full video record.
+- **Notable:** A public video is visible to anyone. A private video is visible only to its owner or an admin — any other caller, including anonymous ones, gets `404`. Deliberately not `403`: the API never confirms a private video exists to someone who isn't allowed to see it. This is also what makes the public watch page work with no sign-in required.
 
 ### GET `/videos/user/me`
 
@@ -213,21 +214,64 @@ List videos uploaded by the current user.
 
 ### DELETE `/videos/by-id/{video_id}`
 
-Delete a video you own.
+Soft-delete a video.
 
-- **Auth:** Required (must own the video)
+- **Auth:** Required, **admin role**
 - **Path param:** `video_id`
 - **Response:** status `204`, no body
-- **Notable:** Has a known bug — the service currently calls `video.video_url` which doesn't exist. The correct field is `video.raw_video_path`. Fix this before using the endpoint.
+- **Notable:** This sets `deleted_at` to now and stops there — the row and every MinIO file are left untouched. Every listing/lookup path filters out rows with a non-null `deleted_at`. An earlier revision of this reference documented a crash here (`video.video_url` doesn't exist on the model); that's resolved — this endpoint never touches that field. A genuine hard-delete method exists in the service layer but isn't wired to any route.
+
+### PATCH `/videos/by-id/{video_id}/visibility`
+
+Flip a video between public and private.
+
+- **Auth:** Required, **admin role**
+- **Path param:** `video_id`
+- **Request body:** `{ "is_public": true }`
+- **Response:** `VideoResponse`, status `200`
+- **Notable:** Only touches `is_public` — independent of `status` (`draft`/`published`/`scheduled`) and independent of soft delete. This is how the admin videos table's visibility toggle works; there is no equivalent control in the upload form itself.
+
+### PATCH `/videos/by-id/{video_id}`
+
+Partial update of a video's metadata — the admin "Edit Details" form.
+
+- **Auth:** Required, **admin role**
+- **Path param:** `video_id`
+- **Request body** (all fields optional — only fields present are changed, via `exclude_unset`):
+  ```json
+  {
+    "title": "string",
+    "description": "string",
+    "thumbnail_url": "string",
+    "is_public": true,
+    "category": "string",
+    "age_rating": "string",
+    "release_date": "2026-01-01",
+    "director": "string",
+    "cast": "Actor A, Actor B",
+    "tags": ["action"],
+    "status": "draft"
+  }
+  ```
+- **Response:** `VideoResponse`, status `200`
+
+### GET `/videos/by-id/{video_id}/download-url`
+
+Get a short-lived, presigned download URL for the original source file.
+
+- **Auth:** Required, **admin role**
+- **Path param:** `video_id`
+- **Response:** `{ "url": "https://..." }`, status `200`
+- **Notable:** The URL expires in 15 minutes and has `Content-Disposition: attachment` already set, so the browser downloads the file instead of trying to play it inline — necessary because storage is served from a different origin than the app. The host/scheme used to sign the URL are read from the incoming request (Caddy forwards `Host` and sets `X-Forwarded-Proto`), so the same code signs correctly in both dev and production without hardcoding a public URL.
 
 ### POST `/videos/{video_id}/view`
 
 Increment a video's view count.
 
-- **Auth:** Not required
+- **Auth:** Optional (`get_current_user_optional`)
 - **Path param:** `video_id`
 - **Response:** `{ "message": "View count incremented" }`, status `200`
-- **Notable:** Call this when playback starts. No auth needed — anonymous views count too.
+- **Notable:** Call this when playback starts. No auth needed — anonymous views count too. As of this writing, the frontend watch page doesn't actually call this endpoint yet, so views aren't being recorded in practice even though the endpoint itself works.
 
 ### GET `/videos/{video_id}/status`
 

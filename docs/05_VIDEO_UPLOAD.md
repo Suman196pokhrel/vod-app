@@ -104,15 +104,21 @@ The frontend polls this every 3 seconds while processing is in progress. When `p
 
 ## Other Video Endpoints
 
-**`GET /videos/`** — public video feed. Returns paginated videos with `processing_status = "completed"`. Supports filtering by category, sorting by date/views, and pagination via `page` and `page_size` query params.
+**`GET /videos/`** — public video feed. Returns all public videos (lightweight `VideoList` shape), paginated via `skip`/`limit`. No auth required.
 
-**`GET /videos/by-id/{video_id}`** — get a specific video by ID. Public, but increments view count. Returns 404 if not found.
+**`GET /videos/by-id/{video_id}`** — get a specific video by ID. Uses optional auth (`get_current_user_optional`): a public video is visible to anyone; a private video is visible only to its owner or an admin. Anyone else gets a **404**, not a 403 — the API never confirms that a private video exists to someone who can't see it.
 
-**`GET /videos/user/me`** — returns all videos uploaded by the current user (admin only meaningful here). Requires auth.
+**`GET /videos/user/me`** — returns all videos uploaded by the current user. Requires auth.
 
-**`DELETE /videos/by-id/{video_id}`** — delete a video. Requires admin. Has a known bug (covered in the Known Bugs doc): calls `minio_service.delete_video(video.video_url)` but the field is `video.raw_video_path`. The delete endpoint will crash until this is fixed.
+**`DELETE /videos/by-id/{video_id}`** — **soft-deletes** a video. Requires admin. Sets `deleted_at` to the current time; the row and every MinIO file are left in place, and permanent cleanup is left to a separate process that doesn't exist yet. Every listing and lookup path filters out rows with a non-null `deleted_at`. (A `VideoService.delete_video` hard-delete method also exists — correctly using `raw_video_path`, not the old `video_url` field the schema dropped two migrations ago — but nothing in the running app calls it; it's dead code kept for whenever a real purge process gets built.)
 
-**`POST /videos/{video_id}/view`** — increments the view count. Called by the frontend when a user starts watching.
+**`PATCH /videos/by-id/{video_id}/visibility`** — flips a video between public and private (`{"is_public": true|false}`) without touching anything else. Requires admin. This is how the admin videos table's visibility toggle works — it does not go through the upload form, since the form itself has no public/private field.
+
+**`PATCH /videos/by-id/{video_id}`** — the admin "Edit Details" form. Every field is optional; only fields present in the request body are changed (`exclude_unset` on the backend). Requires admin.
+
+**`GET /videos/by-id/{video_id}/download-url`** — returns a presigned MinIO URL (15-minute expiry) for the original raw file, with `Content-Disposition: attachment` already set so the browser downloads rather than plays it. Requires admin. The host/scheme for the presigned signature are read from the incoming request (Caddy forwards `Host` and sets `X-Forwarded-Proto`) rather than hardcoded, so the same code signs correctly in both dev and production.
+
+**`POST /videos/{video_id}/view`** — increments the view count. Uses optional auth so anonymous viewers count too. As of this writing the frontend watch page doesn't actually call this endpoint yet — it exists and works, but nothing invokes it (see [13_KNOWN_BUGS_AND_NEXT_STEPS.md](./13_KNOWN_BUGS_AND_NEXT_STEPS.md)).
 
 **`GET /videos/list-all`** — admin-only endpoint. Returns all videos (any status) with full metadata, filtering, sorting, and pagination. Used by the admin panel.
 
@@ -124,9 +130,11 @@ Some systems write uploaded files to a temp directory, then upload to storage. W
 
 ---
 
-## The `video_url` Bug
+## A Resolved Bug, and a New One in Its Place
 
-One gotcha in the current codebase: the `delete_video` endpoint in `video_service.py` (around line 389) references `video.video_url`, but no such field exists on the `Video` model. The correct field is `video.raw_video_path`. This is a clear typo that causes a runtime `AttributeError` whenever someone tries to delete a video. It's documented in Known Bugs and is a safe, one-line fix.
+An earlier version of this document described a crash: `delete_video` referenced `video.video_url`, a field the `Video` model doesn't have. That's now resolved on the live code path — the delete endpoint calls `soft_delete_video`, which only ever touches `deleted_at`, and the surviving hard-delete helper correctly uses `raw_video_path`. The stale `video_url` reference survives only inside a second, unreachable legacy helper (`create_video()`, not called by any route) — dead code, not a live bug, but a reasonable target for deletion during cleanup.
+
+A smaller, previously undocumented gap took its place: the frontend's `saveDraft()` function (`lib/apis/video.ts`) posts to `POST /videos/draft` — a route that doesn't exist anywhere in `video.py`. It's currently harmless because the upload form's "Save Draft" button doesn't call `saveDraft()` yet (see [11_FRONTEND_VIDEO_UPLOAD.md](./11_FRONTEND_VIDEO_UPLOAD.md)), but wiring the button to the existing function as-is would 404.
 
 ---
 
@@ -136,10 +144,11 @@ One gotcha in the current codebase: the `delete_video` endpoint in `video_servic
 - **Multi-file upload** — allow admins to queue multiple videos at once
 - **Resumable uploads** — for large files over slow connections, support chunked upload with resume capability (TUS protocol)
 - **Video preview generation** — extract a short preview clip in addition to the thumbnail
-- **Draft videos** — allow admins to save metadata without uploading the video yet
+- **Real draft saving** — either build the missing `POST /videos/draft` endpoint the frontend already expects, or point `saveDraft()` at an existing endpoint and drop the dead code
+- **Hard-delete / cleanup job** — a scheduled task that actually purges soft-deleted videos (row + MinIO files) after a retention window
 
 ---
 
 ## What's Next
 
-The video is now sitting in MinIO and the database record says `queued`. The hard work starts now. The next document covers the six-stage Celery processing pipeline that turns that raw video file into a streamable HLS feed.
+The video is now sitting in MinIO and the database record says `queued`. The hard work starts now. The next document covers the Celery processing pipeline — storyboard generation plus the multi-stage transcode/segment/manifest chain — that turns that raw video file into a streamable HLS feed with scrubbing-preview thumbnails.
