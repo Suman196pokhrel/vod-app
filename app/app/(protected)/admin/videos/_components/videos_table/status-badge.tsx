@@ -54,6 +54,13 @@ export function ProcessingStatusBadge({
       className: ACTIVE,
     },
 
+    [ProcessingStatus.GENERATING_STORYBOARD]: {
+      label: "Generating Previews",
+      variant: "secondary",
+      icon: Loader2,
+      className: ACTIVE,
+    },
+
     [ProcessingStatus.TRANSCODING]: {
       label: "Transcoding",
       variant: "secondary",

@@ -9,6 +9,7 @@ class ProcessingStatus(str, Enum):
     uploading = "uploading"
     queued = "queued"
     preparing = "preparing"
+    generating_storyboard = "generating_storyboard"
     transcoding = "transcoding"
     aggregating = "aggregating"
     segmenting = "segmenting"
@@ -27,6 +28,7 @@ STATUS_META: Dict[ProcessingStatus, StatusMeta] = {
     ProcessingStatus.uploading: {"progress": 5, "message": "Uploading video..."},
     ProcessingStatus.queued: {"progress": 15, "message": "Video queued for processing"},
     ProcessingStatus.preparing: {"progress": 25, "message": "Analyzing video..."},
+    ProcessingStatus.generating_storyboard: {"progress": 35, "message": "Generating scrubbing previews..."},
     ProcessingStatus.transcoding: {"progress": 50, "message": "Creating quality versions..."},
     ProcessingStatus.aggregating: {"progress": 60, "message": "Compiling video outputs..."},
     ProcessingStatus.segmenting: {"progress": 70, "message": "Preparing for streaming..."},
@@ -57,6 +59,7 @@ def update_video_processing_status(
     - uploading
     - queued
     - preparing
+    - generating_storyboard
     - transcoding
     - aggregating
     - segmenting

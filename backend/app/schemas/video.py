@@ -99,8 +99,9 @@ class VideoResponse(BaseModel):
     updated_at: Optional[datetime]
     manifest_url: str | None = None
     available_qualities: List[str] | None = None
+    storyboard_url: str | None = None
     user_id: str
-    
+
     model_config = ConfigDict(from_attributes=True)
 
     @field_validator("cast", mode="before")
@@ -142,8 +143,9 @@ class AdminVideoList(BaseModel):
     updated_at: datetime
     manifest_url: Optional[str]
     available_qualities: List[str]
+    storyboard_url: Optional[str] = None
     user_id: str
-    
+
     # Additional admin fields
     user_email: Optional[str] = None  # Join with user table
     user_username: Optional[str] = None

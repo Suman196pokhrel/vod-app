@@ -1,6 +1,7 @@
 from celery import chain, chord, group
 from app.tasks.video_tasks import (
     prepare_video,
+    generate_storyboard,
     transcode_quality,
     on_transcode_complete,
     segment_videos,
@@ -13,20 +14,22 @@ from app.tasks.video_tasks import (
 def create_video_processing_workflow(video_id: str):
     """
     Main workflow that orchestrates all video processing tasks
-    
+
     Flow:
     1. Prepare video (sequential)
+    1.5. Generate scrubbing-preview storyboard (sequential, best-effort)
     2. Transcode all qualities (parallel) → Collect results
     3. Segment videos (sequential)
     4. Create manifest (sequential)
     5. Upload to MinIO (sequential)
     6. Finalize (sequential)
-    
+
     """
 
     workflow = chain(
 
         prepare_video.s(video_id),
+        generate_storyboard.s(),
         chord(
             group(
                 # transcode_quality.s("2160p"),  # 4K available for for development purpose its commented as testing would take a lot of time.

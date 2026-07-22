@@ -79,6 +79,7 @@ class Video(Base):
     # ADD: For HLS streaming (filled after processing completes)
     manifest_url = Column(String(500), nullable=True)  # Path to master.m3u8
     available_qualities = Column(JSON, nullable=True)  # ["1080p", "720p", "480p", "360p"]
+    storyboard_url = Column(String(500), nullable=True)  # Path to storyboard.vtt (scrubbing preview)
 
 
     # Foreign key

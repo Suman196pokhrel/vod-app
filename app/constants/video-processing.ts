@@ -21,11 +21,15 @@ export const STATUS_META: Record<ProcessingStatus, StatusMeta> = {
     progress: 15, 
     message: "Video queued for processing" 
   },
-  [ProcessingStatus.PREPARING]: { 
-    progress: 25, 
-    message: "Analyzing video..." 
+  [ProcessingStatus.PREPARING]: {
+    progress: 25,
+    message: "Analyzing video..."
   },
-  [ProcessingStatus.TRANSCODING]: { 
+  [ProcessingStatus.GENERATING_STORYBOARD]: {
+    progress: 35,
+    message: "Generating scrubbing previews..."
+  },
+  [ProcessingStatus.TRANSCODING]: {
     progress: 50, 
     message: "Creating quality versions..." 
   },
@@ -74,9 +78,9 @@ export const PROCESSING_PHASES: ProcessingPhase[] = [
   },
   {
     id: "analyze",
-    label: "Analyze",          
+    label: "Analyze",
     icon: ScanEye,
-    statuses: [ProcessingStatus.PREPARING],
+    statuses: [ProcessingStatus.PREPARING, ProcessingStatus.GENERATING_STORYBOARD],
   },
   {
     id: "transcode",

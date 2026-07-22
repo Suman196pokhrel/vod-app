@@ -200,22 +200,23 @@ class MinIOService:
             raise Exception(f"Failed to upload thumbnail: {str(e)}")
              
 
-    def upload_file(self, bucket_name: str, object_name: str, file_path: str):  
+    def upload_file(self, bucket_name: str, object_name: str, file_path: str, content_type: str = "application/octet-stream"):
         """Upload a local file to MinIO"""
         logger.info(f"Uploading file: {file_path} -> {bucket_name}/{object_name}")
-        
+
         try:
             # Get file size
             import os
             file_size = os.path.getsize(file_path)
-            
+
             # Upload file
             with open(file_path, 'rb') as file_data:
                 self.client.put_object(
                     bucket_name=bucket_name,
                     object_name=object_name,
                     data=file_data,
-                    length=file_size
+                    length=file_size,
+                    content_type=content_type
                 )
             
             logger.info(f"File uploaded successfully: {object_name}")

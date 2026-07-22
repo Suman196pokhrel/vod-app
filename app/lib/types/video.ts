@@ -43,6 +43,7 @@ export interface Video {
   updated_at: string;
   manifest_url: string | null;
   available_qualities: string[];
+  storyboard_url: string | null;
   user_id: string;
   user_email?: string | null;
   user_username?: string | null;
@@ -83,6 +84,7 @@ export enum ProcessingStatus {
   UPLOADING = "uploading",
   QUEUED = "queued",
   PREPARING = "preparing",
+  GENERATING_STORYBOARD = "generating_storyboard",
   TRANSCODING = "transcoding",
   AGGREGATING = "aggregating",
   SEGMENTING = "segmenting",
