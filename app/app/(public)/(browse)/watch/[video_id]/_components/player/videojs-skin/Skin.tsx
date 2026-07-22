@@ -16,8 +16,14 @@
 //      unavailable. HlsJsVideo is the framework's cross-browser HLS element
 //      (hls.js MSE on Chrome/Firefox, native HLS on Safari) and is what
 //      makes that submenu light up.
+//   4. <Slider.Thumbnail> fed via its `thumbnails` prop (pre-parsed by
+//      useStoryboardThumbnails) instead of the default skin's usual pattern
+//      of dropping a metadata <track> on the video and letting the library
+//      auto-detect it — that auto-detection's base-URL resolution doesn't
+//      come through for our cross-origin storage host, see the hook.
 
 import { type CSSProperties, type ComponentProps, forwardRef, type ReactNode, isValidElement } from 'react';
+import type { ThumbnailImage } from '@videojs/core';
 import { AirPlayEnterIcon, AirPlayExitIcon, CaptionsOffIcon, CaptionsOnIcon, CastEnterIcon, CastExitIcon, CheckIcon, ChevronIcon, FullscreenEnterIcon, FullscreenExitIcon, GearIcon, PauseIcon, PipEnterIcon, PipExitIcon, PlayIcon, QualityIcon, RestartIcon, SeekIcon, SpeechIcon, SpeedIcon, SpinnerIcon, VolumeHighIcon, VolumeLowIcon, VolumeOffIcon } from '@videojs/react/icons';
 import { createPlayer, Poster, Container, usePlayer, AirPlayButton, useAudioTrackOptions, BufferingIndicator, useCaptionsOptions, CastButton, Controls, ErrorDialog, FullscreenButton, Gesture, Hotkey, Menu, MuteButton, PiPButton, PlayButton, usePlaybackRateOptions, Popover, useQualityOptions, SeekButton, SeekIndicator, Slider, StatusAnnouncer, StatusIndicator, Time, TimeSlider, Tooltip, VolumeIndicator, VolumeSlider, type RenderProp } from '@videojs/react';
 import { videoFeatures } from '@videojs/react/video';
@@ -278,10 +284,10 @@ export interface VideoJsSkinProps {
   className?: string;
   poster?: string | RenderProp<Poster.State> | undefined;
   placeholder?: string;
-  /** URL of a WebVTT storyboard (sprite-sheet cues in the `#xywh=` media
-   * fragment convention) for timeline scrubbing previews. Undefined for
-   * videos processed before this existed. */
-  storyboardUrl?: string;
+  /** Pre-parsed timeline scrubbing-preview thumbnails (see
+   * useStoryboardThumbnails). Undefined for videos processed before this
+   * existed, or while still loading. */
+  thumbnails?: ThumbnailImage[];
   /** Not a video.js concept — driven by the host page, see the theater
    * button below. */
   theater: boolean;
@@ -294,7 +300,7 @@ export function VideoJsSkin({
   poster,
   placeholder,
   style,
-  storyboardUrl,
+  thumbnails,
   theater,
   onToggleTheater,
   ...rest
@@ -313,11 +319,7 @@ export function VideoJsSkin({
         {/* autoPlay+muted (not in the doc's base example) — browsers block
             unmuted autoplay outright, muted is the only version that
             reliably plays without a user gesture. */}
-        <HlsJsVideo src={src} autoPlay  playsInline>
-          {storyboardUrl && (
-            <track kind="metadata" label="thumbnails" src={storyboardUrl} default />
-          )}
-        </HlsJsVideo>
+        <HlsJsVideo src={src} autoPlay playsInline />
 
         {poster && (
           <Poster src={isString(poster) ? poster : undefined} render={isRenderProp(poster) ? poster : undefined} />
@@ -409,7 +411,7 @@ export function VideoJsSkin({
                 <TimeSlider.Thumb className="media-slider__thumb" />
 
                 <div className="media-surface media-thumbnail media-slider__thumbnail">
-                  <Slider.Thumbnail className="media-thumbnail__image" />
+                  <Slider.Thumbnail className="media-thumbnail__image" thumbnails={thumbnails} />
                   <TimeSlider.Value type="pointer" className="media-time media-thumbnail__time" />
                   <SpinnerIcon className="media-thumbnail__spinner media-icon" />
                 </div>

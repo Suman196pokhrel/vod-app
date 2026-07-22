@@ -2,6 +2,7 @@
 
 import { VideoJsSkin } from "./videojs-skin/Skin"
 import { storageUrl } from "./utils"
+import { useStoryboardThumbnails } from "./useStoryboardThumbnails"
 import type { VideoData } from "./types"
 
 interface VideoPlayerProps {
@@ -12,6 +13,8 @@ interface VideoPlayerProps {
 }
 
 export default function VideoPlayer({ video, theater, onToggleTheater, className }: VideoPlayerProps) {
+  const thumbnails = useStoryboardThumbnails(video.storyboard_url)
+
   if (!video.manifest_url) {
     return (
       <div className="flex aspect-video items-center justify-center rounded-xl bg-card text-sm text-muted-foreground">
@@ -24,7 +27,7 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
     <VideoJsSkin
       src={storageUrl(video.manifest_url)}
       poster={video.thumbnail_url ? storageUrl(video.thumbnail_url) : undefined}
-      storyboardUrl={video.storyboard_url ? storageUrl(video.storyboard_url) : undefined}
+      thumbnails={thumbnails}
       theater={theater}
       onToggleTheater={onToggleTheater}
       className={`overflow-hidden border border-border/60 ${className ?? "aspect-video w-full"}`}
