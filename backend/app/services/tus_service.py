@@ -179,6 +179,16 @@ def handle_post_finish(event: dict) -> dict:
             raw_video_path=raw_video_path,
             user_id=tus_upload.user_id,
             processing_status="queued",
+            # Safe default for a freshly-created, not-yet-reviewed video — the
+            # multipart upload path (create_video_with_files) always derives
+            # is_public from submitted metadata together with status, and can
+            # never produce is_public=True + status="draft" (Video's raw column
+            # defaults). Without this, get_video_by_id's is_public-only gate
+            # would make a tus-uploaded video publicly fetchable/playable the
+            # moment processing completes, before an admin has reviewed it via
+            # Edit Details. Admins can still publish normally afterward.
+            is_public=False,
+            status="draft",
         )
         db.add(video)
         db.flush()  # populate video.id before referencing it below
