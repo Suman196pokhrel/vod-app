@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, RefreshCw, FileVideo } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 import { VideoProcessingDialogProps } from "@/lib/types/video";
 import { PROCESSING_PHASES } from "@/constants/video-processing";
@@ -169,6 +170,12 @@ export const VideoProcessingDialog: React.FC<VideoProcessingDialogProps> = ({
             <Button onClick={onRetry} variant="outline" className="gap-2">
               <RefreshCw className="w-4 h-4" />
               Retry
+            </Button>
+          )}
+
+          {isComplete && videoId && (
+            <Button asChild variant="outline">
+              <Link href={`/watch/${videoId}`}>Watch now</Link>
             </Button>
           )}
 
