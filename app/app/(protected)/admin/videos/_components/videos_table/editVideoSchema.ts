@@ -12,7 +12,7 @@ export const editVideoSchema = z.object({
   description: z
     .string()
     .min(10, "Description must be at least 10 characters.")
-    .max(2000, "Description must be at most 2000 characters."),
+    .max(5000, "Description must be at most 5000 characters."),
 
   category: z
     .string()

@@ -10,7 +10,7 @@ from app.utils.video_helpers import ProcessingStatus
 class VideoMetadata(BaseModel):
     """Metadata sent from frontend along with files"""
     title: str = Field(..., min_length=5, max_length=200)
-    description: str = Field(..., min_length=10, max_length=2000)
+    description: str = Field(..., min_length=10, max_length=5000)
     category: str
     ageRating: Optional[str] = None
     director: Optional[str] = Field(None, max_length=200)
@@ -189,7 +189,12 @@ class VideoList(BaseModel):
     views_count: int
     created_at: datetime
     user_id: str
-    description: Optional[str] = Field(None, max_length=100)
+    # Matches the Video.description column (String(5000)) and every other
+    # description field — this used to cap at 100, which made GET /videos/
+    # 500 for the entire page the moment any one video's description
+    # (a completely normal length) exceeded that, since FastAPI validates
+    # the whole List[VideoList] response at once.
+    description: Optional[str] = Field(None, max_length=5000)
     tags: Optional[List[str]] = None
     
     model_config = ConfigDict(from_attributes=True)

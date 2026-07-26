@@ -3,7 +3,6 @@
 import VideoPlayer from "./_components/player/VideoPlayer";
 import VideoInfo from "./_components/VideoInfo";
 import RelatedVideos from "./_components/RelatedVideos";
-import CommentSection from "./_components/CommentSection";
 import { use, useEffect, useState } from "react";
 import { getVideoById } from "@/lib/apis/video";
 import { useTheaterMode } from "./_components/player/useTheaterMode";
@@ -105,7 +104,6 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
 
           <div className="min-w-0  space-y-6 lg:col-start-1 lg:row-start-2">
             <VideoInfo video={video} />
-            <CommentSection videoId={video.id} />
           </div>
 
           {/* Right Sidebar — always column 2. Spans both rows (beside
