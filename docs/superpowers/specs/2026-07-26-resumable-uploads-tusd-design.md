@@ -82,13 +82,19 @@ with `--reload`, so saving the new model file restarts uvicorn and `create_all()
 create `tus_uploads` immediately — before `alembic upgrade head` is ever run by hand. Running
 the migration afterward would then fail with "relation already exists."
 
-Handling: verify the migration's up/down correctness against a disposable DB copy (`pg_dump`
-the dev DB into a scratch container, or a throwaway schema via `make db`), never against the
-live dev DB directly — this sidesteps the race entirely and is what "migrate on a database
-copy" already implies. For applying it to the actual dev DB, expect the race: if
-`create_all()` wins, `alembic stamp <revision>` instead of `upgrade head` (exact precedent:
-this repo's own history did the same `stamp head` maneuver for its pre-Alembic schema, per
-`main.py`'s lifespan comment).
+Handling: this isn't a maybe — on the local dev box, `create_all()` **will** win, every time,
+because saving the new model file is what triggers uvicorn's `--reload` restart, and that
+restart's lifespan is what runs `create_all()`. So the expected, primary sequence for the dev
+DB is: add the model, let `--reload` restart (table now exists via `create_all()`), then run
+`alembic stamp <revision>` — **not** `alembic upgrade head`, which would fail with "relation
+already exists" and look like a bug when it isn't. This exactly mirrors this repo's own
+history, which did the same `stamp head` maneuver for its pre-Alembic schema (see `main.py`'s
+lifespan comment).
+
+Correctness (up/down actually work) is verified separately, never on the live dev DB: a
+disposable DB copy (`pg_dump` the dev DB into a scratch container, or a throwaway schema via
+`make db`) where `create_all()` hasn't run, so `alembic upgrade head` → `downgrade -1` →
+`upgrade head` again all execute for real instead of being short-circuited by `stamp`.
 
 **Verify:** upgrade + downgrade + upgrade again on the scratch copy, `\d videos` unchanged,
 existing `videos` rows untouched, app boots normally.
@@ -102,7 +108,6 @@ compose file) on the existing `backend_net` bridge network — no new network:
 tusd:
   image: tusproject/tusd:v2.9.2   # pinned
   command:
-    - -behind-proxy
     - -s3-bucket=${minio_bucket_videos}
     - -s3-endpoint=http://minio:9000
     - -s3-part-size=${tus_part_size_mb}000000
@@ -118,7 +123,11 @@ tusd:
     - tusd_data:/srv/tusd-data     # temp part buffering, new named volume
   networks:
     - backend_net
-  # No `ports:` — not exposed to the host or Caddy yet. Step 6 adds the Caddy route.
+  # No `ports:` — not exposed to the host or Caddy yet. Step 6 adds the Caddy route
+  # *and* the `-behind-proxy` flag together — adding `-behind-proxy` here, before
+  # anything actually proxies to tusd, would be inert and misleading about what's
+  # actually protecting this service at this stage (nothing proxies here yet;
+  # the network boundary is the only control until Step 6).
 ```
 
 `local.env` uses lowercase keys matching pydantic's `Settings` fields exactly (confirmed:
@@ -149,8 +158,22 @@ correct at this stage.
 
 ## 4. FastAPI hook endpoints (Step 4)
 
-New router, `backend/app/apis/routes/tus_hooks.py`, mounted at `/internal/tus/hooks`,
-registered in `main.py` alongside the other routers. Not part of the public API surface —
+Three new backend files total for this step, matching the existing routes/services split
+(no separate schemas file — the hook payload is handled as a plain dict, since it's an
+internal contract with tusd, not user input needing Pydantic validation):
+- `backend/app/services/tus_service.py` — all logic: admission control, the three hook
+  handlers, and the status lookup used by Step 7's frontend bridge (below).
+- `backend/app/apis/routes/tus_hooks.py` — thin router with two routes: the internal
+  `POST /internal/tus/hooks` (secret-protected, dispatches by `Type` to `tus_service`), and
+  `GET /internal/tus/hooks/uploads/{upload_id}` (normal admin JWT auth, matching
+  `get_current_admin_user` like every other admin endpoint) — the one new public-facing read
+  the frontend needs to bridge from "upload finished" to "here's the video_id," since tusd's
+  own protocol never hands the client a hook-computed value. Two different auth mechanisms in
+  one small router is intentional here rather than a third file for one GET.
+- `backend/app/models/tus_upload.py` — the `TusUpload` model (already shown above).
+
+Registered in `main.py` alongside the other routers. The hook route is not part of the public
+API surface —
 protected by two layers: (1) network scope, since `tusd` calls it over `backend_net` and
 Caddy never proxies this path to the internet, and (2) `tus_hook_shared_secret`, embedded as
 a `?secret=` query parameter in the static `-hooks-http` URL tusd is started with (Step 3) —
@@ -169,11 +192,16 @@ tusd relays that `StatusCode`/`Header`/`Body` straight through to the client, wh
 503 + `Retry-After` requirement is satisfied.
 
 **pre-create** (`payload["Type"] == "pre-create"`):
-- Extract the JWT from `payload["Event"]["Upload"]["MetaData"]`. Uppy sets it as upload
-  `metadata` when the file is added; `tus-js-client` sends that as the `Upload-Metadata`
-  header on tusd's creation request, and tusd decodes it into every hook payload for that
-  upload, pre-create included — no header-forwarding config needed, it's part of the standard
-  hook contract.
+- Extract the JWT, plus `title` and `category`, from `payload["Event"]["Upload"]["MetaData"]`.
+  Uppy sets these as upload `metadata` when the file is added; `tus-js-client` sends that as
+  the `Upload-Metadata` header on tusd's creation request, and tusd decodes it into every hook
+  payload for that upload, pre-create included — no header-forwarding config needed, it's part
+  of the standard hook contract. `title`/`category` ride along here because `Video.title` and
+  `Video.category` are `nullable=False` — `post-finish` needs them to create a valid row, and
+  they're the only two required fields the tus flow's minimal pre-upload form collects (see
+  Step 7 — everything else is filled in afterward via the *existing*
+  `PATCH /videos/by-id/{id}` edit-details endpoint, unmodified, already admin-only, already
+  doing exactly this kind of partial update).
 - `verify_token(token, expected_type="access")` — the existing plain function in
   `app/core/jwt.py`, callable directly outside the FastAPI dependency graph.
 - Reject (`RejectUpload: true`) if: token invalid, declared `Upload.Size` exceeds
@@ -199,9 +227,23 @@ tusd relays that `StatusCode`/`Header`/`Body` straight through to the client, wh
 - Idempotency key: the upload ID. Look up the `TusUpload` row first; if `status` is already
   `"completed"`, return success immediately without re-inserting or re-enqueuing (hooks can be
   retried by tusd on delivery failure).
-- Otherwise: create the `Video` row exactly as `create_video_with_files` does today
-  (`raw_video_path` = the MinIO object key, `processing_status="queued"`, `user_id` from the
-  upload's JWT), update the `TusUpload` row (`status="completed"`, `video_id`, `object_key`,
+- Otherwise: create the `Video` row with the four columns that are actually `nullable=False`
+  (`title`, `category` — from `MetaData`, captured above; `user_id` — from the JWT;
+  `raw_video_path`), plus `processing_status="queued"` (required by `prepare_video`'s own
+  assertion before it'll touch the row) — everything else (`description`, `director`, tags,
+  etc.) stays at its column default/NULL until the admin fills it in later via the existing
+  edit-details endpoint, exactly the same as a freshly-created row from the multipart path
+  looks before anyone's touched "Edit Details."
+  `raw_video_path` is built from `payload["Event"]["Upload"]["Storage"]`
+  (`f"{storage['Bucket']}/{storage['Key']}"`) — confirmed against tusd's s3store source
+  (`Storage: {"Type": "s3store", "Bucket": ..., "Key": ...}`), **not** hand-reconstructed from
+  the `-s3-object-prefix` convention, so it stays correct even if tusd's actual key shape ever
+  changes. This matches the *shape* `minio_service.upload_video` already produces
+  (`f"{bucket}/{key}"`), which is what `download_video_to_file` expects — it strips the first
+  `/`-segment and always downloads from `settings.minio_bucket_videos` regardless of that
+  segment's value, so using the real bucket here is both correct and consistent with the
+  existing (slightly redundant) convention rather than fighting it.
+  Then: update the `TusUpload` row (`status="completed"`, `video_id`, `object_key`,
   `completed_at`), `DEL tus:active:{upload_id}`, then call
   `workflows.start_video_processing(video_id)` — the same Celery entrypoint the existing path
   uses (Step 5).
@@ -252,27 +294,50 @@ tusd, lands in MinIO, and fires both hooks — inspected via `docker logs` and `
 
 ## 7. Frontend Uppy integration (Step 7)
 
-New component, `app/(protected)/admin/videos/upload/_components/ResumableUploadZone.tsx` (or
-sibling to the existing `VideoUploadZone.tsx`), using `@uppy/core` + `@uppy/tus` with a
-hand-rolled progress UI rather than `@uppy/dashboard` — avoids fighting the dark/cyan design
-system (`docs/DESIGN_SYSTEM.md`) with Uppy's bundled CSS, and sidesteps checking `@uppy/react`
-against React 19 peer-dep constraints. Installed with `pnpm`.
+**A new route, not a spliced-in component of the existing form:**
+`app/(protected)/admin/videos/upload/resumable/page.tsx`. The existing upload page
+(`upload/page.tsx`) and `UploadForm.tsx` and every file under `uploadForm/` stay completely
+untouched — zero shared-file risk. The only change to any existing file is one small,
+flag-gated link/button on the existing upload page pointing at the new route; with the flag
+off that link doesn't render, so the existing page is byte-identical to today.
 
-Loaded via `next/dynamic` with `ssr: false`, gated on `process.env
-.NEXT_PUBLIC_UPLOADS_TUS_ENABLED === "true"` — with the flag off, Uppy's JS is never fetched
-by the browser at all, not just hidden. The existing `VideoUploadZone` stays the unconditional
-default; this is an alternate path on the same upload page, not a replacement.
+The new page is self-contained: a minimal pre-upload form (`title` + `category` — the exact
+same category list `BasicInformationSection.tsx` already hardcodes: action, drama, comedy,
+scifi, thriller, documentary, fantasy, horror) gates a dropzone that only activates once both
+are filled in. This is deliberately smaller than the full multi-section `UploadForm` — the
+tus flow's job is just to get bytes into MinIO reliably; the rest of the metadata (description,
+director, cast, etc.) is filled in afterward via the *existing, unmodified*
+`PATCH /videos/by-id/{id}` edit-details endpoint, the same one the admin table's row-actions
+menu already uses. No new backend endpoint needed for that part.
+
+Uses `@uppy/core` + `@uppy/tus` with a hand-rolled progress UI rather than `@uppy/dashboard` —
+avoids fighting the dark/cyan design system (`docs/DESIGN_SYSTEM.md`) with Uppy's bundled CSS,
+and sidesteps checking `@uppy/react` against React 19 peer-dep constraints. Installed with
+`pnpm`. The whole page is loaded via `next/dynamic` with `ssr: false` from wherever it's
+linked, gated on `process.env.NEXT_PUBLIC_UPLOADS_TUS_ENABLED === "true"` — with the flag off,
+Uppy's JS is never fetched by the browser at all, not just hidden.
 
 Uppy's `tus` plugin points at `/files/*` through Caddy (Step 6) and carries the JWT (read from
-the same `tokenManager` the axios client already uses) as upload `metadata`, which tusd
-forwards to the pre-create hook. Progress, pause/resume, and error states use Uppy's own event
-API (`upload-progress`, `error`, `complete`) — this is also the first real byte-progress UI in
-the app, since the existing multipart path never wired `onUploadProgress` at all.
+the same `tokenManager` the axios client already uses) plus `title`/`category` as upload
+`metadata` — this is what `pre-create` and `post-finish` consume (Step 4). Progress,
+pause/resume, and error states use Uppy's own event API (`upload-progress`, `error`,
+`complete`) — this is also the first real byte-progress UI in the app, since the existing
+multipart path never wired `onUploadProgress` at all.
 
-**Verify:** with the flag off, the admin upload page is pixel-identical to today and no Uppy
-code appears in the network tab. With the flag on locally, start an upload, kill network
-mid-transfer, confirm the resume completes without re-sending finished bytes (byte offset via
-tusd's `HEAD` response), and confirm the video appears in the admin table processing normally
+**Closing the loop back to the existing processing UI:** tus's own protocol never hands the
+client a hook-computed value, so the client doesn't learn the new `video_id` through the
+upload itself. On Uppy's `complete` event, the page polls the new
+`GET /internal/tus/hooks/uploads/{upload_id}` endpoint (Step 4) — using the `upload_id` Uppy
+already has from creating the upload — until it returns a `video_id`, then hands off to the
+*existing* `useVideoProcessing` hook and `VideoProcessingDialog`, unmodified, pointed at that
+ID. The resumable flow rejoins the exact same processing UI the multipart flow already has;
+no new dialog or status-polling code.
+
+**Verify:** with the flag off, the admin upload page is pixel-identical to today, the new
+route link doesn't render, and no Uppy code appears in the network tab. With the flag on
+locally, start an upload, kill network mid-transfer, confirm the resume completes without
+re-sending finished bytes (byte offset via tusd's `HEAD` response), confirm the bridge to
+`video_id` works, and confirm the video appears in the admin table processing normally
 afterward.
 
 ## Out of scope for this spec
