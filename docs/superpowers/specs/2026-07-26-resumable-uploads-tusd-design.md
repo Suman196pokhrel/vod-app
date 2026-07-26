@@ -29,6 +29,7 @@ tus_max_concurrent_uploads: int = 5
 tus_max_file_size_gb: int = 50
 tus_allowed_mime_types: list[str] = ["video/mp4", "video/quicktime", "video/webm"]
 tus_hook_shared_secret: str = ""                  # required when uploads_tus_enabled=true
+tus_admission_ttl_hours: int = 24                 # admission-control slot lifetime, not tied to storage cleanup
 ```
 
 `tus_allowed_mime_types` intentionally matches the existing multipart path's
@@ -99,14 +100,15 @@ compose file) on the existing `backend_net` bridge network — no new network:
 
 ```yaml
 tusd:
-  image: tusproject/tusd:v2.8.0   # pinned
+  image: tusproject/tusd:v2.9.2   # pinned
   command:
     - -behind-proxy
     - -s3-bucket=${minio_bucket_videos}
     - -s3-endpoint=http://minio:9000
     - -s3-part-size=${tus_part_size_mb}000000
+    - -s3-object-prefix=tus-uploads/
     - -hooks-http=http://api:8000/internal/tus/hooks?secret=${tus_hook_shared_secret}
-    - -hooks-enabled-events=pre-create,post-finish,post-terminate,post-receive
+    - -hooks-enabled-events=pre-create,post-finish,post-terminate
     - -upload-dir=/srv/tusd-data
   environment:
     AWS_ACCESS_KEY_ID: ${minio_access_key}
@@ -127,9 +129,14 @@ interpolation is case-sensitive against those exact lowercase keys. New tus vars
 `Settings` (via the same `env_file:` injection every other service already uses) read from
 one consistent source, no duplicate uppercase copies.
 
-Object key prefix inside the bucket: `tus-uploads/{upload_id}`, distinct from the existing
-`user-{user_id}/{uuid}.{ext}` convention used by direct multipart uploads, so the two paths'
-objects are trivially distinguishable in the bucket during the parallel-run period.
+Object key prefix inside the bucket: `tus-uploads/`, set via tusd's own `-s3-object-prefix`
+flag (confirmed to exist against the pinned version's docs) rather than per-upload override —
+distinct from the existing `user-{user_id}/{uuid}.{ext}` convention used by direct multipart
+uploads, so the two paths' objects are trivially distinguishable in the bucket during the
+parallel-run period.
+
+Pinned image: `tusproject/tusd:v2.9.2` (confirmed current stable on Docker Hub at design
+time), not a floating tag.
 
 Credentials reused from existing MinIO secrets (`minio_access_key`/`minio_secret_key` already
 in `infra/local.env`) — no new secret for storage access, only the new
@@ -152,29 +159,43 @@ string is the mechanism, checked on every request against `tus_hook_shared_secre
 scope is the primary control; the secret is defense-in-depth against anything else that lands
 on `backend_net`.
 
-**pre-create** (`event.Type == "pre-create"`):
-- Extract the JWT from `Event.Upload.MetaData` in the hook's JSON body. Uppy sets it as
-  upload `metadata` when the file is added; `tus-js-client` sends that as the `Upload-Metadata`
-  header on tusd's creation request, and tusd includes it decoded in every hook payload for
-  that upload — no header forwarding config needed, it's part of the standard hook contract.
+The hook request body's exact shape (confirmed against tusd's docs, not assumed): a top-level
+envelope `{"Type": "<event-name>", "Event": {"Upload": {...}, "HTTPRequest": {...}}}` — the
+event name is a field in the body, not a header. `Event.Upload` carries `ID`, `Size`,
+`Offset`, `MetaData` (a flat string-to-string map decoded from the client's
+`Upload-Metadata` header), and `Storage`. Rejection is signaled by responding `200 OK` with
+`{"RejectUpload": true, "HTTPResponse": {"StatusCode": ..., "Body": ..., "Header": {...}}}` —
+tusd relays that `StatusCode`/`Header`/`Body` straight through to the client, which is how the
+503 + `Retry-After` requirement is satisfied.
+
+**pre-create** (`payload["Type"] == "pre-create"`):
+- Extract the JWT from `payload["Event"]["Upload"]["MetaData"]`. Uppy sets it as upload
+  `metadata` when the file is added; `tus-js-client` sends that as the `Upload-Metadata`
+  header on tusd's creation request, and tusd decodes it into every hook payload for that
+  upload, pre-create included — no header-forwarding config needed, it's part of the standard
+  hook contract.
 - `verify_token(token, expected_type="access")` — the existing plain function in
   `app/core/jwt.py`, callable directly outside the FastAPI dependency graph.
-- Reject (tusd's `RejectUpload` hook response) if: token invalid, declared size exceeds
-  `tus_max_file_size_gb`, or declared MIME type isn't in `tus_allowed_mime_types`.
+- Reject (`RejectUpload: true`) if: token invalid, declared `Upload.Size` exceeds
+  `tus_max_file_size_gb`, or declared MIME type (from `MetaData.filetype`) isn't in
+  `tus_allowed_mime_types`.
 - Admission control: check the count of live `tus:active:{upload_id}` Redis keys (see below)
-  against `tus_max_concurrent_uploads`. At the cap, reject with a 503-equivalent hook
-  rejection and a `Retry-After` value so the client backs off instead of holding a connection
-  open.
+  against `tus_max_concurrent_uploads`. At the cap, reject with `HTTPResponse.StatusCode: 503`
+  and `HTTPResponse.Header: {"Retry-After": "..."}` so the client backs off instead of holding
+  a connection open.
 - On accept: insert a `TusUpload` row (`status="created"`), `SET tus:active:{upload_id} 1 EX
-  <ttl>` where `<ttl>` matches tusd's incomplete-upload expiration from Step 3 — this is the
-  admission-control counter, and it's per-upload keys rather than a plain `INCR`/`DECR`
-  counter specifically so an abandoned upload (browser closed, no `post-terminate` fired)
-  self-heals via TTL expiry instead of leaking forever. `redis-py` (already in
-  `requirements.txt` as a Celery transitive dependency) gets its first direct use in this
-  codebase here — a small standalone connection helper, not routed through Celery's app
-  object.
+  <ttl>`. `<ttl>` is a new standalone setting (`tus_admission_ttl_hours`, default 24) sized to
+  a generous worst-case upload duration for a 50GB file — **not** tied to any tusd-native
+  incomplete-upload expiration, because tusd (the Go implementation) has no documented
+  built-in flag for that; abandoned-upload storage cleanup stays a separate, out-of-scope
+  concern (MinIO lifecycle rules, per the ADR). The TTL key is what makes admission control
+  self-healing: it's per-upload keys rather than a plain `INCR`/`DECR` counter specifically so
+  an abandoned upload (browser closed, no `post-terminate` fired) frees its slot automatically
+  instead of leaking forever. `redis-py` (already in `requirements.txt` as a Celery transitive
+  dependency) gets its first direct use in this codebase here — a small standalone connection
+  helper, not routed through Celery's app object.
 
-**post-finish** (`event.Type == "post-finish"`):
+**post-finish** (`payload["Type"] == "post-finish"`):
 - Idempotency key: the upload ID. Look up the `TusUpload` row first; if `status` is already
   `"completed"`, return success immediately without re-inserting or re-enqueuing (hooks can be
   retried by tusd on delivery failure).
