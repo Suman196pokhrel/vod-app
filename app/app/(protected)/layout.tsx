@@ -1,6 +1,5 @@
 "use client"
 import React, { useEffect } from "react"
-import HomeNavbar from "@/components/navbar/HomeNavbar"
 import { useAuthStore } from "@/lib/store"
 import { useRouter, usePathname } from "next/navigation"
 import { buildSignInUrl } from "@/lib/utils/safeNextPath"
@@ -40,13 +39,10 @@ const ProtectedLayout = ({children}:ProtectedLayoutProps) => {
     return null;
   }
 
-  // If authenticated , render protected route
-  return (
-    <div className="w-full border ">
-        <HomeNavbar />
-          {children}
-    </div>
-  )
+  // If authenticated, render protected route — admin/layout.tsx supplies
+  // its own full nav chrome (sidebar + header), so this guard stays
+  // invisible instead of stacking a second fixed navbar on top of it.
+  return <>{children}</>
 }
 
 export default ProtectedLayout
