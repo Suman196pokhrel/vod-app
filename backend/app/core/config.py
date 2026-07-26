@@ -53,6 +53,17 @@ class Settings(BaseSettings):
     redis_password: str
     redis_db: int = 0
 
+    # Resumable upload (tusd) settings — all inert until uploads_tus_enabled is true
+    uploads_tus_enabled: bool = False
+
+    tusd_endpoint_url: str = "http://tusd:1080"       # internal, service-to-service
+    tus_part_size_mb: int = 50
+    tus_max_concurrent_uploads: int = 5
+    tus_max_file_size_gb: int = 50
+    tus_allowed_mime_types: list[str] = ["video/mp4", "video/quicktime", "video/webm"]
+    tus_hook_shared_secret: str = ""                  # required when uploads_tus_enabled=true
+    tus_admission_ttl_hours: int = 24                 # admission-control slot lifetime, independent of storage cleanup
+
     # video settings
     max_video_size:int   #in GB
     max_thumbnail_size:int  # in MB
