@@ -5,5 +5,6 @@ from app.models.videos import Video
 from app.models.tokens import RefreshToken
 from app.models.email_verification import EmailVerificationToken
 from app.models.password_reset import PasswordResetToken
+from app.models.tus_upload import TusUpload
 
-__all__ = ["User", "Video", "UserRole","RefreshToken","EmailVerificationToken","PasswordResetToken"]
+__all__ = ["User", "Video", "UserRole","RefreshToken","EmailVerificationToken","PasswordResetToken", "TusUpload"]
