@@ -142,7 +142,7 @@ class AdminVideoList(BaseModel):
     created_at: datetime
     updated_at: datetime
     manifest_url: Optional[str]
-    available_qualities: List[str]
+    available_qualities: List[str] | None = None
     storyboard_url: Optional[str] = None
     user_id: str
 
