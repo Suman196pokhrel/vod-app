@@ -127,7 +127,7 @@ class AdminVideoList(BaseModel):
     category: str
     raw_video_path: str
     thumbnail_url: Optional[str]
-    age_rating: str
+    age_rating: Optional[str]
     release_date: Optional[date]
     director: Optional[str]
     cast: Optional[List[str]] = None
