@@ -150,6 +150,33 @@ services:
     networks:
       - backend_net
 
+  tusd:
+    image: tusproject/tusd:v2.9.2   # pinned, not floating
+    restart: unless-stopped
+    command:
+      - -s3-bucket=${minio_bucket_videos}
+      - -s3-endpoint=http://minio:9000
+      - -s3-part-size=${tus_part_size_mb}000000
+      - -s3-object-prefix=tus-uploads/
+      - -hooks-http=http://api:8000/internal/tus/hooks?secret=${tus_hook_shared_secret}
+      - -hooks-enabled-events=pre-create,post-finish,post-terminate
+      - -upload-dir=/srv/tusd-data
+      - -port=1080
+    environment:
+      AWS_ACCESS_KEY_ID: ${minio_access_key}
+      AWS_SECRET_ACCESS_KEY: ${minio_secret_key}
+      AWS_REGION: us-east-1
+    volumes:
+      - tusd_data:/srv/tusd-data
+    networks:
+      - backend_net
+    depends_on:
+      - minio
+      - api
+    # No `ports:` — not reachable from the host yet. Task 6 adds the Caddy
+    # route (and `-behind-proxy`, which only makes sense once something
+    # actually proxies to this service).
+
 
 networks:
   backend_net:
@@ -163,3 +190,4 @@ volumes:
   redisinsight_data:
   caddy_data:
   caddy_config:
+  tusd_data:
