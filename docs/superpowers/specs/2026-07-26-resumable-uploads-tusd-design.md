@@ -346,3 +346,59 @@ Matches the ADR's own "follow-up decisions" and later phases — explicitly not 
 work: MinIO lifecycle rules for abandoned multipart uploads, multi-instance tusd / sticky
 sessions, the Phase 5 default-path cutover, and Phase 6 decommissioning the existing endpoint.
 The existing multipart path is untouched and remains the default in every phase covered here.
+
+## As-built corrections
+
+Implementation surfaced several places where this spec's design assumptions didn't hold.
+Rather than silently editing the sections above, they're recorded here — the sections above
+describe the design as planned; this section describes where the built system actually
+diverged and why.
+
+- **§4's "network scope" claim was false as built.** Caddy's `/files/*` route (§6) shares the
+  same `:80` server block as the catch-all `reverse_proxy api:8000`, which proxies
+  `/internal/tus/hooks` from the public internet exactly like every other route — tusd calling
+  the hook route over `backend_net` doesn't make it *unreachable* from outside, just
+  *additionally* reachable that way too. With the flag on, the shared secret query param was
+  briefly the sole control. Fixed post-implementation: both Caddyfiles now explicitly
+  `respond 404` for `/internal/*`, with a narrow carve-out for the one legitimately
+  public-facing route, `GET /internal/tus/hooks/uploads/{upload_id}` (admin-JWT-protected, no
+  secret in its URL — the frontend polls it directly through Caddy per §7). The POST hook
+  route stays blocked at the Caddy layer entirely now, on top of its own secret check.
+- **tusd's `Event.Upload.ID` is empty/null at pre-create time** — not populated the way §4
+  originally assumed. Fixed: `handle_pre_create` generates its own UUID and returns it via
+  tusd's documented `ChangeFileInfo.ID` hook-response field, which tusd then genuinely assigns
+  to the upload from that point forward.
+- **tusd's S3 store composes a *different*, longer ID (`<baseId>+<multipartUploadId>`) at
+  `post-finish`/`post-terminate` time**, once the underlying S3 multipart upload exists — not
+  the base UUID from the fix above. Fixed: a `_base_upload_id()` helper normalizes by splitting
+  on the first `+` at every post-pre-create lookup site.
+- **`pre-create`'s admin check was missing at first pass** — §4 as originally written let any
+  authenticated user (not just admins) create a `TusUpload`/`Video` row, unlike the multipart
+  path's `get_current_admin_user` requirement. Fixed to match.
+- **`post-finish`'s `Video(...)` construction left `is_public`/`status` at their raw column
+  defaults** (`is_public=True`, `status="draft"`) — a combination the multipart path can never
+  produce, since it always derives both together from submitted metadata. This made a
+  tus-uploaded video publicly fetchable by ID immediately after processing, before any admin
+  review. Fixed: `post-finish` now explicitly sets `is_public=False, status="draft"`.
+- **`tus_admission_ttl_hours` (24h default) was too long relative to `tus_max_concurrent_uploads`
+  (5)** given that the shipped frontend (§7) has no cancel control, so an abandoned upload's
+  Redis admission slot only ever expires via TTL, never via `post-terminate`. Reduced default to
+  2 hours; cap raised to 8 as a secondary buffer.
+- **The pre-create accept response now also strips `token` from the metadata tusd retains**,
+  via `ChangeFileInfo.MetaData` (which *replaces*, not merges, tusd's stored map — the
+  replacement retains `title`/`category`/`filetype`, everything `post-finish` reads). Without
+  this, the admin's access JWT was confirmed, empirically, to persist in both tusd's S3 `.info`
+  sidecar object and the underlying S3 object's own user-metadata.
+- **Both hook route handlers were `async def` performing blocking synchronous I/O** (sync
+  SQLAlchemy sessions, sync redis-py calls) — since FastAPI runs `async def` route bodies
+  directly on the event loop, a slow hook call could stall every other concurrent request the
+  API process was handling. Fixed: the GET status route is now plain `def` (FastAPI
+  auto-threadpools it); the POST hook route stays `async def` (needed for `await
+  request.json()`) but wraps its synchronous dispatch calls in `run_in_threadpool`.
+- **ADR §6's "no redeploy required" rollback claim is optimistic.** `Settings` is
+  `@lru_cache`'d per-process, so flipping `uploads_tus_enabled` requires at minimum an API
+  process restart, not a live config change with zero process impact.
+- **§3's prod-compose mirroring never happened** — the tusd service exists only in
+  `docker-compose.local.yml`. This matches the plan's actual Task 3 scope (local dev only), but
+  means the ADR's Phase 5 cutover can't proceed until a prod compose entry and `Caddyfile.prod`
+  route are added.
