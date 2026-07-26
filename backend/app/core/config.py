@@ -58,11 +58,25 @@ class Settings(BaseSettings):
 
     tusd_endpoint_url: str = "http://tusd:1080"       # internal, service-to-service
     tus_part_size_mb: int = 50
-    tus_max_concurrent_uploads: int = 5
+    # Bounds concurrent tusd/S3 multipart-upload churn, not transcode load
+    # (Celery queues that independently, decoupled from admission control).
+    # Raised from 5: with the shorter TTL below, a handful of abandoned
+    # uploads (easily hit in normal testing/retries) no longer comes as
+    # close to exhausting the whole cap for real admins.
+    tus_max_concurrent_uploads: int = 8
     tus_max_file_size_gb: int = 50
     tus_allowed_mime_types: list[str] = ["video/mp4", "video/quicktime", "video/webm"]
     tus_hook_shared_secret: str = ""                  # required when uploads_tus_enabled=true
-    tus_admission_ttl_hours: int = 24                 # admission-control slot lifetime, independent of storage cleanup
+    # Admission-control slot lifetime, independent of storage cleanup. Only
+    # read at pre-create time (count_active_uploads), so expiry mid-upload
+    # doesn't abort or reject an in-progress transfer — it just stops
+    # counting it toward the concurrency cap, and release_upload() on an
+    # already-expired key is a harmless no-op DEL. Shortened from 24h: with
+    # no cancel button in the frontend yet, an abandoned upload (closed tab,
+    # never resumed) otherwise held its slot for a full day. 2h bounds that
+    # blast radius to a fraction of a work session while still comfortably
+    # outliving normal pauses between chunks of a real large transfer.
+    tus_admission_ttl_hours: int = 2
 
     # video settings
     max_video_size:int   #in GB
