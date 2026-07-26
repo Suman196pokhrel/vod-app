@@ -154,6 +154,7 @@ services:
     image: tusproject/tusd:v2.9.2   # pinned, not floating
     restart: unless-stopped
     command:
+      - -behind-proxy
       - -s3-bucket=${minio_bucket_videos}
       - -s3-endpoint=http://minio:9000
       - -s3-part-size=${tus_part_size_mb}000000
@@ -173,9 +174,9 @@ services:
     depends_on:
       - minio
       - api
-    # No `ports:` — not reachable from the host yet. Task 6 adds the Caddy
-    # route (and `-behind-proxy`, which only makes sense once something
-    # actually proxies to this service).
+    # No `ports:` — not reachable directly from the host. Caddy fronts it at
+    # /files/* (see Caddyfile.local), which is also why `-behind-proxy` is set
+    # above.
 
 
 networks:

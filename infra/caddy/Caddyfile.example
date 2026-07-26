@@ -5,6 +5,19 @@
 # =============================================================================
 
 :80 {
+    # tusd resumable-upload server (feature-flagged, dormant until enabled).
+    # `handle` (not `handle_path`) deliberately preserves the /files prefix:
+    # tusd's default base path is /files/ and it doesn't honor
+    # X-Forwarded-Prefix, so stripping the prefix here would make tusd see
+    # requests at "/" instead of "/files/" and 404/misroute them (confirmed
+    # empirically — handle_path made tusd serve its welcome page for
+    # `OPTIONS /files/` instead of a tus 204 response).
+    handle /files/* {
+        reverse_proxy tusd:1080 {
+            flush_interval -1
+        }
+    }
+
     # Reverse proxy all requests to the FastAPI container
     reverse_proxy api:8000
 
