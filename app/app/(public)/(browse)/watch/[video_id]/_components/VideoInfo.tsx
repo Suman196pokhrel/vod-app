@@ -4,25 +4,17 @@
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { ThumbsUp, ThumbsDown, Share2, Download, Plus, Check } from 'lucide-react'
 import { Video } from '@/lib/types/video'
-import { useRequireAuth } from '@/hooks/use-require-auth'
 
 interface VideoInfoProps {
   video: Video
 }
 
 const VideoInfo = ({ video }: VideoInfoProps) => {
-  const { requireAuth } = useRequireAuth()
-  const [isLiked, setIsLiked] = useState(false)
-  const [isDisliked, setIsDisliked] = useState(false)
-  const [isInWatchlist, setIsInWatchlist] = useState(false)
-  const [isFollowing, setIsFollowing] = useState(false)
   const [showFullDescription, setShowFullDescription] = useState(false)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Title and Badges */}
       <div className="space-y-3">
         <h1 className="text-3xl">{video.title}</h1>
@@ -47,97 +39,27 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
         </p>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 bg-muted rounded-full p-1">
-          <Button
-            size="sm"
-            variant={isLiked ? "default" : "ghost"}
-            className="rounded-full"
-            onClick={() => requireAuth(() => {
-              setIsLiked(!isLiked)
-              if (isDisliked) setIsDisliked(false)
-            })}
-          >
-            <ThumbsUp className="h-4 w-4 mr-1" />
-            {isLiked ? "Liked" : "Like"}
-          </Button>
-          <div className="w-px h-6 bg-border" />
-          <Button
-            size="sm"
-            variant={isDisliked ? "default" : "ghost"}
-            className="rounded-full"
-            onClick={() => requireAuth(() => {
-              setIsDisliked(!isDisliked)
-              if (isLiked) setIsLiked(false)
-            })}
-          >
-            <ThumbsDown className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <Button
-          size="sm"
-          variant={isInWatchlist ? "default" : "outline"}
-          className="rounded-full"
-          onClick={() => requireAuth(() => setIsInWatchlist(!isInWatchlist))}
-        >
-          {isInWatchlist ? (
-            <>
-              <Check className="h-4 w-4 mr-2" />
-              In Watchlist
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              Watchlist
-            </>
-          )}
-        </Button>
-
-        <Button size="sm" variant="outline" className="rounded-full">
-          <Share2 className="h-4 w-4 mr-2" />
-          Share
-        </Button>
-
-        <Button size="sm" variant="outline" className="rounded-full">
-          <Download className="h-4 w-4 mr-2" />
-          Download
-        </Button>
-      </div>
-
-      {/* Creator + description — one panel, not two stacked boxes */}
-      <div className="space-y-3 rounded-lg bg-card p-4">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-12 w-12">
-            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${video.director}`} />
-            <AvatarFallback>{video.director?.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <p className="text-sm text-muted-foreground">Created by</p>
-            <p className="font-semibold">{video.director}</p>
-          </div>
-          <Button
-            variant={isFollowing ? "default" : "outline"}
-            size="sm"
-            onClick={() => requireAuth(() => setIsFollowing(!isFollowing))}
-          >
-            {isFollowing ? "Following" : "Follow"}
-          </Button>
-        </div>
-
-        <div className="border-t border-border/60 pt-3">
-          <p className={`text-sm leading-relaxed ${!showFullDescription && 'line-clamp-3'}`}>
-            {video.description}
+      {/* Synopsis — plain text over the page background, no boxed panel */}
+      <div className="space-y-3">
+        {video.director && (
+          <p className="text-sm text-muted-foreground">
+            Directed by <span className="text-foreground">{video.director}</span>
           </p>
-          <Button
-            variant="link"
-            className="mt-1 h-auto p-0"
-            onClick={() => setShowFullDescription(!showFullDescription)}
-          >
-            {showFullDescription ? 'Show less' : 'Show more'}
-          </Button>
-        </div>
+        )}
+        {video.description && (
+          <div>
+            <p className={`text-sm leading-relaxed text-muted-foreground ${!showFullDescription && 'line-clamp-3'}`}>
+              {video.description}
+            </p>
+            <Button
+              variant="link"
+              className="mt-1 h-auto p-0"
+              onClick={() => setShowFullDescription(!showFullDescription)}
+            >
+              {showFullDescription ? 'Show less' : 'Show more'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Cast */}
@@ -154,13 +76,13 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
         </div>
       )}
 
-      {/* Tags */}
+      {/* Tags — static, no fake clickability affordance */}
       {video.tags && video.tags.length > 0 && (
         <div>
           <h3 className="eyebrow mb-2">Tags</h3>
           <div className="flex flex-wrap gap-2">
             {video.tags.map((tag, index) => (
-              <Badge key={index} variant="outline" className="font-normal cursor-pointer hover:bg-accent">
+              <Badge key={index} variant="outline" className="font-normal">
                 #{tag}
               </Badge>
             ))}

@@ -3,6 +3,7 @@
 import React from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { Play } from "lucide-react"
 import { storageUrl } from "@/lib/utils/storage"
 import { PublicVideo } from "@/lib/types/video"
 
@@ -19,8 +20,8 @@ const VideoCard = ({ video }: { video: PublicVideo }) => {
       onClick={() => router.push(`/watch/${video.id}`)}
       className="group -m-2 block w-full cursor-pointer rounded-xl p-2 text-left transition-all duration-(--duration-base) ease-(--ease-out-quart) hover:-translate-y-1 hover:scale-[1.02] hover:bg-accent/60 hover:shadow-2xl hover:shadow-background/60 focus-visible:-translate-y-1 focus-visible:scale-[1.02] focus-visible:bg-accent/60"
     >
-      {/* Thumbnail */}
-      <div className="relative aspect-video overflow-hidden rounded-lg bg-card">
+      {/* Thumbnail — poster-edge ring gives it presence at rest, not just on hover */}
+      <div className="relative aspect-video overflow-hidden rounded-lg bg-card ring-1 ring-border/60 transition-shadow duration-(--duration-base) ease-(--ease-out-quart) group-hover:ring-border">
         {video.thumbnail_url ? (
           <Image
             src={storageUrl(video.thumbnail_url)}
@@ -34,9 +35,17 @@ const VideoCard = ({ video }: { video: PublicVideo }) => {
           </div>
         )}
 
-        {/* Bottom gradient — the thumbnail edge dissolves toward the card's
-            own info block instead of cutting off hard against it. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-background/70 to-transparent opacity-0 transition-opacity duration-(--duration-base) group-hover:opacity-100" />
+        {/* Bottom gradient — always present at low strength so the thumbnail
+            reads as color-graded key art rather than a flat screenshot;
+            deepens on hover for the usual reveal feedback. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-background/45 to-transparent transition-opacity duration-(--duration-base) group-hover:from-background/80" />
+
+        {/* Hover play cue — static glyph, no autoplay preview */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-(--duration-base) group-hover:opacity-100">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-background/50 backdrop-blur-sm">
+            <Play className="h-4 w-4 fill-foreground text-foreground" />
+          </div>
+        </div>
 
         {/* Age rating badge */}
         {video.age_rating && (

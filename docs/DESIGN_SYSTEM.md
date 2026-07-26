@@ -18,13 +18,18 @@ interface only speaks when touched — and when it speaks, it is fast and cyan.
 
 Influences (from reference research):
 - **MUBI** → surfaces, spacing, editorial ALL-CAPS metadata, separation by space not borders
-- **YouTube** → watch-page information stack (title → actions row → description → comments)
+- **YouTube** → superseded on the watch page (2026-07-27: minimalist pass, see
+  §5 Step 2 note) — the actions row and comments are gone; kept only as the
+  origin of the eyebrow-metadata-row pattern itself
 - **Netflix** → confidence through scale and darkness, embraced fully for the hero
   banner and watch-page atmosphere (2026-07-27: cinematic pass) — large-scale
   cinematic backdrops, edges that dissolve into the background rather than cut off,
-  page-wide ambient tint. Still explicitly **NOT** its red, and still **NOT** its
-  hover-preview/mega-expand card mechanic (autoplaying clip + expanding card on
-  hover) — that stays out of scope everywhere in this app; see the Motion table below.
+  page-wide ambient tint. Also the reference for the watch page's minimal info
+  stack (2026-07-27: minimalist pass) — title, quiet metadata, synopsis, cast/tags,
+  nothing else; no actions row, no comments, no non-functional buttons. Still
+  explicitly **NOT** its red, and still **NOT** its hover-preview/mega-expand card
+  mechanic (autoplaying clip + expanding card on hover) — that stays out of scope
+  everywhere in this app; see the Motion table below.
 - **Twitch** → rejected: accent-by-coverage. Our accent works by contrast, not coverage.
 
 **Signature element:** the ambient glow — every watch page is tinted by the video's
@@ -130,7 +135,7 @@ the content they replace. Spinners only inside buttons and the video player.
 | File | Demonstrates |
 |---|---|
 | `VideoPlayer.tsx` | watch surface (#000), cyan seek/progress, controls reveal timing, quality menu |
-| `VideoCard.tsx` | card surface, hover elevate + scale + accent underline, eyebrow metadata, skeleton |
+| `VideoCard.tsx` | card surface, hover elevate + scale + accent underline, always-on graded gradient scrim, poster-edge ring, hover play cue, eyebrow metadata, skeleton — shared verbatim by the browse grid and the watch page's `RelatedVideos.tsx` sidebar (2026-07-27), not two divergent implementations |
 | `lib/motion/useAmbientColor.ts` | ambient tint extraction (§6) — shared by the watch page and the browse-page hero |
 | `lib/motion/useStaggeredReveal.ts` | cinematic content load-in — ref-returning GSAP hook, stagger-reveals a container's direct children, `prefers-reduced-motion`-safe. Used by `HeroSection.tsx` and the watch page |
 | `_components/HeroSection.tsx` | cinematic hero — real data via `usePublicVideos`, backdrop crossfade, ambient tint, vignette gradients |
@@ -147,8 +152,9 @@ Work top to bottom. One surface per PR/commit.
    (`next/font/google`: Space_Grotesk + Geist), verify existing shadcn components
    pick up the theme.
 2. **Watch page** — pure-black `--surface-watch` background, ambient glow behind
-   player (§6), YouTube-order info stack, eyebrow metadata row
-   (CATEGORY · VIEWS · DATE), skeleton for loading state.
+   player (§6), eyebrow metadata row (CATEGORY · VIEWS · DATE), skeleton for
+   loading state. (2026-07-27: info stack simplified to title → metadata →
+   synopsis → cast/tags only — see §5 note below.)
 3. **Browse/home grid** — delete mock components (rule 3.5), MUBI spacing
    (`gap-6`+ between cards, generous section padding), eyebrow section headers,
    card skeletons while loading.

@@ -10,7 +10,7 @@ written the way the rest of the docs reference them, e.g. `app/(protected)/...`)
 Run the doc's §8 verification checklist against each step before checking it done.
 
 **Status: every user-facing surface in the app (public, protected, and admin)
-is now on the unified dark/cyan design system.** Steps 0–8 below are all
+is now on the unified dark/cyan design system.** Steps 0–9 below are all
 done. Only the backend-touching §7 route restructure remains deferred.
 
 ---
@@ -423,6 +423,105 @@ hover-preview/mega-expand card mechanic out of scope (confirmed with the user).
       screenshot. Worth a real browser pass before considering this
       surface fully verified, the same way every earlier step in this
       document was.
+
+## Step 9 — Watch-page minimalist pass + shared premium card ✅ done
+
+Follow-up requested directly by the user, sequenced explicitly after Step 8:
+pivot the watch page from a YouTube-style layout (actions row, comment-adjacent
+info stack) to a minimal-but-premium Netflix/VOD style, delete every remaining
+dead/mock file on that page, then return to the browse grid's cards and give
+them the "premium, faded gradient" treatment the user said Step 8 hadn't fully
+delivered.
+
+- [x] Deleted 5 orphaned AI-mock files outright (not just unlinked, per the
+      user's explicit "no dead code or mock items" instruction, which
+      supersedes Step 1's older "leave orphaned" wording for this directory):
+      `AISceneTimeline.tsx`, `AIMoodAnalysis.tsx`, `AIRecommendations.tsx`,
+      `AIWatchParty.tsx`, `AIContentWarnings.tsx`. All confirmed zero
+      importers via grep before deletion. `docs/12_AI_FEATURES.md` updated to
+      record these as deleted rather than orphaned; the browse-page
+      `AIWatchTimeBanner.tsx` was out of scope (different directory) and is
+      untouched.
+- [x] `VideoInfo.tsx` rewritten — removed every non-backed interactive
+      control: Like/Dislike (no increment endpoint exists for `likes_count`
+      despite the column being real), Watchlist (no backend concept at all),
+      Follow + a dicebear-avatar "creator" card (there's no channel/creator
+      entity — `director` is a plain credit string, not a followable entity),
+      Share and Download (both were inert buttons; the one real download
+      endpoint is admin-only, not usable from a public watch page). Kept:
+      title, eyebrow metadata row, synopsis (moved out of a boxed `bg-card`
+      panel onto the plain page background — Netflix's own title screens
+      don't box synopsis text), a plain "Directed by X" line (null-guarded —
+      the old version crashed toward an empty avatar/name when `director` was
+      null), Cast badges, Tags badges. Tags also lost a pre-existing wart:
+      `cursor-pointer hover:bg-accent` with **no click handler** — a small
+      mock-affordance in its own right, now static like Cast. Deliberately
+      **not** animated internally — the page-level `useStaggeredReveal` in
+      `page.tsx` already fades this whole column in as one of three blocks;
+      a second nested stagger on VideoInfo's own children would compound
+      opacity against the outer one and read as sluggish rather than
+      cinematic (caught before writing the code, not after).
+- [x] `VideoCard.tsx` — addressed the user's "barebones/bootstrapped" and
+      "faded gradient" feedback on Step 8's card treatment: the bottom
+      gradient scrim is now **always present** at low strength
+      (`from-background/45`) instead of hover-only, so thumbnails read as
+      color-graded key art at rest, not flat screenshots; deepens to `/80` on
+      hover. Added a poster-edge ring (`ring-border/60`, brightens on hover)
+      and a static center play-glyph that fades in on hover — a hint, not an
+      autoplay preview, staying inside the already-decided "no Netflix
+      mega-hover" boundary. Cyan budget stayed put: the title's accent
+      underline remains the only cyan touch per card: the new ring and play
+      icon are neutral (`ring-border`, `text-foreground`), not cyan, to avoid
+      stacking three accent elements on one hovered card.
+- [x] `RelatedVideos.tsx` rewritten to import `VideoCard`/`VideoCardSkeleton`
+      directly instead of hand-rolling its own thumbnail markup and a second,
+      slightly different skeleton — one card implementation, two call sites,
+      not two components that drift apart over time.
+- [x] `VideoPlayer.tsx` — dropped the hard `border border-border/60` around
+      the player. `.media-default-skin` in `player.css` already supplies its
+      own `border-radius` (2rem, via `--media-border-radius`), so removing
+      the Tailwind border doesn't leave square corners — it just lets the
+      ambient glow (§6) read as bleeding directly behind the player instead
+      of stopping at a visible edge.
+- [x] Fixed a real bug in `useScrollReveal` (caught by the advisor before
+      implementation, not after): the hook's `useEffect` had a hardcoded `[]`
+      dependency array, so on `VideoGrid.tsx` — where the skeleton grid and
+      the loaded grid are two branches of one ternary at the same JSX
+      position — the reveal only ever fired once, during the skeleton phase,
+      and never again once real cards replaced them. Extended the hook with
+      an optional `deps` array (defaults to `[]`, so both existing callers,
+      `LandingCTA.tsx` and `LandingFeatures.tsx`, are unaffected — grep-
+      confirmed neither is actually imported anywhere either, both orphaned
+      leftovers of the retired marketing landing page) and an optional
+      `{ stagger: true }` mode that animates the container's direct children
+      instead of the container itself. `VideoGrid.tsx` now passes
+      `[isPending, videos?.length]` as deps and `{ stagger: true }`, and only
+      attaches the ref to the loaded-state grid div (not the skeleton one) —
+      the ref transitions from unset to set exactly when real data lands,
+      which is what re-triggers the effect correctly regardless of whether
+      React reuses the underlying DOM node across the ternary branches.
+      Also promoted the section header from a tiny all-caps `.eyebrow` label
+      to a proper `text-2xl` heading — an eyebrow is for quiet metadata, not
+      a section's main title, and Netflix/Apple-TV-style section headers
+      carry real visual weight.
+- [x] `docs/DESIGN_SYSTEM.md` updated: §1 Influences (YouTube demoted to
+      "superseded on the watch page," Netflix's minimal-info-stack influence
+      made explicit), §4 Reference implementations (`VideoCard.tsx` entry
+      notes it's now shared by two consumers, not duplicated), §5 Step 2 note
+      pointing at this section.
+- [x] `pnpm build` clean, raw-color grep clean across every file touched this
+      pass. **Not verified this pass:** a live browser check — the
+      Claude-in-Chrome extension was retried at both the start and end of
+      this session and remained disconnected throughout, so verification
+      is `pnpm build`/`tsc` plus a careful manual re-read, not an actual
+      rendered screenshot, same caveat as Step 8.
+- [ ] **Known gap surfaced, not fixed, during this pass:** `views_count` is
+      displayed on both `VideoCard.tsx` and `VideoInfo.tsx`, but the frontend
+      never calls the real, anonymous-friendly `POST /videos/{id}/view`
+      endpoint — so the number shown is permanently whatever it was at
+      creation (usually 0). Flagged rather than silently wired up (scope
+      creep) or silently left as-is (this pass was specifically about
+      removing things that don't do what they appear to do).
 
 ## Deferred (tracked, not part of this task)
 

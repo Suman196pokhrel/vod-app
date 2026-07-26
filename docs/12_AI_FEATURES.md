@@ -1,54 +1,54 @@
 # 12 — AI Features
 
-The frontend has a full set of AI-powered feature components — scene analysis, mood detection, smart recommendations, watch time predictions, and more. They were originally designed and placed exactly where they should appear in the UI. That's no longer true of their current state: during the dark/cyan design-system migration, every one of these components' imports and JSX usage was deliberately removed from both the home page and the watch page ("real surfaces polished over fake surfaces themed" was the literal rule applied — see [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) §3.5). The component files themselves were left in place rather than deleted, so they still exist on disk, fully coded and styled — but none of them render anywhere in the running app today. They're orphaned, not wired to a stale location.
+The frontend has a full set of AI-powered feature components — scene analysis, mood detection, smart recommendations, watch time predictions, and more. They were originally designed and placed exactly where they should appear in the UI. That's no longer true of their current state: during the dark/cyan design-system migration, every one of these components' imports and JSX usage was deliberately removed from both the home page and the watch page ("real surfaces polished over fake surfaces themed" was the literal rule applied — see [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) §3.5). At that point the component files were left in place rather than deleted, orphaned but still on disk.
 
-No model is running, no API is being called, and every data point in them is hardcoded — that part hasn't changed. What has changed is that a reader browsing the live app won't encounter any of this; you'd only find these components by reading the file tree.
+That changed for the watch-page components specifically during the 2026-07-27 watch-page minimalist redesign: the user's explicit instruction that pass ("remove the code or files for whatever things we're not using on the watch page, I don't want any dead code or mock items") superseded the earlier "leave orphaned" policy for that directory. All five watch-page AI mock files — Scene Timeline, Mood Analysis, Smart Recommendations, Watch Party, Content Warnings — were **deleted outright**, not just unlinked. The browse-page one (`AIWatchTimeBanner.tsx`, home feed) was out of scope for that pass and remains on disk, orphaned, same as before.
 
-This document explains what's there, what it's supposed to do, what the vision is, and what it would actually take to make it real — useful if these are ever reintroduced, but understand going in that reintroducing them means re-adding the import and JSX to a page, not just fixing the data source.
+No model was ever running for any of these, no API was being called, and every data point was hardcoded. This document now serves as the historical record of what existed and the vision behind it — useful if these are ever rebuilt, but understand going in that rebuilding the watch-page ones means writing new files, not resurrecting old ones.
 
 ---
 
 ## What Exists Today (Coded, Styled, but Orphaned From Every Page)
 
-Paths below reflect where these files live today, under the browse/watch directory's new location (`app/(public)/(browse)/...`) — they moved along with the rest of the watch page during the public-route restructure, even though nothing imports them anymore.
+Paths below reflect where these files lived before the 2026-07-27 deletion pass — kept for reference since the descriptions and extension points below are still the vision, even though the watch-page files no longer exist on disk.
 
-### Scene Timeline
+### Scene Timeline — file no longer exists (deleted 2026-07-27)
 
-**`app/(public)/(browse)/watch/[video_id]/_components/AISceneTimeline.tsx`**
+Was **`app/(public)/(browse)/watch/[video_id]/_components/AISceneTimeline.tsx`**.
 
 An interactive timeline below the video player that shows detected scene boundaries with labels. The UI shows a scrollable timeline with color-coded scene markers and labels like "Action sequence", "Dialogue", "Exterior shot".
 
-**Current state:** Hardcoded array of fake scenes with static timestamps and labels. The component renders beautifully but nothing changes when you seek the video.
+**Former state:** Hardcoded array of fake scenes with static timestamps and labels. The component rendered beautifully but nothing changed when you seek the video.
 
 **What it needs:** A backend model that analyzes the video and returns scene boundaries with timestamps and categories. This would run as an additional Celery task after transcoding completes, storing results in the database.
 
-### Mood Analysis
+### Mood Analysis — file no longer exists (deleted 2026-07-27)
 
-**`app/(public)/(browse)/watch/[video_id]/_components/AIMoodAnalysis.tsx`**
+Was **`app/(public)/(browse)/watch/[video_id]/_components/AIMoodAnalysis.tsx`**.
 
 A sidebar panel showing the detected emotional tone of the video — action, drama, comedy, thriller — as percentages with a visual bar chart. Also shows recommended similar videos based on "mood matching."
 
-**Current state:** Completely hardcoded percentages and recommendations. The numbers don't change between videos.
+**Former state:** Completely hardcoded percentages and recommendations. The numbers didn't change between videos.
 
 **What it needs:** A content analysis model (genre classification, sentiment analysis) that outputs a mood profile per video. Results stored as a JSON column on the Video model.
 
-### Watch Time Banner
+### Watch Time Banner — still orphaned, not deleted
 
 **`app/(public)/(browse)/_components/AIWatchTimeBanner.tsx`** (this one lives with the browse feed's components, not the watch page's — the name is a slight misnomer)
 
 A banner at the top of the watch page that says something context-aware — like "Good evening! Great choice for winding down." The component branches on `new Date().getHours()` for the time-of-day greeting, so that part is actually dynamic. But the "AI recommendation" message below it is still hardcoded.
 
-**Current state:** Partially real (time-of-day greeting), mostly fake (recommendation text).
+**Current state:** Partially real (time-of-day greeting), mostly fake (recommendation text). Out of scope for the 2026-07-27 watch-page cleanup pass (that pass was scoped to the watch page's own directory) — still on disk, still orphaned, unchanged.
 
 **What it needs:** A user behavior model that can suggest content based on viewing history.
 
-### Smart Recommendations
+### Smart Recommendations — file no longer exists (deleted 2026-07-27)
 
-**`app/(public)/(browse)/watch/[video_id]/_components/AIRecommendations.tsx`**
+Was **`app/(public)/(browse)/watch/[video_id]/_components/AIRecommendations.tsx`**.
 
 A "You might also like" section with recommended videos. Shows thumbnail, title, and a "Match score" percentage.
 
-**Current state:** Three hardcoded video objects with fake match scores.
+**Former state:** Three hardcoded video objects with fake match scores.
 
 **What it needs:** A recommendation model — collaborative filtering (what similar users watched), content-based filtering (videos with similar tags/category/mood), or a combination.
 
@@ -60,9 +60,9 @@ A "You might also like" section with recommended videos. Shows thumbnail, title,
 
 `AIChapters.tsx` (previously under the watch page's components — would have shown clickable YouTube-style named sections jumping to a timestamp) is likewise **deleted**, not orphaned. Same situation: rebuild from scratch if wanted.
 
-### Two more orphaned components not covered above
+### Two more — also deleted 2026-07-27
 
-Two additional AI-adjacent mock components survive on disk, unlinked from the watch page, that weren't part of this document's original scope: **`AIWatchParty.tsx`** and **`AIContentWarnings.tsx`**, both at `app/(public)/(browse)/watch/[video_id]/_components/`. They followed the same fate as the others during the design-system migration — imports and JSX removed from `page.tsx`, files left in place. Worth knowing about if you're auditing the directory for dead code, even though they're outside the "scene/mood/recommendation" AI theme the rest of this document focuses on.
+Two additional AI-adjacent mock components weren't part of this document's original scope but lived in the same directory: **`AIWatchParty.tsx`** and **`AIContentWarnings.tsx`**, both formerly at `app/(public)/(browse)/watch/[video_id]/_components/`. They were unlinked from `page.tsx` during the design-system migration same as the others, then deleted outright in the same 2026-07-27 pass that removed the rest of the watch page's dead code.
 
 ---
 
@@ -128,14 +128,14 @@ Before adding a recommendation model, start simple: recommend other videos with 
 
 | Component | Originally designed for | Status |
 |-----------|--------------------------|--------|
-| Scene Timeline | watch page | Orphaned — file exists, data hardcoded, not imported anywhere |
-| Mood Analysis | watch page | Orphaned — file exists, data hardcoded, not imported anywhere |
-| Watch Time Banner | watch page | Orphaned — time-of-day greeting logic was real, recommendation text was mocked; neither renders anywhere now |
-| Smart Recommendations | watch page | Orphaned — file exists, data hardcoded, not imported anywhere |
+| Scene Timeline | watch page | **Deleted** (2026-07-27) — no file remains, would need rebuilding |
+| Mood Analysis | watch page | **Deleted** (2026-07-27) — no file remains, would need rebuilding |
+| Watch Time Banner | browse feed | Still orphaned — time-of-day greeting logic was real, recommendation text was mocked; out of scope for the watch-page cleanup, unchanged |
+| Smart Recommendations | watch page | **Deleted** (2026-07-27) — no file remains, would need rebuilding |
 | Engagement Predictor | home feed | **Deleted** — no file remains, would need rebuilding |
 | Auto Chapters | watch page | **Deleted** — no file remains, would need rebuilding |
-| Watch Party | watch page | Orphaned (outside this doc's original scope) — file exists, not imported anywhere |
-| Content Warnings | watch page | Orphaned (outside this doc's original scope) — file exists, not imported anywhere |
+| Watch Party | watch page | **Deleted** (2026-07-27) — no file remains, would need rebuilding |
+| Content Warnings | watch page | **Deleted** (2026-07-27) — no file remains, would need rebuilding |
 
 ---
 

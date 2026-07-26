@@ -30,7 +30,7 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
       thumbnails={thumbnails}
       theater={theater}
       onToggleTheater={onToggleTheater}
-      className={`overflow-hidden border border-border/60 ${className ?? "aspect-video w-full"}`}
+      className={`overflow-hidden ${className ?? "aspect-video w-full"}`}
     />
   )
 }
