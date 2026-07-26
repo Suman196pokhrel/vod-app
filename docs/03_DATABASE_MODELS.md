@@ -1,6 +1,6 @@
-# 03 — Database Models
+# 03 - Database Models
 
-With the infrastructure running, let's look at what lives inside the database — the tables that store every user, every video, and every authentication token in the system. Understanding the data model is the foundation for understanding everything else.
+With the infrastructure running, let's look at what lives inside the database - the tables that store every user, every video, and every authentication token in the system. Understanding the data model is the foundation for understanding everything else.
 
 ---
 
@@ -28,7 +28,7 @@ alembic revision --autogenerate -m "add watch_history table"
 alembic upgrade head
 ```
 
-For local dev convenience, `Base.metadata.create_all(bind=engine)` also runs on every API startup (in `main.py`'s lifespan function). This is idempotent — it only creates tables that don't exist yet — so it won't overwrite anything. In production, you'd rely on Alembic exclusively.
+For local dev convenience, `Base.metadata.create_all(bind=engine)` also runs on every API startup (in `main.py`'s lifespan function). This is idempotent - it only creates tables that don't exist yet - so it won't overwrite anything. In production, you'd rely on Alembic exclusively.
 
 ---
 
@@ -51,17 +51,17 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 ```
 
-**`id`** — UUID string, not an auto-increment integer. Why? Sequential integers are predictable — someone can guess that `user/2` exists if they know `user/1` does. UUIDs prevent enumeration.
+**`id`** - UUID string, not an auto-increment integer. Why? Sequential integers are predictable - someone can guess that `user/2` exists if they know `user/1` does. UUIDs prevent enumeration.
 
-**`hashed_password`** — bcrypt hash, never the plain text password. bcrypt is slow by design, which makes brute-force attacks impractical.
+**`hashed_password`** - bcrypt hash, never the plain text password. bcrypt is slow by design, which makes brute-force attacks impractical.
 
-**`role`** — a PostgreSQL enum (`USER` or `ADMIN`) defined at the database level. Indexed for fast role-based queries. The `UserRole` Python enum has lowercase values (`"user"`, `"admin"`), but the DB enum and `server_default` use uppercase (`'USER'`). This asymmetry exists in the code — something to be aware of.
+**`role`** - a PostgreSQL enum (`USER` or `ADMIN`) defined at the database level. Indexed for fast role-based queries. The `UserRole` Python enum has lowercase values (`"user"`, `"admin"`), but the DB enum and `server_default` use uppercase (`'USER'`). This asymmetry exists in the code - something to be aware of.
 
-**`is_active`** — allows soft suspension of accounts without deleting data. A suspended user's history and content stays intact.
+**`is_active`** - allows soft suspension of accounts without deleting data. A suspended user's history and content stays intact.
 
-**`is_verified`** — starts as `False`. Users must click a verification link before they can log in. This prevents abuse with fake email addresses.
+**`is_verified`** - starts as `False`. Users must click a verification link before they can log in. This prevents abuse with fake email addresses.
 
-**`videos`** — not a database column. It's a SQLAlchemy relationship that lets you access `user.videos` in Python as a list. No extra SQL column is created.
+**`videos`** - not a database column. It's a SQLAlchemy relationship that lets you access `user.videos` in Python as a list. No extra SQL column is created.
 
 ---
 
@@ -70,29 +70,29 @@ class User(Base):
 The most complex table, defined in `backend/app/models/videos.py`. It tracks a video through its entire lifecycle from upload to streamable playback.
 
 **Identity:**
-- `id` — UUID primary key
-- `celery_task_id` — the ID of the active Celery task processing this video. Cleared when processing completes.
+- `id` - UUID primary key
+- `celery_task_id` - the ID of the active Celery task processing this video. Cleared when processing completes.
 
 **Content metadata:**
-- `title`, `description`, `category` — basic info, all indexed or queryable
-- `age_rating` — G, PG, PG-13, R, TV-14, TV-MA
-- `release_date`, `director`, `cast` — editorial metadata
-- `tags` — stored as a JSON array (e.g., `["action", "thriller"]`). Simple for MVP; a proper many-to-many tags table would be better long-term.
+- `title`, `description`, `category` - basic info, all indexed or queryable
+- `age_rating` - G, PG, PG-13, R, TV-14, TV-MA
+- `release_date`, `director`, `cast` - editorial metadata
+- `tags` - stored as a JSON array (e.g., `["action", "thriller"]`). Simple for MVP; a proper many-to-many tags table would be better long-term.
 
 **Storage paths (MinIO object names, not full URLs):**
-- `raw_video_path` — object name in the raw bucket (e.g., `user-abc123/uuid.mp4`)
-- `thumbnail_url` — object name in the thumbnails bucket
-- `manifest_url` — path to `master.m3u8` in the processed bucket. Set after processing completes.
-- `available_qualities` — JSON array like `["1440p", "1080p", "720p", "480p"]`. Set after processing.
-- `storyboard_url` — object name of the scrubbing-preview `storyboard.vtt` in the thumbnails bucket. Nullable; only populated for videos processed after the storyboard feature shipped (no backfill for older videos). See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md).
+- `raw_video_path` - object name in the raw bucket (e.g., `user-abc123/uuid.mp4`)
+- `thumbnail_url` - object name in the thumbnails bucket
+- `manifest_url` - path to `master.m3u8` in the processed bucket. Set after processing completes.
+- `available_qualities` - JSON array like `["1440p", "1080p", "720p", "480p"]`. Set after processing.
+- `storyboard_url` - object name of the scrubbing-preview `storyboard.vtt` in the thumbnails bucket. Nullable; only populated for videos processed after the storyboard feature shipped (no backfill for older videos). See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md).
 
 We store object names (not full URLs) so that changing the MinIO endpoint doesn't require a database migration.
 
 **Publishing and lifecycle:**
-- `is_public` — boolean, defaults `True`. Toggled independently of `status` from the admin videos table (a video can be `published` but flipped private without changing its publication status).
-- `status` — string: `draft`, `published`, or `scheduled`. Set at upload time; editable via the admin "Edit Details" form.
-- `deleted_at` — nullable timestamp. **Soft delete**: a non-null value means the video is hidden from every listing and lookup path, but its database row and MinIO files are left untouched. There is no separate `is_deleted` boolean — presence of a timestamp *is* the flag. A genuine hard-delete helper (`VideoService.delete_video`) still exists for a future cleanup process, but nothing in the running application calls it today; the admin table's delete action calls `soft_delete_video` instead.
-- `views_count`, `likes_count` — engagement counters. `views_count` increments via `POST /videos/{id}/view`, which works for anonymous viewers (no auth required) — though as of this writing the frontend watch page doesn't call it yet, so it's plumbed but unused.
+- `is_public` - boolean, defaults `True`. Toggled independently of `status` from the admin videos table (a video can be `published` but flipped private without changing its publication status).
+- `status` - string: `draft`, `published`, or `scheduled`. Set at upload time; editable via the admin "Edit Details" form.
+- `deleted_at` - nullable timestamp. **Soft delete**: a non-null value means the video is hidden from every listing and lookup path, but its database row and MinIO files are left untouched. There is no separate `is_deleted` boolean - presence of a timestamp *is* the flag. A genuine hard-delete helper (`VideoService.delete_video`) still exists for a future cleanup process, but nothing in the running application calls it today; the admin table's delete action calls `soft_delete_video` instead.
+- `views_count`, `likes_count` - engagement counters. `views_count` increments via `POST /videos/{id}/view`, which works for anonymous viewers (no auth required) - though as of this writing the frontend watch page doesn't call it yet, so it's plumbed but unused.
 
 **Processing lifecycle:**
 
@@ -111,6 +111,9 @@ The `processing_status` field tracks exactly where the video is in the pipeline:
 | `finalizing` | Updating DB, cleaning up temp files |
 | `completed` | Video is ready to stream |
 | `failed` | Something went wrong |
+| `generating_storyboard` | Building the scrubbing-preview sprite sheet, runs before transcoding starts |
+
+Note: a live bug means `uploading_to_storage` never actually shows up in `GET /videos/{id}/status` responses today - see [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md) for details.
 
 `processing_metadata` is a JSON field that stores what FFprobe extracted about the raw video: `{"duration_seconds": 3600, "width": 1920, "height": 1080, "codec": "h264", "bitrate": 5000000}`. The worker uses this to skip transcoding to qualities higher than the source resolution (no upscaling).
 
@@ -120,17 +123,17 @@ The `processing_status` field tracks exactly where the video is in the pipeline:
 
 ## The `refresh_tokens` Table
 
-Defined in `backend/app/models/tokens.py`. Access tokens are stateless JWTs — we don't store them. But refresh tokens are different.
+Defined in `backend/app/models/tokens.py`. Access tokens are stateless JWTs - we don't store them. But refresh tokens are different.
 
 A refresh token is long-lived (7 days) and lets users get new access tokens without logging in again. The problem with stateless refresh tokens: you can't revoke them (you can't "unsign" a JWT). The solution: store them in the database.
 
-But we don't store the token itself — we store a **SHA256 hash** of it. This way, even if the database is compromised, the tokens can't be used (you'd need the original string to make API calls).
+But we don't store the token itself - we store a **SHA256 hash** of it. This way, even if the database is compromised, the tokens can't be used (you'd need the original string to make API calls).
 
 ```python
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(String, ForeignKey("users.id"))
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"))
     token_hash = Column(String, nullable=False, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     is_revoked = Column(Boolean, default=False)
@@ -155,6 +158,30 @@ Defined in `backend/app/models/password_reset.py`. Similar to email verification
 
 The token is stored in the DB, and the `used` flag prevents replay. After a successful password reset, all refresh tokens for that user are also revoked (logged out of all devices).
 
+This is the one table with no dedicated Alembic migration - it only exists via `Base.metadata.create_all()` running on API startup. Every other token table was added through a versioned migration; this one wasn't, which is worth knowing if you're ever tracing why the migration history doesn't account for it.
+
+---
+
+## The `tus_uploads` Table
+
+Defined in `backend/app/models/tus_upload.py`. Tracks a resumable (tusd) upload from the moment it's admitted through to completion or termination - see [15_RESUMABLE_UPLOADS.md](./15_RESUMABLE_UPLOADS.md) for the full feature.
+
+```python
+class TusUpload(Base):
+    __tablename__ = "tus_uploads"
+
+    upload_id = Column(String, primary_key=True)  # tusd's own upload ID
+    user_id = Column(String(100), ForeignKey("users.id"), nullable=False, index=True)
+    video_id = Column(String, ForeignKey("videos.id"), nullable=True, index=True)  # set on post-finish
+    object_key = Column(String(500), nullable=True)  # final MinIO key, set on post-finish
+    declared_size = Column(BigInteger, nullable=False)
+    status = Column(String(30), default="created", index=True)  # created|completed|failed|terminated
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+```
+
+`video_id` starts `null` - the row is created in the pre-create hook, before tusd has assembled the file or FastAPI has any video metadata beyond title/category. It's populated once the post-finish hook creates the actual `Video` row.
+
 ---
 
 ## Table Relationships
@@ -164,6 +191,8 @@ users ──────────< videos               (one user → many vi
 users ──────────< refresh_tokens       (one user → many sessions)
 users ──────────< email_verification_tokens
 users ──────────< password_reset_tokens
+users ──────────< tus_uploads
+videos ─────────< tus_uploads          (nullable - one video → at most one originating upload)
 ```
 
 All foreign keys reference `users.id` (UUID string).
@@ -174,28 +203,29 @@ All foreign keys reference `users.id` (UUID string).
 
 The Alembic migrations tell the story of how the schema evolved:
 
-1. **`e28f8af22e7f`** — initial tables: `users`, `refresh_tokens`, `videos`. The original `videos` table looked quite different: `video_url` (not `raw_video_path`), an integer `duration` column, plus `is_public`, `status`, `views_count`, `likes_count` — no category, no metadata, no processing fields yet.
-2. **`34419c05503e`** — added `email_verification_tokens` table
-3. **`c8a105f8d90a`** — added video metadata fields: `category`, `age_rating`, `release_date`, `director`, `cast`, `tags` (JSON). Backfills `category='uncategorized'` and `tags='[]'` for existing rows before making `category` `NOT NULL`.
-4. **`2944b960c15e`** — added `raw_video_path` (`NOT NULL`), `processing_status`, `processing_metadata`, `processing_error`, `manifest_url`, `available_qualities` — and **dropped** the old `video_url` and `duration` columns. This is the migration that retired `video_url` in favor of `raw_video_path`; any documentation or code still referencing `video_url` predates this and is describing dead schema.
-5. **`4838fc1c2ea9`** — added `celery_task_id` to `videos`
-6. **`4933c49d2a23`** — added `deleted_at` (soft-delete marker) to `videos`
-7. **`bdc80bbbc0c9`** — added `storyboard_url` to `videos` (current head)
+1. **`e28f8af22e7f`** - initial tables: `users`, `refresh_tokens`, `videos`. The original `videos` table looked quite different: `video_url` (not `raw_video_path`), an integer `duration` column, plus `is_public`, `status`, `views_count`, `likes_count` - no category, no metadata, no processing fields yet.
+2. **`34419c05503e`** - added `email_verification_tokens` table
+3. **`c8a105f8d90a`** - added video metadata fields: `category`, `age_rating`, `release_date`, `director`, `cast`, `tags` (JSON). Backfills `category='uncategorized'` and `tags='[]'` for existing rows before making `category` `NOT NULL`.
+4. **`2944b960c15e`** - added `raw_video_path` (`NOT NULL`), `processing_status`, `processing_metadata`, `processing_error`, `manifest_url`, `available_qualities` - and **dropped** the old `video_url` and `duration` columns. This is the migration that retired `video_url` in favor of `raw_video_path`; any documentation or code still referencing `video_url` predates this and is describing dead schema.
+5. **`4838fc1c2ea9`** - added `celery_task_id` to `videos`
+6. **`4933c49d2a23`** - added `deleted_at` (soft-delete marker) to `videos`
+7. **`bdc80bbbc0c9`** - added `storyboard_url` to `videos`
+8. **`f4a7c1e9b2d6`** - added the `tus_uploads` table (current head), purely additive, nothing altered or dropped on any existing table
 
-Each migration represents a feature being added to the system. Reading them in order is a useful way to understand what was built and when — notably, the `is_public` column has been present since migration 1 and was simply unused by the UI until the admin visibility toggle was built; no schema change was needed to add that feature, only a new endpoint and a frontend control.
+Each migration represents a feature being added to the system. Reading them in order is a useful way to understand what was built and when - notably, the `is_public` column has been present since migration 1 and was simply unused by the UI until the admin visibility toggle was built; no schema change was needed to add that feature, only a new endpoint and a frontend control.
 
 ---
 
 ## Future Upgrades
 
-- **Categories table** — currently `category` is just a string field on videos. A proper `categories` table with slug, name, and description would enable better browsing and admin management.
-- **Tags table** — move tags from a JSON array to a proper many-to-many `video_tags` table for queryability.
-- **Comments table** — `user_id`, `video_id`, `content`, `created_at`. The frontend UI exists, the backend doesn't.
-- **Watch history table** — `user_id`, `video_id`, `watched_at`, `progress_seconds`. Needed for "continue watching" and AI recommendations.
-- **Playlists table** — curated collections of videos.
+- **Categories table** - currently `category` is just a string field on videos. A proper `categories` table with slug, name, and description would enable better browsing and admin management.
+- **Tags table** - move tags from a JSON array to a proper many-to-many `video_tags` table for queryability.
+- **Comments table** - `user_id`, `video_id`, `content`, `created_at`. The frontend UI exists, the backend doesn't.
+- **Watch history table** - `user_id`, `video_id`, `watched_at`, `progress_seconds`. Needed for "continue watching" and AI recommendations.
+- **Playlists table** - curated collections of videos.
 
 ---
 
 ## What's Next
 
-Now that you know what data we store and why, let's see the first real feature built on top of this schema: the authentication system — how users sign up, verify their email, log in, and stay logged in across sessions.
+Now that you know what data we store and why, let's see the first real feature built on top of this schema: the authentication system - how users sign up, verify their email, log in, and stay logged in across sessions.

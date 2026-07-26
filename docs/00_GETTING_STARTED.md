@@ -1,6 +1,6 @@
-# 00 — Getting Started
+# 00 - Getting Started
 
-Welcome to the VOD platform. This is a full-stack Video on Demand application where admins upload videos, the system automatically transcodes them into streamable HLS format at multiple quality levels, and authenticated users watch them on demand. If you're a new developer — or returning after some time away — this guide gets you from zero to a running local stack.
+Welcome to the VOD platform. This is a full-stack Video on Demand application where admins upload videos, the system automatically transcodes them into streamable HLS format at multiple quality levels, and authenticated users watch them on demand. If you're a new developer - or returning after some time away - this guide gets you from zero to a running local stack.
 
 ---
 
@@ -8,9 +8,9 @@ Welcome to the VOD platform. This is a full-stack Video on Demand application wh
 
 Make sure you have these installed before you begin:
 
-- **Docker and Docker Compose** — every backend service runs in containers (PostgreSQL, Redis, MinIO, FastAPI, Celery, Caddy). You don't need any of these installed locally.
-- **Node.js 18+ and pnpm** — the frontend (Next.js) runs locally, not in Docker. Install pnpm with `npm install -g pnpm`.
-- **Git** — to clone the repo.
+- **Docker and Docker Compose** - every backend service runs in containers (PostgreSQL, Redis, MinIO, FastAPI, Celery, Caddy, tusd). You don't need any of these installed locally.
+- **Node.js 20.9+ and pnpm** - the frontend (Next.js 16) runs locally, not in Docker. Install pnpm with `npm install -g pnpm`.
+- **Git** - to clone the repo.
 
 You do **not** need Python, FFmpeg, PostgreSQL, or Redis installed on your machine. FFmpeg runs inside the Celery worker container.
 
@@ -23,7 +23,7 @@ git clone <repo-url>
 cd vod-app
 ```
 
-Two config files need to be copied before the stack starts. Neither is tracked in git (for good reason — they contain secrets):
+Two config files need to be copied before the stack starts. Neither is tracked in git (for good reason - they contain secrets):
 
 ```bash
 # The main environment file
@@ -35,8 +35,8 @@ cp infra/caddy/Caddyfile.example infra/caddy/Caddyfile.local
 
 Open `infra/local.env` in your editor. Most values have working defaults for local dev. The one you should know about:
 
-- **`RESEND_API_KEY`** — Leave this as `dummy_key` to start. The app runs fine, but verification and password reset emails won't actually send. Sign up for a free Resend account if you want real email.
-- **`JWT_SECRET_KEY`** — The placeholder is fine for local dev. For production, generate a real one: `openssl rand -hex 32`.
+- **`RESEND_API_KEY`** - Leave this as `dummy_key` to start. The app runs fine, but verification and password reset emails won't actually send. Sign up for a free Resend account if you want real email.
+- **`JWT_SECRET_KEY`** - The placeholder is fine for local dev. For production, generate a real one: `openssl rand -hex 32`.
 - Everything else (database passwords, MinIO credentials, Redis password) has a working local default.
 
 ---
@@ -49,18 +49,18 @@ From the project root:
 make dev
 ```
 
-This starts every backend service using the local Docker Compose configuration. On first run it will pull images and build the API and worker containers — expect a few minutes. Subsequent starts are fast.
+This starts every backend service using the local Docker Compose configuration. On first run it will pull images and build the API and worker containers - expect a few minutes. Subsequent starts are fast.
 
 ### What's Running After `make dev`
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| API (via Caddy proxy) | http://localhost | — |
-| Swagger / OpenAPI docs | http://localhost/docs | — |
+| API (via Caddy proxy) | http://localhost | - |
+| Swagger / OpenAPI docs | http://localhost/docs | - |
 | MinIO console | http://localhost:9001 | minioadmin / minioadmin123 |
 | pgAdmin (DB browser) | http://localhost:5050 | admin@local.dev / admin |
-| Flower (Celery monitor) | http://localhost:5555 | — |
-| RedisInsight | http://localhost:5540 | — |
+| Flower (Celery monitor) | http://localhost:5555 | - |
+| RedisInsight | http://localhost:5540 | - |
 
 The Caddy reverse proxy listens on port 80 and routes all requests to the FastAPI backend running on port 8000 inside Docker. The frontend talks to Caddy, not directly to FastAPI.
 
@@ -84,16 +84,24 @@ Create `app/.env.local` to tell the frontend where the API is:
 NEXT_PUBLIC_API_URL=http://localhost
 ```
 
-This points at Caddy on port 80. You can also use `http://localhost:8000` to bypass Caddy and go directly to FastAPI — either works for local dev.
+This points at Caddy on port 80. You can also use `http://localhost:8000` to bypass Caddy and go directly to FastAPI - either works for local dev.
+
+Optionally, add a second variable to control which admin upload form renders - see [15_RESUMABLE_UPLOADS.md](./15_RESUMABLE_UPLOADS.md):
+
+```
+NEXT_PUBLIC_UPLOADS_TUS_ENABLED=true
+```
+
+It defaults to `true` when unset, so the resumable upload form is what you'll see out of the box.
 
 ---
 
 ## Verifying Everything Works
 
-1. **http://localhost:3000** — the browse feed should appear (the root route is the public video feed; it'll be empty until an admin uploads something)
-2. **http://localhost/docs** — Swagger UI loads with all API endpoints
-3. Hit `GET /health` in Swagger — it should return `{"status": "ok"}`
-4. **http://localhost:9001** — MinIO console loads with the minioadmin credentials
+1. **http://localhost:3000** - the browse feed should appear (the root route is the public video feed; it'll be empty until an admin uploads something)
+2. **http://localhost/docs** - Swagger UI loads with all API endpoints
+3. Hit `GET /health` in Swagger - it should return `{"status": "Ok!"}`
+4. **http://localhost:9001** - MinIO console loads with the minioadmin credentials
 5. Register a test account at http://localhost:3000/auth/sign-up
 
 If the API fails to start, run `make logs s=api` to see the error. If MinIO isn't reachable, check that ports 9000 and 9001 are free.
@@ -106,13 +114,13 @@ The `makefile` at the project root is your day-to-day interface with the stack:
 
 ```bash
 make dev              # Start all containers (local compose, includes monitoring tools)
-make build            # Rebuild Docker images — run this after changing Python dependencies
+make build            # Rebuild Docker images - run this after changing Python dependencies
 make logs s=api       # Tail logs for a service. s=worker, s=postgres, s=redis also work
-make shell            # Bash into the API container — use this to run Alembic migrations
+make shell            # Bash into the API container - use this to run Alembic migrations
 make db               # Open a psql session inside the PostgreSQL container
 make down             # Stop all containers
 make restart          # Stop then start (make down + make dev)
-make clean            # Stop containers AND delete volumes — you lose all stored data
+make clean            # Stop containers AND delete volumes - you lose all stored data
 ```
 
 When you add a new Python package to `requirements.txt`, you must run `make build` (not just `make dev`) so Docker rebuilds the image with the new dependency.
@@ -149,4 +157,4 @@ One thing to know right away: the Docker Compose `depends_on` setting only waits
 
 ## What's Next
 
-Now that your stack is running and you can reach the app, the next document steps back and explains the full architecture — what each service does, why we made the technology choices we did, and how data flows through the system from an admin's upload all the way to a user pressing play.
+Now that your stack is running and you can reach the app, the next document steps back and explains the full architecture - what each service does, why we made the technology choices we did, and how data flows through the system from an admin's upload all the way to a user pressing play.

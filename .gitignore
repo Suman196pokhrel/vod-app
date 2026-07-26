@@ -102,6 +102,8 @@ CLAUDE.md
 PREPROD_AUDIT.md
 # Superpowers brainstorming companion
 .superpowers/
+docs/superpowers/
+docs/design-system-reference/
 
 
 files.zip

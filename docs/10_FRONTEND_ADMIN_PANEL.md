@@ -1,4 +1,4 @@
-# 10 — Frontend: Admin Panel
+# 10 - Frontend: Admin Panel
 
 The home feed and watch page are for viewers. The admin panel is where the people managing the platform live. This document covers the admin panel's structure, what's actually wired up to the backend, and where the gaps are.
 
@@ -6,7 +6,7 @@ The home feed and watch page are for viewers. The admin panel is where the peopl
 
 ## Access Control
 
-The admin panel lives at `/admin` — the only route still under the `(protected)` group since the public-browse restructure covered in [07_FRONTEND_FOUNDATION.md](./07_FRONTEND_FOUNDATION.md). `app/(protected)/admin/layout.tsx` checks the authenticated user's role and **redirects non-admins to `/`** (the browse feed is the root route now, not `/home`):
+The admin panel lives at `/admin` - the only route still under the `(protected)` group since the public-browse restructure covered in [07_FRONTEND_FOUNDATION.md](./07_FRONTEND_FOUNDATION.md). `app/(protected)/admin/layout.tsx` checks the authenticated user's role and **redirects non-admins to `/`** (the browse feed is the root route now, not `/home`):
 
 ```typescript
 useEffect(() => {
@@ -20,7 +20,7 @@ useEffect(() => {
 }, [isLoading, isAuthenticated, user, router])
 ```
 
-This is client-side enforcement only — there is no Next.js `middleware.ts` in this codebase. The backend API endpoints for admin operations (`GET /videos/list-all`, delete, visibility, edit-details, download-url) also require `role = ADMIN` via the `get_current_admin_user` dependency, so a malicious user can't bypass this by calling the API directly.
+This is client-side enforcement only - there is no Next.js `middleware.ts` in this codebase. The backend API endpoints for admin operations (`GET /videos/list-all`, delete, visibility, edit-details, download-url) also require `role = ADMIN` via the `get_current_admin_user` dependency, so a malicious user can't bypass this by calling the API directly.
 
 ---
 
@@ -51,24 +51,24 @@ The dashboard shows overview stats (total videos, total users, videos processing
 
 This is the most functional admin page. It displays all videos with their processing status, upload dates, view counts, and controls to manage them.
 
-The page calls `GET /videos/list-all` (admin only) which returns paginated videos with full metadata including processing status. This is the most fully-wired admin page — video management, not just video *listing*.
+The page calls `GET /videos/list-all` (admin only) which returns paginated videos with full metadata including processing status. This is the most fully-wired admin page - video management, not just video *listing*.
 
 Features:
-- **List/table view** of all videos with status badges (queued, transcoding, completed, failed — collapsed to a three-state visual language: neutral+static for queued/completed, cyan+pulsing for actively processing, destructive for failed)
+- **List/table view** of all videos with status badges (queued, transcoding, completed, failed - collapsed to a three-state visual language: neutral+static for queued/completed, cyan+pulsing for actively processing, destructive for failed)
 - **Search** by title
 - **Filter** by processing status
 - **Sort** by date or views
 - **Pagination** controls
 - **Per-row actions menu** (`VideoActionsCell.tsx`):
-  - **Preview Video** — disabled until `manifest_url` exists
-  - **Edit Details** — opens a dialog driving `PATCH /videos/by-id/{video_id}`, a partial update (title, description, category, age rating, release date, director, cast, tags, status)
-  - **Make Private / Make Public** — toggles `is_public` via `PATCH /videos/by-id/{video_id}/visibility`, independent of the `status` field
-  - **View Details** — read-only detail dialog
-  - **Download** — fetches a presigned MinIO URL (`GET /videos/by-id/{video_id}/download-url`, 15-minute expiry) and triggers a browser download of the original source file
+  - **Preview Video** - disabled until `manifest_url` exists
+  - **Edit Details** - opens a dialog driving `PATCH /videos/by-id/{video_id}`, a partial update (title, description, category, age rating, release date, director, cast, tags, status)
+  - **Make Private / Make Public** - toggles `is_public` via `PATCH /videos/by-id/{video_id}/visibility`, independent of the `status` field
+  - **View Details** - read-only detail dialog
+  - **Download** - fetches a presigned MinIO URL (`GET /videos/by-id/{video_id}/download-url`, 15-minute expiry) and triggers a browser download of the original source file
   - **Copy Link** / **Copy ID**
-  - **Delete Video** — a confirmation dialog that's explicit about the semantics: *"This removes the video from browsing, search, and playback everywhere. The underlying files are kept in storage, not erased."* It calls `DELETE /videos/by-id/{video_id}`, which **soft-deletes** (sets `deleted_at`) rather than actually removing anything.
+  - **Delete Video** - a confirmation dialog that's explicit about the semantics: *"This removes the video from browsing, search, and playback everywhere. The underlying files are kept in storage, not erased."* It calls `DELETE /videos/by-id/{video_id}`, which **soft-deletes** (sets `deleted_at`) rather than actually removing anything.
 
-An earlier revision of this document described a crash here: the delete endpoint referenced a `video.video_url` field that doesn't exist on the model. That's resolved — delete is now a soft delete that only ever touches `deleted_at`, and doesn't go near `raw_video_path`/`video_url` at all. See [05_VIDEO_UPLOAD.md](./05_VIDEO_UPLOAD.md) for where that old field reference still exists (in dead, unreachable code) versus where it doesn't.
+An earlier revision of this document described a crash here: the delete endpoint referenced a `video.video_url` field that doesn't exist on the model. That's resolved - delete is now a soft delete that only ever touches `deleted_at`, and doesn't go near `raw_video_path`/`video_url` at all. See [05_VIDEO_UPLOAD.md](./05_VIDEO_UPLOAD.md) for where that old field reference still exists (in dead, unreachable code) versus where it doesn't.
 
 All row-action mutations go through TanStack Query, invalidating the video list query on success so the table reflects the change immediately.
 
@@ -93,7 +93,7 @@ Shows a table of all registered users with their email, username, role, verifica
 - Filtering by role (admin/user)
 - Suspending/activating accounts
 
-The backend for user management operations (list users, update role, suspend account) needs to be confirmed — the endpoints may exist but the frontend wiring is incomplete for the write operations. The `GET /users/` endpoint for listing all users is not documented in the current route files (only `GET /user/profile` exists). This likely needs a new admin users endpoint on the backend.
+The backend for user management operations (list users, update role, suspend account) needs to be confirmed - the endpoints may exist but the frontend wiring is incomplete for the write operations. The `GET /users/` endpoint for listing all users is not documented in the current route files (only `GET /user/profile` exists). This likely needs a new admin users endpoint on the backend.
 
 ---
 
@@ -117,7 +117,7 @@ Everything is hardcoded mock data. There are no backend analytics endpoints. Wir
 
 **`app/(protected)/admin/categories/page.tsx`**
 
-A management view for the platform's categories, restyled onto the same dark/cyan design system as the rest of the admin panel — including a 12-icon morph-picker (`CategoryDialog.tsx`) drawing from the same shared icon registry (`lib/icons/categoryIcons.ts`) that powers the home page's `CategoryPills` filter. Visually this is one of the more polished admin surfaces.
+A management view for the platform's categories, restyled onto the same dark/cyan design system as the rest of the admin panel - including a 12-icon morph-picker (`CategoryDialog.tsx`) drawing from `lib/icons/categoryIcons.ts`. That registry is admin-only now; the home page's `CategoryPills` filter (see [09_FRONTEND_HOME_AND_WATCH.md](./09_FRONTEND_HOME_AND_WATCH.md)) was rewritten as plain-text pills with no icons and doesn't import it. Visually this admin page is still one of the more polished admin surfaces.
 
 It's still not backed by real persistence, though: `category` remains a plain string column on `Video` (see [03_DATABASE_MODELS.md](./03_DATABASE_MODELS.md)), not a database table, and there's no CRUD API behind this page. Implementing this properly would still require:
 1. A backend `categories` table with name, slug, icon, and description
@@ -149,26 +149,26 @@ The left navigation for the admin panel. Links to all admin sections. The sideba
 | Role-based redirect (non-admins → `/`) | Working |
 | Video list (`GET /videos/list-all`) | Working |
 | Video edit details, visibility toggle, download URL | Working |
-| Video delete | Working — soft delete via `deleted_at`; the old `video_url` crash is resolved |
+| Video delete | Working - soft delete via `deleted_at`; the old `video_url` crash is resolved |
 | Dashboard stats | Mock data |
 | User management table | Mock data (no admin user-listing endpoint exists) |
 | Analytics charts | Mock data |
-| Categories management UI | Restyled, real icon-picker UX — but no backend table/CRUD behind it; `category` is still a string field |
+| Categories management UI | Restyled, real icon-picker UX - but no backend table/CRUD behind it; `category` is still a string field |
 | Settings save | No API call |
 
 ---
 
 ## Future Upgrades
 
-- **Admin user management API** — `GET /admin/users` with filtering and pagination; `PUT /admin/users/{id}` to update role or active status
-- **Real analytics** — start with simple DB aggregations on the videos table; graduate to event streaming for real-time dashboards
-- **Categories as proper entities** — database table, CRUD endpoints, frontend integration
-- **Bulk operations** — select multiple videos to delete, publish, or archive at once
-- **Processing queue view** — show which videos are currently being processed and their stage
-- **Audit log** — track admin actions (who deleted what, when)
+- **Admin user management API** - `GET /admin/users` with filtering and pagination; `PUT /admin/users/{id}` to update role or active status
+- **Real analytics** - start with simple DB aggregations on the videos table; graduate to event streaming for real-time dashboards
+- **Categories as proper entities** - database table, CRUD endpoints, frontend integration
+- **Bulk operations** - select multiple videos to delete, publish, or archive at once
+- **Processing queue view** - show which videos are currently being processed and their stage
+- **Audit log** - track admin actions (who deleted what, when)
 
 ---
 
 ## What's Next
 
-The admin panel is how content gets managed. The video upload form is how content gets created. The next document focuses on the upload flow from the admin's perspective — the upload form component, how it submits to the API, and the real-time progress tracking that follows.
+The admin panel is how content gets managed. The video upload form is how content gets created. The next document focuses on the upload flow from the admin's perspective - the upload form component, how it submits to the API, and the real-time progress tracking that follows.
