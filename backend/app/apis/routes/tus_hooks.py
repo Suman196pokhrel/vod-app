@@ -2,6 +2,7 @@
 import hmac
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.dependencies import get_current_admin_user
@@ -39,18 +40,27 @@ async def handle_tus_hook(request: Request, secret: str = ""):
     event_type = payload.get("Type")
     event = payload.get("Event", {})
 
+    # handle_tus_hook must stay async def (it awaits request.json() above),
+    # but the dispatch targets below do blocking sync I/O (SessionLocal /
+    # psycopg2, redis-py). An async def route runs directly on the event
+    # loop, so blocking here would stall every other concurrent request the
+    # API process is handling — not just this one. run_in_threadpool moves
+    # the blocking work off the loop, same effect FastAPI gives a plain
+    # `def` route automatically (see get_tus_upload_status below, and
+    # app/core/dependencies.py's get_current_user for the existing pattern
+    # this repo already uses).
     if event_type == "pre-create":
-        return tus_service.handle_pre_create(event)
+        return await run_in_threadpool(tus_service.handle_pre_create, event)
     if event_type == "post-finish":
-        return tus_service.handle_post_finish(event)
+        return await run_in_threadpool(tus_service.handle_post_finish, event)
     if event_type == "post-terminate":
-        return tus_service.handle_post_terminate(event)
+        return await run_in_threadpool(tus_service.handle_post_terminate, event)
 
     return {"RejectUpload": False}
 
 
 @tus_hooks_router.get("/uploads/{upload_id}", dependencies=[Depends(_require_tus_enabled)])
-async def get_tus_upload_status(
+def get_tus_upload_status(
     upload_id: str,
     current_user: User = Depends(get_current_admin_user),
 ):
