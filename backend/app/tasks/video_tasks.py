@@ -108,7 +108,7 @@ def prepare_video(self, video_id:str):
         # No retry for metadata extraction if file is corrupt , retrying wont help
         with get_db_session() as db:
             update_video_processing_status(
-                    db, video_id, "Failed",f"{str(e)}"
+                    db, video_id, "failed",f"{str(e)}"
                 )
             raise
 
@@ -417,7 +417,7 @@ def transcode_quality(self, data:dict, quality:str):
         except Exception as e:
             with get_db_session() as db:
                 update_video_processing_status(
-                        db, video_id, "Failed",f"{str(e)}"
+                        db, video_id, "failed",f"{str(e)}"
                     )
 
             return None
@@ -452,7 +452,7 @@ def on_transcode_complete(self, results: list):
         logger.error("All transcoding tasks failed!")
         with get_db_session() as db:
             update_video_processing_status(
-                    db, video_id, "Failed",f"All transcoding tasks failed!"
+                    db, video_id, "failed",f"All transcoding tasks failed!"
                 )
         raise Exception("No successful transcodes - cannot continue workflow")
 
