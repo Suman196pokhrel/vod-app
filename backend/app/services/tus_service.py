@@ -137,7 +137,21 @@ def handle_pre_create(event: dict) -> dict:
         db.close()
 
     admit_upload(upload_id)
-    return {"RejectUpload": False, "ChangeFileInfo": {"ID": upload_id}}
+    return {
+        "RejectUpload": False,
+        "ChangeFileInfo": {
+            "ID": upload_id,
+            # ChangeFileInfo.MetaData REPLACES tusd's stored metadata going
+            # forward (not merges) — so this must retain everything except
+            # token, not just omit it. Without this, the admin's access JWT
+            # rides through to tusd's S3-store .info sidecar object (and, per
+            # empirical testing, the S3 data object's own user-metadata too),
+            # sitting in MinIO in plaintext for as long as that object exists
+            # (tusd doesn't clean these up automatically). title/category are
+            # still read from this same replaced map by handle_post_finish.
+            "MetaData": {k: v for k, v in metadata.items() if k != "token"},
+        },
+    }
 
 
 def handle_post_finish(event: dict) -> dict:
