@@ -172,6 +172,22 @@ export function TusUploadForm() {
         toast.error("Couldn't save video details — you can set them later from Edit Details.")
       }
 
+      // Clear Uppy's internal file store on success — without this,
+      // restrictions.maxNumberOfFiles: 1 silently rejects every subsequent
+      // addFile() for the rest of the page's lifetime (the Uppy instance is
+      // created once per mount), and Uppy signals that rejection via a
+      // "restriction-failed" event, not "error"/"upload-error", so it was
+      // going completely unsurfaced: the Upload button would look like it
+      // does nothing on a second video.
+      try {
+        uppyRef.current?.clear()
+      } catch {
+        // no-op: only throws if an upload is still in progress, which it
+        // isn't here — the upload just completed.
+      }
+      fileIdRef.current = null
+      thumbnailFileRef.current = null
+
       setPhase("idle")
       form.reset()
       setVideoFile(null)
@@ -187,6 +203,14 @@ export function TusUploadForm() {
     uppy.on("upload-error", (_file, error) => {
       setPhase("error")
       toast.error("Upload failed", { description: error.message })
+    })
+
+    // Restriction violations (e.g. a stale file still in Uppy's store from
+    // maxNumberOfFiles: 1) surface here, not via "error"/"upload-error" —
+    // without this listener they fail completely silently.
+    uppy.on("restriction-failed", (_file, error) => {
+      setPhase("error")
+      toast.error("Couldn't start upload", { description: error.message })
     })
 
     uppyRef.current = uppy
@@ -215,18 +239,28 @@ export function TusUploadForm() {
     thumbnailFileRef.current = thumbnailFile
 
     const token = tokenManager.getAccessToken() || ""
-    const fileId = uppyRef.current.addFile({
-      name: videoFile.name,
-      type: videoFile.type,
-      data: videoFile,
-      meta: { token, title: data.title, category: data.category, filetype: videoFile.type },
-    })
-    fileIdRef.current = fileId
-    lastProgressRef.current = { bytes: 0, time: Date.now() }
-    setProgress({ percent: 0, uploaded: 0, total: 0 })
-    setSpeedBytesPerSec(0)
-    setPhase("uploading")
-    uppyRef.current.upload()
+    try {
+      const fileId = uppyRef.current.addFile({
+        name: videoFile.name,
+        type: videoFile.type,
+        data: videoFile,
+        meta: { token, title: data.title, category: data.category, filetype: videoFile.type },
+      })
+      fileIdRef.current = fileId
+      lastProgressRef.current = { bytes: 0, time: Date.now() }
+      setProgress({ percent: 0, uploaded: 0, total: 0 })
+      setSpeedBytesPerSec(0)
+      setPhase("uploading")
+      uppyRef.current.upload().catch((error: Error) => {
+        setPhase("error")
+        toast.error("Upload failed", { description: error.message })
+      })
+    } catch {
+      // addFile() throws synchronously on a restriction violation (e.g. a
+      // stale file already in Uppy's store) — the "restriction-failed"
+      // listener above already surfaces a toast for this same error; catch
+      // here only to stop it propagating as an uncaught exception.
+    }
   }
 
   const handleTogglePause = () => {
