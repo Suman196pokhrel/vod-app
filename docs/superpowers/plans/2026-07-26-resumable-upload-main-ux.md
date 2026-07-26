@@ -1221,6 +1221,8 @@ This is the core of the feature: the full metadata form (reusing the existing se
       })
       fileIdRef.current = fileId
       lastProgressRef.current = { bytes: 0, time: Date.now() }
+      setProgress({ percent: 0, uploaded: 0, total: 0 })
+      setSpeedBytesPerSec(0)
       setPhase("uploading")
       uppyRef.current.upload()
     }
@@ -1239,6 +1241,9 @@ This is the core of the feature: the full metadata form (reusing the existing se
     // store (restrictions.maxNumberOfFiles: 1 would then reject the next
     // addFile call). Also reachable while idle, to remove a staged-but-not
     // -yet-submitted file — fileIdRef is null then, so removeFile is skipped.
+    // progress/speedBytesPerSec are reset here too (not just at the next
+    // onSubmit) so a fresh file selection right after a failure never has a
+    // window to render leftover numbers from the failed attempt.
     const handleRemoveFile = () => {
       if (fileIdRef.current && uppyRef.current) {
         try {
@@ -1251,6 +1256,8 @@ This is the core of the feature: the full metadata form (reusing the existing se
       thumbnailFileRef.current = null
       setVideoFile(null)
       setPhase("idle")
+      setProgress({ percent: 0, uploaded: 0, total: 0 })
+      setSpeedBytesPerSec(0)
     }
 
     const handleSaveDraft = async () => {
