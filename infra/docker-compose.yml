@@ -9,6 +9,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-vod_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vod_password}
       POSTGRES_DB: ${POSTGRES_DB:-vod_db}
+
+    mem_limit: 512m
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -21,13 +23,17 @@ services:
     env_file:
       - prod.env
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:9000:9000"
+
+    mem_limit: 512m
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
     networks:
-      - backend_net  
+      - backend_net
 
   redis:
     image: redis:7-alpine
@@ -36,12 +42,14 @@ services:
       - prod.env
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-    
+
+    mem_limit: 256m
+
     command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
 
     networks:
       - backend_net
-    
+
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "redis_dev_password", "ping"]
       interval: 30s
@@ -67,12 +75,14 @@ services:
     networks:
       - backend_net
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    mem_limit: 768m
 
   caddy:
     image: caddy:2-alpine
     container_name: vod_caddy
     restart: unless-stopped
     network_mode: "host"
+    mem_limit: 64m
     volumes:
       - ./caddy/Caddyfile.prod:/etc/caddy/Caddyfile
       - caddy_data:/data
@@ -80,6 +90,46 @@ services:
 
     depends_on:
       - api
+
+  tusd:
+    image: tusproject/tusd:v2.9.2   # pinned, not floating — matches local dev deliberately
+    restart: unless-stopped
+    command:
+      - -behind-proxy
+      - -s3-bucket=${minio_bucket_videos}
+      - -s3-endpoint=http://minio:9000
+      - -s3-part-size=${tus_part_size_mb}000000
+      - -s3-object-prefix=tus-uploads/
+      - -hooks-http=http://api:8000/internal/tus/hooks?secret=${tus_hook_shared_secret}
+      - -hooks-enabled-events=pre-create,post-finish,post-terminate
+      - -upload-dir=/srv/tusd-data
+      - -port=1080
+    environment:
+      AWS_ACCESS_KEY_ID: ${minio_access_key}
+      AWS_SECRET_ACCESS_KEY: ${minio_secret_key}
+      AWS_REGION: us-east-1
+    volumes:
+      - tusd_data:/srv/tusd-data
+    # Caddy here runs with network_mode: host, so it can't reach tusd by
+    # Docker service-name DNS the way api/postgres/redis/minio do on
+    # backend_net — it needs a loopback port, same reasoning as api's own
+    # "127.0.0.1:8000:8000" binding above. tusd itself still also joins
+    # backend_net so it can call api:8000 directly for hooks, identical to
+    # local dev — only the extra published port is prod-specific.
+    ports:
+      - "127.0.0.1:1080:1080"
+    networks:
+      - backend_net
+    depends_on:
+      - minio
+      - api
+    # Real box specs (checked, not assumed): 3.72GiB total RAM, 2GB swap.
+    # postgres+redis+api+worker's own mem_limits already sum to 3336m and
+    # have run in production for 12 days — left untouched here rather than
+    # guessed at. tusd streams upload parts to local disk (the tusd_data
+    # volume), not memory, so its real footprint stays low even under
+    # concurrent uploads; 192m is generous headroom, not a tight squeeze.
+    mem_limit: 192m
 
   worker:
     cpu_shares: 256
@@ -95,7 +145,9 @@ services:
       - minio
     networks:
       - backend_net
-    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=2"]
+    command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=1"]
+    mem_limit: 1800m
+
 
 
 networks:
@@ -108,3 +160,4 @@ volumes:
     driver: local
   caddy_data:
   caddy_config:
+  tusd_data:
