@@ -289,6 +289,34 @@ export const updateVideoDetails = async (
 };
 
 /**
+ * Attach a thumbnail to an already-created video — used by the resumable
+ * (tus) upload flow, where the video row exists before the thumbnail file
+ * does. The multipart flow sends its thumbnail inline via uploadVideo()
+ * instead and never calls this.
+ */
+export const uploadVideoThumbnail = async (
+  videoId: string,
+  file: File
+): Promise<Video> => {
+  try {
+    const formData = new FormData();
+    formData.append("thumbnail", file);
+    const response = await api.post<Video>(`/videos/${videoId}/thumbnail`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("[uploadVideoThumbnail] failed", { videoId, error });
+    if (error instanceof AxiosError) {
+      throw new Error(
+        error.response?.data?.detail || "Failed to upload thumbnail"
+      );
+    }
+    throw new Error("An unexpected error occurred while uploading the thumbnail");
+  }
+};
+
+/**
  * Get a short-lived presigned URL for downloading a video's original
  * source file. The URL carries Content-Disposition: attachment set by
  * MinIO itself, so navigating to it downloads the file instead of playing
