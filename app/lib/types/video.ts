@@ -49,6 +49,23 @@ export interface Video {
   user_username?: string | null;
 }
 
+// Shape actually returned by GET /videos/ and GET /user/me (backend's
+// VideoList schema) — deliberately narrower than Video above (no is_public,
+// status, processing_status, etc.), since those are admin-only fields the
+// public listing never sends.
+export interface PublicVideo {
+  id: string;
+  title: string;
+  category: string;
+  thumbnail_url: string | null;
+  age_rating: string | null;
+  views_count: number;
+  created_at: string;
+  user_id: string;
+  description: string | null;
+  tags: string[] | null;
+}
+
 // Partial update payload for the admin "Edit Details" form — every field
 // optional, only the ones actually changed need to be sent.
 export interface VideoDetailsUpdatePayload {

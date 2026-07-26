@@ -1,11 +1,10 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { getPublicVideos } from '@/lib/apis/video'
+import { usePublicVideos } from '@/hooks/video/use-public-videos'
 import { storageUrl } from './player/utils'
-import type { Video } from '@/lib/types/video'
 
 interface RelatedVideosProps {
   currentVideoId: string
@@ -17,24 +16,24 @@ const formatViews = (n: number) =>
 
 const RelatedVideos = ({ currentVideoId, category }: RelatedVideosProps) => {
   const router = useRouter()
-  const [videos, setVideos] = useState<Video[] | null>(null)
+  // Shares its cache entry with the browse page's Hero/Grid (same
+  // skip/limit) — navigating browse -> watch within staleTime reuses the
+  // already-fetched list instead of firing a new request.
+  const { data, isPending } = usePublicVideos(0, 20)
 
-  useEffect(() => {
-    getPublicVideos(0, 20)
-      .then((all: Video[]) => {
-        const others = all.filter((v) => v.id !== currentVideoId)
+  const videos = data
+    ? [...data]
+        .filter((v) => v.id !== currentVideoId)
         // Same-category videos first, then everything else.
-        others.sort((a, b) => Number(b.category === category) - Number(a.category === category))
-        setVideos(others.slice(0, 10))
-      })
-      .catch(() => setVideos([]))
-  }, [currentVideoId, category])
+        .sort((a, b) => Number(b.category === category) - Number(a.category === category))
+        .slice(0, 10)
+    : []
 
   return (
     <div className="space-y-3">
       <h2 className="text-xl">Related Videos</h2>
       <div className="space-y-3">
-        {videos === null &&
+        {isPending &&
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="space-y-2">
               <div className="skeleton aspect-video w-full rounded-lg" />
@@ -43,11 +42,11 @@ const RelatedVideos = ({ currentVideoId, category }: RelatedVideosProps) => {
             </div>
           ))}
 
-        {videos?.length === 0 && (
+        {!isPending && videos.length === 0 && (
           <p className="text-sm text-muted-foreground">No other videos yet.</p>
         )}
 
-        {videos?.map((video) => (
+        {videos.map((video) => (
           <button
             key={video.id}
             type="button"

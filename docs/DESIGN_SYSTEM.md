@@ -19,11 +19,17 @@ interface only speaks when touched — and when it speaks, it is fast and cyan.
 Influences (from reference research):
 - **MUBI** → surfaces, spacing, editorial ALL-CAPS metadata, separation by space not borders
 - **YouTube** → watch-page information stack (title → actions row → description → comments)
-- **Netflix** → confidence through scale and darkness (NOT its red, NOT its mega-hover)
+- **Netflix** → confidence through scale and darkness, embraced fully for the hero
+  banner and watch-page atmosphere (2026-07-27: cinematic pass) — large-scale
+  cinematic backdrops, edges that dissolve into the background rather than cut off,
+  page-wide ambient tint. Still explicitly **NOT** its red, and still **NOT** its
+  hover-preview/mega-expand card mechanic (autoplaying clip + expanding card on
+  hover) — that stays out of scope everywhere in this app; see the Motion table below.
 - **Twitch** → rejected: accent-by-coverage. Our accent works by contrast, not coverage.
 
 **Signature element:** the ambient glow — every watch page is tinted by the video's
-own artwork (see §6). This is the one place the design is allowed to be atmospheric.
+own artwork (see §6), and as of the cinematic pass, so is the browse-page hero.
+This is the one place the design is allowed to be atmospheric.
 
 ---
 
@@ -77,11 +83,16 @@ Full-round for avatars only.
 | `--duration-fast` | 150ms | hover, focus, small state |
 | `--duration-base` | 200ms | overlays, menus, controls reveal |
 | `--duration-slow` | 300ms | page-level transitions |
-| `--ease-out-quart` | `cubic-bezier(0.2, 0, 0, 1)` | the ONLY easing curve |
+| `--duration-cinematic` | 600ms | hero backdrop crossfade, ambient vignette fade — the hero/watch atmosphere ONLY, never an ordinary control |
+| `--ease-out-quart` | `cubic-bezier(0.2, 0, 0, 1)` | the ONLY easing curve — `--duration-cinematic` reuses it too, no second curve |
 
 Rules: every interactive element has a visible hover/focus response within 150ms.
-Card hover = `scale-[1.02]` + `bg-accent/60` wash + accent underline on title +
-pointer cursor. No parallax, no bounce, no Netflix mega-expand. Respect
+Card hover = `-translate-y-1` + `scale-[1.02]` + `bg-accent/60` wash + accent
+underline on title + deeper shadow (`shadow-2xl shadow-background/60`) at
+`--duration-base`, not `--duration-fast` — the cinematic pass slowed card hover
+by one token step for a more deliberate, premium feel. Still no parallax, no
+bounce, and still no Netflix mega-expand (autoplaying hover-preview clip +
+expanding card) — that interaction is explicitly out of scope. Respect
 `prefers-reduced-motion` (handled in globals).
 
 ### Loading
@@ -119,8 +130,10 @@ the content they replace. Spinners only inside buttons and the video player.
 | File | Demonstrates |
 |---|---|
 | `VideoPlayer.tsx` | watch surface (#000), cyan seek/progress, controls reveal timing, quality menu |
-| `VideoCard.tsx` | card surface, hover scale + accent underline, eyebrow metadata, skeleton |
-| `useAmbientColor.ts` | ambient tint extraction (§6) |
+| `VideoCard.tsx` | card surface, hover elevate + scale + accent underline, eyebrow metadata, skeleton |
+| `lib/motion/useAmbientColor.ts` | ambient tint extraction (§6) — shared by the watch page and the browse-page hero |
+| `lib/motion/useStaggeredReveal.ts` | cinematic content load-in — ref-returning GSAP hook, stagger-reveals a container's direct children, `prefers-reduced-motion`-safe. Used by `HeroSection.tsx` and the watch page |
+| `_components/HeroSection.tsx` | cinematic hero — real data via `usePublicVideos`, backdrop crossfade, ambient tint, vignette gradients |
 
 When restyling any other component, match these patterns before inventing new ones.
 
@@ -174,6 +187,17 @@ Constraints:
 - Fail silent: on CORS taint or error, `color` stays `null` and the page renders
   identically minus the glow. The glow is enhancement, never a dependency.
 - Opacity stays ≤ 0.2. The glow is felt, not seen.
+
+**Page-wide variant (`.ambient-glow-page`, added in the cinematic pass):** the
+watch page now also sets `--ambient` on its outermost wrapper (not just the
+player-local glow div), so a second, fainter, more heavily blurred layer
+(`opacity: 0.08`, `blur(120px)`, `fixed inset-0 -z-10`) can spread the same tint
+across the whole viewport instead of leaving it pooled around the player. Same
+`--ambient` variable, so the two layers always agree on color — never introduce
+a second color source for this. The hero's own ambient tint (`HeroSection.tsx`)
+is a simpler one-off `opacity-[0.16]` div reading `color` directly via inline
+style, since the hero doesn't need a second, page-wide layer the way the watch
+page's sidebar/info column does.
 
 ---
 

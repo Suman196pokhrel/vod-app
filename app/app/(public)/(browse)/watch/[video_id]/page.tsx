@@ -3,10 +3,11 @@
 import VideoPlayer from "./_components/player/VideoPlayer";
 import VideoInfo from "./_components/VideoInfo";
 import RelatedVideos from "./_components/RelatedVideos";
-import { use, useEffect, useState } from "react";
-import { getVideoById } from "@/lib/apis/video";
+import { use } from "react";
+import { useVideo } from "@/hooks/video/use-video";
 import { useTheaterMode } from "./_components/player/useTheaterMode";
-import { useAmbientColor } from "./_components/player/useAmbientColor";
+import { useAmbientColor } from "@/lib/motion/useAmbientColor";
+import { useStaggeredReveal } from "@/lib/motion/useStaggeredReveal";
 import { storageUrl } from "./_components/player/utils";
 
 // Width of the right sidebar (related videos column) — the only place
@@ -17,23 +18,17 @@ const SIDEBAR_WIDTH = "500px"
 
 const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
   const { video_id } = use(params)
-  const [video, setVideo] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: video, isError } = useVideo(video_id)
   const { theater, toggle: toggleTheater } = useTheaterMode()
   const { color } = useAmbientColor(
     video?.thumbnail_url ? storageUrl(video.thumbnail_url) : null
   )
+  const contentRef = useStaggeredReveal<HTMLDivElement>([video?.id])
 
-  useEffect(() => {
-    getVideoById(video_id)
-      .then(setVideo)
-      .catch(() => setError("Video not found"));
-  }, [video_id]);
-
-  if (error)
+  if (isError)
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface-watch p-8 text-muted-foreground">
-        {error}. Try going back and selecting another video.
+        Video not found. Try going back and selecting another video.
       </div>
     );
   if (!video)
@@ -62,12 +57,13 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
   // the width of its container changes (full page width in theater, the
   // grid's left column otherwise), height is capped identically so
   // toggling theater never changes vertical space, only horizontal.
+  // --ambient itself is set once, on the page wrapper below, and cascades
+  // down to this div along with .ambient-glow-page.
   const playerBlock = (
     <div className="relative w-full ">
       <div
         aria-hidden
         className="ambient-glow absolute -inset-8 -z-10 rounded-4xl"
-        style={{ "--ambient": color ?? "transparent" } as React.CSSProperties}
       />
       <VideoPlayer
         video={video}
@@ -79,7 +75,16 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
   );
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-surface-watch">
+    <div
+      className="min-h-screen overflow-x-clip bg-surface-watch"
+      style={{ "--ambient": color ?? "transparent" } as React.CSSProperties}
+    >
+      {/* Page-wide ambient — same signature tint as the player-local glow,
+          spread thin across the whole viewport so the cinematic atmosphere
+          reaches the page edges rather than staying pooled around the
+          player. Fixed + -z-10 so it never affects layout or scrolling. */}
+      <div aria-hidden className="ambient-glow-page fixed inset-0 -z-10" />
+
       {/* overflow-x-clip above clips the glow's intentional -inset-8 bleed
           so it can't push the page into horizontal scroll — `clip` (not
           `hidden`) so this div doesn't become a scroll container, which
@@ -91,6 +96,7 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
             tree position across theater toggles; only which grid cells
             it occupies changes, so playback never resets. */}
         <div
+          ref={contentRef}
           className="grid grid-cols-1 gap-6 pb-4 lg:grid-cols-[minmax(0,1fr)_var(--sidebar-w)] lg:pb-6"
           style={{ "--sidebar-w": SIDEBAR_WIDTH } as React.CSSProperties}
         >

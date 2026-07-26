@@ -4,20 +4,20 @@ import React from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { storageUrl } from "@/lib/utils/storage"
-import { Video } from "./VideoGrid"
+import { PublicVideo } from "@/lib/types/video"
 
 // 12500 → "12.5K", 12500000 → "12.5M"
 const formatViews = (n: number) =>
   Intl.NumberFormat("en", { notation: "compact" }).format(n)
 
-const VideoCard = ({ video }: { video: Video }) => {
+const VideoCard = ({ video }: { video: PublicVideo }) => {
   const router = useRouter()
 
   return (
     <button
       type="button"
       onClick={() => router.push(`/watch/${video.id}`)}
-      className="group -m-2 block w-full cursor-pointer rounded-xl p-2 text-left transition-all duration-(--duration-fast) ease-(--ease-out-quart) hover:scale-[1.02] hover:bg-accent/60 focus-visible:scale-[1.02] focus-visible:bg-accent/60"
+      className="group -m-2 block w-full cursor-pointer rounded-xl p-2 text-left transition-all duration-(--duration-base) ease-(--ease-out-quart) hover:-translate-y-1 hover:scale-[1.02] hover:bg-accent/60 hover:shadow-2xl hover:shadow-background/60 focus-visible:-translate-y-1 focus-visible:scale-[1.02] focus-visible:bg-accent/60"
     >
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden rounded-lg bg-card">
@@ -26,13 +26,17 @@ const VideoCard = ({ video }: { video: Video }) => {
             src={storageUrl(video.thumbnail_url)}
             alt={video.title}
             fill
-            className="object-cover transition-[filter] duration-(--duration-fast) ease-(--ease-out-quart) group-hover:brightness-110"
+            className="object-cover transition-[filter] duration-(--duration-base) ease-(--ease-out-quart) group-hover:brightness-110"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-xs text-subtle">
             No thumbnail
           </div>
         )}
+
+        {/* Bottom gradient — the thumbnail edge dissolves toward the card's
+            own info block instead of cutting off hard against it. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-background/70 to-transparent opacity-0 transition-opacity duration-(--duration-base) group-hover:opacity-100" />
 
         {/* Age rating badge */}
         {video.age_rating && (

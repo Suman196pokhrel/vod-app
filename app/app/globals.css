@@ -84,6 +84,11 @@
   --duration-fast: 150ms;   /* hover, focus, small state */
   --duration-base: 200ms;   /* overlays, menus, controls reveal */
   --duration-slow: 300ms;   /* page-level transitions */
+  /* Reserved for the hero/watch-page cinematic surfaces only (backdrop
+     crossfade, ambient vignette fade-in) — deliberately slower than the
+     three UI-interaction speeds above, which stay as the ceiling for every
+     ordinary hover/menu/control. Same easing curve, no new curve. */
+  --duration-cinematic: 600ms;
   --ease-out-quart: cubic-bezier(0.2, 0, 0, 1);
 
   /* ---- Ambient (set per watch page by useAmbientColor) --------------------- */
@@ -243,6 +248,19 @@
     opacity: 0.16;
     filter: blur(64px);
     transition: background var(--duration-slow) var(--ease-out-quart);
+    pointer-events: none;
+  }
+
+  /* Page-wide companion to .ambient-glow — the same signature tint, spread
+     across the whole watch page rather than just around the player, so the
+     cinematic atmosphere reaches the edges of the viewport. Fainter than
+     the player-local glow since it covers far more area; same --ambient
+     var, so both layers always agree on color. */
+  .ambient-glow-page {
+    background: var(--ambient);
+    opacity: 0.08;
+    filter: blur(120px);
+    transition: background var(--duration-cinematic) var(--ease-out-quart);
     pointer-events: none;
   }
 }

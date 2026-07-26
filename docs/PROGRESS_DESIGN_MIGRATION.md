@@ -10,7 +10,7 @@ written the way the rest of the docs reference them, e.g. `app/(protected)/...`)
 Run the doc's §8 verification checklist against each step before checking it done.
 
 **Status: every user-facing surface in the app (public, protected, and admin)
-is now on the unified dark/cyan design system.** Steps 0–7 below are all
+is now on the unified dark/cyan design system.** Steps 0–8 below are all
 done. Only the backend-touching §7 route restructure remains deferred.
 
 ---
@@ -187,8 +187,9 @@ done. Only the backend-touching §7 route restructure remains deferred.
       action ("No videos yet. Upload one to get started." /
       "Couldn't load videos. Try refreshing the page."), upload form's
       `isSubmitting` state is text-only inside a button (spinners-in-buttons
-      is explicitly allowed), `RelatedVideos`/`CommentSection` still run on
-      mock data so no real empty state applies yet.
+      is explicitly allowed). *(Superseded by Step 8: `RelatedVideos` now
+      runs on real data with a real empty state; `CommentSection` was
+      deleted outright rather than migrated — see Step 8.)*
 - [x] Ran the doc §8 checklist:
       - Raw-color grep across every file touched in Steps 0–5 (excluding the
         deferred admin dashboards): zero hits outside `globals.css` (whose
@@ -247,6 +248,10 @@ bundled in the `gsap` package already installed — confirmed via GSAP/Webflow's
       morphing into a `Check` on hover/selected.
 - [x] `HeroSection.tsx` + watch page `RelatedVideos.tsx` — `★` text glyph →
       `components/icons/RatingStar.tsx` (Star morphs into Sparkles on hover).
+      *(Superseded by Step 8: the fabricated rating this displayed had no
+      backing field anywhere in the schema — dropped entirely rather than
+      kept as decoration, and `RatingStar.tsx` deleted once it had zero
+      remaining importers.)*
 - [x] Player `ControlBar.tsx` (Play/Pause) and `VolumeControl.tsx`
       (mute/low/high) — wired through `IconSwap`.
 - [x] `admin/categories/` — larger scope expansion, confirmed with the user
@@ -330,6 +335,94 @@ committed independently:
       lint shows only pre-existing unrelated issues (verified via
       `git diff` — same lines flagged before these changes), zero console
       errors across every route re-checked in the browser.
+
+## Step 8 — Cinematic pass: hero real data + Netflix-influenced atmosphere ✅ done
+
+Follow-up requested directly by the user (not part of the original §5 rollout):
+replace the hero's remaining mock data with real videos via TanStack Query, and
+lean further into the Netflix influence (§1) for the browse-page hero and the
+watch page specifically — cinematic scale, edges dissolving into the
+background, a page-wide ambient tint — while explicitly keeping the
+hover-preview/mega-expand card mechanic out of scope (confirmed with the user).
+
+- [x] `HeroSection.tsx` — the last mock data left on any live surface (a
+      hardcoded `featuredVideos` array of fake titles + Unsplash stock
+      photos) replaced with real videos via the new `usePublicVideos` hook.
+      Featured rotation = the 5 most-recent public videos (`get_public_videos`
+      already orders by `created_at desc`; there's no admin curation feature
+      yet to source a real "featured" flag from). Real fields only — dropped
+      the fabricated star rating entirely (no rating field exists anywhere in
+      the schema) rather than inventing one. Backdrop now cross-fades between
+      rotations via GSAP (`useLayoutEffect`, not `useEffect`, so the
+      fade-from-transparent state applies before paint — avoids a one-frame
+      flash of the new image at full opacity). Ambient tint (§6) now reaches
+      the hero too. Clean empty state ("Nothing here yet. Check back soon.")
+      instead of ever rendering the slideshow with no data.
+- [x] `usePublicVideos` (`hooks/video/use-public-videos.ts`) — shared TanStack
+      Query hook, one query key for `HeroSection`, `VideoGrid`, and
+      `RelatedVideos`. All three request the same skip/limit page, so they
+      dedupe into one network request (`staleTime: 60s`) instead of each
+      firing its own fetch — the "batch API calls" ask from the brief.
+      `VideoGrid.tsx`'s previous manual `useEffect`/`useState` fetch is gone;
+      `RelatedVideos.tsx`'s previous *separate* `getPublicVideos` call
+      (duplicate network request, and typed against the wrong, too-broad
+      admin `Video` type) now shares the same hook and the new, correctly-
+      shaped `PublicVideo` type (`lib/types/video.ts`) matching what
+      `GET /videos/` actually returns.
+- [x] `use-video.ts` (`hooks/video/`) — same treatment for the watch page's
+      single-video fetch (`getVideoById`), replacing its own manual
+      `useEffect`/`useState`. `retry: false` preserves the original
+      fail-immediately behavior (no retry loop before showing "not found").
+- [x] `VideoCard.tsx` — hover treatment slowed from `--duration-fast` to
+      `--duration-base` and given a `-translate-y-1` lift + deeper shadow +
+      a hover-revealed bottom gradient, for a more deliberate/premium feel
+      than the flat `scale-[1.02]` alone. Still no hover-preview/expand.
+      (Caught and fixed during self-review: the gradient/shadow were
+      initially written with raw `black`, which the doc's hard rule 1
+      forbids — moved to the `--background` token, same visual result.)
+- [x] Watch page (`page.tsx`) — `--ambient` now set once on the page's
+      outermost wrapper (previously only on the player-local glow div) so a
+      new `.ambient-glow-page` layer (`globals.css`) can spread the same tint
+      thinly across the whole viewport (`opacity: 0.08`, `blur(120px)`,
+      fixed, `-z-10`) rather than leaving the atmosphere pooled around the
+      player. Page content (player/info/related columns) now reveals via the
+      new `useStaggeredReveal` hook on load and on video-to-video navigation.
+- [x] New motion primitive: `lib/motion/useStaggeredReveal.ts` — generic,
+      ref-returning GSAP stagger-reveal for a container's direct children,
+      reused by both `HeroSection.tsx` and the watch page rather than writing
+      two bespoke reveal effects. `prefers-reduced-motion`-safe, matching the
+      existing `useScrollReveal` hook's pattern.
+- [x] `useAmbientColor` moved from `watch/[video_id]/_components/player/` to
+      `lib/motion/` — it now has two consumers (hero + watch page) instead of
+      one, so a page-private location no longer fit. Confirmed the old
+      `useHeroIntro.ts` motion hook (a *different*, still-imported hook, used
+      by the orphaned-but-still-compiling `LandingHero.tsx`) was left
+      untouched — reused where the shape genuinely matched, never modified
+      code that something else still depends on.
+- [x] New token: `--duration-cinematic` (600ms) — hero backdrop crossfade and
+      the ambient vignette's fade, reusing the existing `--ease-out-quart`
+      curve (no second easing curve introduced). Scoped explicitly to
+      hero/watch atmosphere in `DESIGN_SYSTEM.md` §2, not a general-purpose
+      addition to the three UI-interaction speeds.
+- [x] Dead-code sweep triggered by this pass: `RatingStar.tsx` deleted
+      (orphaned the moment `HeroSection.tsx`'s fake rating display was
+      removed — confirmed zero remaining importers via grep).
+      `CommentSection.tsx` (100% mock data — hardcoded names/avatars/like
+      counts, a comment box that didn't persist anything) deleted from the
+      watch page in the same work session, ahead of this pass.
+- [x] `docs/DESIGN_SYSTEM.md` updated: §1 Influences (Netflix embrace now
+      explicit for hero/watch, mega-hover/expand still explicitly out),
+      §2 Motion table (`--duration-cinematic`, card-hover rule), §4 Reference
+      implementations, §6 Ambient system (page-wide variant documented).
+- [x] `pnpm build` clean (re-verified after the raw-color fix above), raw-color
+      grep clean across every file touched this pass. **Not verified this
+      pass:** a live browser check — the Claude-in-Chrome extension wasn't
+      connected in this session, so verification was curl (both pages return
+      200, no error strings in the served HTML) plus a careful manual
+      line-by-line re-read of the changed files, not an actual rendered
+      screenshot. Worth a real browser pass before considering this
+      surface fully verified, the same way every earlier step in this
+      document was.
 
 ## Deferred (tracked, not part of this task)
 

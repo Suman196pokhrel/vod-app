@@ -1,7 +1,7 @@
 import api from "./client";
 import { VideoFormData } from "@/app/(protected)/admin/videos/_components/uploadForm/formSchema";
 import { AxiosError } from "axios";
-import { ProcessingStatus, Video, VideoDetailsUpdatePayload } from "../types/video";
+import { ProcessingStatus, PublicVideo, Video, VideoDetailsUpdatePayload } from "../types/video";
 import { VideoPublicationStatus } from "@/lib/types/video";
 
 export interface VideoUploadPayload {
@@ -382,14 +382,14 @@ export const getVideoStatus = async (
 };
 
 
-export async function getPublicVideos(skip=0, limit=20){
-  const {data} =  await api.get("/videos/",{params: {skip:skip, limit: limit}, skipAuthRedirect: true})
+export async function getPublicVideos(skip = 0, limit = 20): Promise<PublicVideo[]> {
+  const { data } = await api.get("/videos/", { params: { skip, limit }, skipAuthRedirect: true })
   return data
 }
 
 
-export async function getVideoById(videoId:string){
-  const {data} = await api.get(`/videos/by-id/${videoId}`, {skipAuthRedirect: true})
+export async function getVideoById(videoId: string): Promise<Video> {
+  const { data } = await api.get(`/videos/by-id/${videoId}`, { skipAuthRedirect: true })
   return data
 }
 
