@@ -18,6 +18,30 @@
         }
     }
 
+    # GET /internal/tus/hooks/uploads/* is the one /internal route that IS
+    # meant to be reachable from the public internet — it's the admin-JWT-
+    # protected (not secret-protected) status bridge the resumable-upload
+    # frontend polls through this exact Caddy path after Uppy finishes (see
+    # app/lib/apis/tusUpload.ts). It carries no secret in its URL (auth is an
+    # Authorization header), so there's nothing for Caddy's access log to
+    # leak. Must be listed before the broader block below so it takes
+    # precedence.
+    handle /internal/tus/hooks/uploads/* {
+        reverse_proxy api:8000
+    }
+
+    # Block public access to the rest of the internal tusd-hook surface —
+    # specifically POST /internal/tus/hooks, which carries the shared secret
+    # as a `?secret=` query param that Caddy's own access log would otherwise
+    # capture verbatim (level INFO, full URI), and which the catch-all
+    # reverse_proxy below would happily forward to FastAPI from the public
+    # internet. tusd reaches this POST route directly over backend_net
+    # (service-to-service), never through Caddy, so this has zero effect on
+    # real hook delivery. Must sit above the catch-all to take precedence.
+    handle /internal/* {
+        respond 404
+    }
+
     # Reverse proxy all requests to the FastAPI container
     reverse_proxy api:8000
 
