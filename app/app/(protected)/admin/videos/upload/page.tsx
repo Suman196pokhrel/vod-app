@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { VideoProcessingDialog } from "@/app/(protected)/admin/videos/_components/multi_step_progress/video-processing-dialog";
 import { ApiError, uploadVideo } from '@/lib/apis/video'
 import { useVideoProcessing } from '../../../../../hooks/video/use-video-processing'
+import { isResumableUploadsEnabled } from '@/lib/utils/featureFlags'
 
 const UploadVideoPage = () => {
 
@@ -200,6 +201,12 @@ const UploadVideoPage = () => {
           </p>
         </div>
       </div>
+
+      {isResumableUploadsEnabled() && (
+        <Link href="/admin/videos/upload/resumable" className="text-sm text-primary underline">
+          Try resumable upload (beta)
+        </Link>
+      )}
 
       {/* Upload Form */}
       <UploadForm 
