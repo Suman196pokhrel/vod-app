@@ -455,10 +455,20 @@ class VideoService:
         # A status change should cascade into visibility exactly as it does
         # at creation time (create_video_with_files: is_public = status ==
         # "published"), unless the caller explicitly set is_public in the
-        # same payload. Without this, setting status to "published" here
-        # leaves is_public untouched — a video can show "published" in the
-        # admin table while still being 404 on every public route.
-        if "status" in update_fields and "is_public" not in update_fields:
+        # same payload. Checking payload-key presence alone isn't enough —
+        # EditVideoDialog.tsx unconditionally sends the current `status` on
+        # every save, even when the admin only touched an unrelated field
+        # like title, so "status" in update_fields is true on nearly every
+        # request. The check has to be against a real change (comparing to
+        # the row's current value), or an unrelated Edit Details save would
+        # silently re-derive is_public and undo a privacy decision made
+        # separately via the visibility toggle (e.g. a published-but-privated
+        # video would flip back to public just from a title edit).
+        if (
+            "status" in update_fields
+            and "is_public" not in update_fields
+            and update_fields["status"] != video.status
+        ):
             update_fields["is_public"] = update_fields["status"] == "published"
 
         logger.info(f"update_video_details: updating video {video_id} - fields: {list(update_fields.keys())}")
