@@ -38,6 +38,15 @@ def _admission_key(upload_id: str) -> str:
     return f"{ADMISSION_KEY_PREFIX}{upload_id}"
 
 
+def _base_upload_id(upload_id: str) -> str:
+    # tusd's S3Store composes the "real" upload ID as "<id>+<multipartUploadId>" once
+    # the S3 multipart upload is created — after pre-create already returned our base
+    # UUID via ChangeFileInfo.ID. post-finish/post-terminate/status-lookup all see the
+    # composite form, so lookups against the base UUID we stored miss. Split on the
+    # first "+" to recover the base ID for matching against our row.
+    return upload_id.split("+", 1)[0] if upload_id else upload_id
+
+
 def count_active_uploads() -> int:
     # Bounded by tus_max_concurrent_uploads (small, single digits to low tens) —
     # KEYS is fine at this scale and simpler than a SCAN cursor loop.
@@ -133,7 +142,7 @@ def handle_pre_create(event: dict) -> dict:
 
 def handle_post_finish(event: dict) -> dict:
     upload = event.get("Upload", {})
-    upload_id = upload.get("ID")
+    upload_id = _base_upload_id(upload.get("ID"))
     metadata = upload.get("MetaData") or {}
 
     db = SessionLocal()
@@ -181,7 +190,7 @@ def handle_post_finish(event: dict) -> dict:
 
 
 def handle_post_terminate(event: dict) -> dict:
-    upload_id = event.get("Upload", {}).get("ID")
+    upload_id = _base_upload_id(event.get("Upload", {}).get("ID"))
 
     db = SessionLocal()
     try:
@@ -197,6 +206,7 @@ def handle_post_terminate(event: dict) -> dict:
 
 
 def get_upload_status(upload_id: str) -> dict | None:
+    upload_id = _base_upload_id(upload_id)
     db = SessionLocal()
     try:
         tus_upload = db.query(TusUpload).filter(TusUpload.upload_id == upload_id).first()
