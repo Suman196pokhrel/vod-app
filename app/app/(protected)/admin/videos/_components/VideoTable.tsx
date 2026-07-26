@@ -9,16 +9,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Video, Film, TrendingUp, AlertCircle, CloudCog } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Video, Film, TrendingUp, AlertCircle } from "lucide-react";
+import { useState } from "react";
 import { AdminVideoFilters, getAdminVideos } from "@/lib/apis/video";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { Spinner } from "@/components/ui/spinner";
+import { useVideoProcessing } from "@/hooks/video/use-video-processing";
+import { VideoProcessingDialog } from "./multi_step_progress/video-processing-dialog";
 
 export default function AdminVideosPage() {
-  // Calculate statistics
- 
-
   const [filters, setFilters] = useState<AdminVideoFilters>({
     skip: 0,
     limit: 20,
@@ -35,9 +34,22 @@ export default function AdminVideosPage() {
     placeholderData: keepPreviousData,
   });
 
+  // One shared dialog instance for the whole table — any row's status badge
+  // opens it against that row's video ID, so it's reachable again after
+  // being closed instead of only appearing once at upload time.
+  const { isOpen, currentStatus, videoId, openDialog, closeDialog } = useVideoProcessing({
+    pollingInterval: 3000,
+  });
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <VideoProcessingDialog
+        isOpen={isOpen}
+        onClose={closeDialog}
+        currentStatus={currentStatus}
+        videoId={videoId || undefined}
+      />
+
       {/* Header */}
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl tracking-tight">Video Management</h1>
@@ -106,16 +118,10 @@ export default function AdminVideosPage() {
       {/* Main Content */}
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="all">
-            All Videos 
-          </TabsTrigger>
-          <TabsTrigger value="published">
-            Published 
-          </TabsTrigger>
-          <TabsTrigger value="processing">
-            Processing 
-          </TabsTrigger>
-          <TabsTrigger value="failed">Failed </TabsTrigger>
+          <TabsTrigger value="all">All Videos</TabsTrigger>
+          <TabsTrigger value="published">Published</TabsTrigger>
+          <TabsTrigger value="processing">Processing</TabsTrigger>
+          <TabsTrigger value="failed">Failed</TabsTrigger>
         </TabsList>
 
         {isPending && (
@@ -136,64 +142,15 @@ export default function AdminVideosPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <DataTable columns={columns} data={data.items} />
+                <DataTable
+                  columns={columns}
+                  data={data.items}
+                  meta={{ openProcessingDialog: openDialog }}
+                />
               </CardContent>
             </Card>
           </TabsContent>
         )}
-
-        {/* <TabsContent value="published" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Published Videos</CardTitle>
-              <CardDescription>
-                Videos that are live and publicly accessible
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable 
-                columns={columns} 
-                data={mockVideos.filter(v => v.status === 'published' && v.is_public)} 
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="processing" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Processing Videos</CardTitle>
-              <CardDescription>
-                Videos currently being transcoded and processed
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable 
-                columns={columns} 
-                data={mockVideos.filter(v => 
-                  !['completed', 'failed'].includes(v.processing_status)
-                )} 
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="failed" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Failed Videos</CardTitle>
-              <CardDescription>
-                Videos that encountered errors during processing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable 
-                columns={columns} 
-                data={mockVideos.filter(v => v.processing_status === 'failed')} 
-              />
-            </CardContent>
-          </Card>
-        </TabsContent> */}
       </Tabs>
     </div>
   );

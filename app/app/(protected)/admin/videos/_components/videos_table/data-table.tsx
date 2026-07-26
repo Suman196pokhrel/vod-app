@@ -3,6 +3,7 @@ import {
   ColumnDef,
   ColumnFiltersState,
   SortingState,
+  TableMeta,
   VisibilityState,
   flexRender,
   getCoreRowModel,
@@ -51,11 +52,13 @@ import {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  meta?: TableMeta<TData>;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  meta,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'created', desc: true } // Default sort by created_at descending
@@ -68,6 +71,7 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
+    meta,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),

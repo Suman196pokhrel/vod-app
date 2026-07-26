@@ -26,7 +26,12 @@ import {
   AlertCircle,
   ArrowUpDown,
 } from 'lucide-react';
-import { useVideoProcessing } from '@/hooks/video/use-video-processing';
+
+declare module '@tanstack/react-table' {
+  interface TableMeta<TData> {
+    openProcessingDialog?: (videoId: string) => void;
+  }
+}
 
 export const columns: ColumnDef<Video>[] = [
   // Selection column
@@ -146,20 +151,17 @@ export const columns: ColumnDef<Video>[] = [
     id: 'status',
     accessorKey: 'processing_status',
     header: 'Status',
-    cell: ({ row }) => {
+    cell: ({ row, table }) => {
       const video = row.original;
-        const { isOpen, currentStatus, videoId, openDialog, closeDialog } = useVideoProcessing()
-      
-      
+      const openProcessingDialog = table.options.meta?.openProcessingDialog;
+
       // Show processing status if not completed
       if (video.processing_status !== 'completed') {
         return (
           <div className="min-w-[140px]">
-            <Button variant={"ghost"} onClick={()=>openDialog()}>
-            <ProcessingStatusBadge status={video.processing_status} />
-
+            <Button variant={"ghost"} onClick={() => openProcessingDialog?.(video.id)}>
+              <ProcessingStatusBadge status={video.processing_status} />
             </Button>
-
 
             {video.processing_error && (
               <TooltipProvider>
