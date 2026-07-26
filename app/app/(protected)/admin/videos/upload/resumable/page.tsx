@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Uppy } from "@uppy/core"
 import Tus from "@uppy/tus"
-import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -105,7 +104,9 @@ export default function ResumableUploadPage() {
 
     uppyRef.current = uppy
     return () => uppy.destroy()
-  }, [])
+    // openDialog is a stable useCallback ([] deps in useVideoProcessing) — listed
+    // here to satisfy exhaustive-deps without changing when this effect re-runs.
+  }, [openDialog])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
