@@ -5,31 +5,16 @@ import React, { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, Video, X, FileVideo } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
 
 interface VideoUploadZoneProps {
   videoFile: File | null
   setVideoFile: (file: File | null) => void
 }
 
-
-
-
 const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
-  const [uploadProgress, setUploadProgress] = React.useState(0)
-
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       setVideoFile(acceptedFiles[0])
-      // Simulate upload progress
-      // let progress = 0
-      // const interval = setInterval(() => {
-      //   progress += 10
-      //   setUploadProgress(progress)
-      //   if (progress >= 100) {
-      //     clearInterval(interval)
-      //   }
-      // }, 200)
     }
   }, [setVideoFile])
 
@@ -67,24 +52,11 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
             type="button"
             variant="ghost"
             size="icon"
-            onClick={() => {
-              setVideoFile(null)
-              setUploadProgress(0)
-            }}
+            onClick={() => setVideoFile(null)}
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
-
-        {/* {uploadProgress < 100 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Uploading...</span>
-              <span className="font-semibold">{uploadProgress}%</span>
-            </div>
-            <Progress value={uploadProgress} />
-          </div>
-        )} */}
       </div>
     )
   }
@@ -95,14 +67,13 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
       className={`
         border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
         transition-colors
-        ${isDragActive 
-          ? 'border-primary bg-primary/5' 
+        ${isDragActive
+          ? 'border-primary bg-primary/5'
           : 'border-muted-foreground/25 hover:border-primary/50'
         }
       `}
     >
       <input {...getInputProps()} />
-
 
       <div className="flex flex-col items-center gap-4">
         <div className="p-4 rounded-full bg-primary/10">
@@ -121,8 +92,6 @@ const VideoUploadZone = ({ videoFile, setVideoFile }: VideoUploadZoneProps) => {
           Choose Video File
         </Button>
       </div>
-    
-    
     </div>
   )
 }
