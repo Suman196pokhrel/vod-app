@@ -152,6 +152,30 @@ def update_video_details(
     )
 
 
+@video_router.post(
+    "/{video_id}/thumbnail",
+    response_model=VideoResponse,
+    summary="Attach a thumbnail to an already-created video (resumable upload flow)"
+)
+async def upload_video_thumbnail(
+    video_id: str,
+    thumbnail: UploadFile = File(..., description="Thumbnail image (JPEG, PNG, WEBP)"),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Used by the tus/resumable upload flow, where the video row already
+    exists (created by the tus post-finish hook) before the thumbnail file
+    is sent. The multipart create flow attaches its thumbnail inline at
+    POST /videos/create instead and never calls this route."""
+    return await video_service.upload_video_thumbnail(
+        db=db,
+        video_id=video_id,
+        file=thumbnail,
+        user_id=current_user.id,
+        is_admin=current_user.is_admin(),
+    )
+
+
 @video_router.get(
     "/by-id/{video_id}/download-url",
     summary="Get a short-lived download URL for the original source file"

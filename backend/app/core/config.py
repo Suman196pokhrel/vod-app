@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     redis_db: int = 0
 
     # Resumable upload (tusd) settings — all inert until uploads_tus_enabled is true
-    uploads_tus_enabled: bool = False
+    uploads_tus_enabled: bool = True
 
     tusd_endpoint_url: str = "http://tusd:1080"       # internal, service-to-service
     tus_part_size_mb: int = 50

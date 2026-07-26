@@ -451,6 +451,16 @@ class VideoService:
             raise HTTPException(status_code=403, detail="Not authorized to update this video")
 
         update_fields = payload.model_dump(exclude_unset=True)
+
+        # A status change should cascade into visibility exactly as it does
+        # at creation time (create_video_with_files: is_public = status ==
+        # "published"), unless the caller explicitly set is_public in the
+        # same payload. Without this, setting status to "published" here
+        # leaves is_public untouched — a video can show "published" in the
+        # admin table while still being 404 on every public route.
+        if "status" in update_fields and "is_public" not in update_fields:
+            update_fields["is_public"] = update_fields["status"] == "published"
+
         logger.info(f"update_video_details: updating video {video_id} - fields: {list(update_fields.keys())}")
 
         for field, value in update_fields.items():
@@ -460,6 +470,32 @@ class VideoService:
         db.refresh(video)
 
         logger.info(f"update_video_details: video {video_id} updated successfully")
+        return video
+
+    async def upload_video_thumbnail(self, db: Session, video_id: str, file: UploadFile, user_id: str, is_admin: bool = False) -> Video:
+        """Attach/replace a thumbnail on an already-created video — used by
+        the resumable (tus) upload flow, where the file arrives after the
+        video row already exists (tus's post-finish hook only ever sets
+        title/category). Reuses the same validation and MinIO upload path
+        as the multipart create flow."""
+        video = db.query(Video).filter(Video.id == video_id, Video.deleted_at.is_(None)).first()
+
+        if not video:
+            logger.error(f"upload_video_thumbnail: video not found - {video_id}")
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        if video.user_id != user_id and not is_admin:
+            logger.error(f"upload_video_thumbnail: user {user_id} not authorized for video {video_id}")
+            raise HTTPException(status_code=403, detail="Not authorized to update this video")
+
+        self._validate_thumbnail_file(file)
+        thumbnail_path = await minio_service.upload_thumbnail(file, user_id)
+
+        video.thumbnail_url = thumbnail_path
+        db.commit()
+        db.refresh(video)
+
+        logger.info(f"upload_video_thumbnail: video {video_id} thumbnail updated")
         return video
 
     def get_video_download_url(self, db: Session, video_id: str, user_id: str, public_host: str, public_scheme: str, is_admin: bool = False) -> str:
