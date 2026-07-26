@@ -3,20 +3,14 @@
 // Ejected from the @videojs/react v10 "Default Video Skin"
 // (https://videojs.org/docs/framework/react/how-to/customize-skins), copied
 // verbatim and then modified in these places, marked below:
-//   1. A theater-mode toggle button — added to the right button group, since
-//      the framework has no built-in concept of theater mode.
-//   2. VideoJsSkinProps/the component signature — extended with
-//      theater/onToggleTheater to drive that button. Skip ±10s (SeekButton)
-//      and the quality selector (inside SettingsMenu) were already part of
-//      the default skin — no changes needed for those.
-//   3. <Video> swapped for <HlsJsVideo> (@videojs/react/media/hlsjs-video):
+//   1. <Video> swapped for <HlsJsVideo> (@videojs/react/media/hlsjs-video):
 //      our manifest_url is an HLS master playlist, and the plain <Video>
 //      element has no HLS/ABR engine, so it never populated
 //      videoRenditionList — the Quality submenu above existed but stayed
 //      unavailable. HlsJsVideo is the framework's cross-browser HLS element
 //      (hls.js MSE on Chrome/Firefox, native HLS on Safari) and is what
 //      makes that submenu light up.
-//   4. <Slider.Thumbnail> fed via its `thumbnails` prop (pre-parsed by
+//   2. <Slider.Thumbnail> fed via its `thumbnails` prop (pre-parsed by
 //      useStoryboardThumbnails) instead of the default skin's usual pattern
 //      of dropping a metadata <track> on the video and letting the library
 //      auto-detect it — that auto-detection's base-URL resolution doesn't
@@ -28,8 +22,6 @@ import { AirPlayEnterIcon, AirPlayExitIcon, CaptionsOffIcon, CaptionsOnIcon, Cas
 import { createPlayer, Poster, Container, usePlayer, AirPlayButton, useAudioTrackOptions, BufferingIndicator, useCaptionsOptions, CastButton, Controls, ErrorDialog, FullscreenButton, Gesture, Hotkey, Menu, MuteButton, PiPButton, PlayButton, usePlaybackRateOptions, Popover, useQualityOptions, SeekButton, SeekIndicator, Slider, StatusAnnouncer, StatusIndicator, Time, TimeSlider, Tooltip, VolumeIndicator, VolumeSlider, type RenderProp } from '@videojs/react';
 import { videoFeatures } from '@videojs/react/video';
 import { HlsJsVideo } from '@videojs/react/media/hlsjs-video';
-import { RectangleHorizontal, Clapperboard } from 'lucide-react';
-import { MorphIcon } from '@/lib/motion/MorphIcon';
 import './player.css';
 
 const TOP_STATUS_ACTIONS = ['toggleSubtitles', 'toggleFullscreen', 'togglePictureInPicture'] as const;
@@ -288,10 +280,6 @@ export interface VideoJsSkinProps {
    * useStoryboardThumbnails). Undefined for videos processed before this
    * existed, or while still loading. */
   thumbnails?: ThumbnailImage[];
-  /** Not a video.js concept — driven by the host page, see the theater
-   * button below. */
-  theater: boolean;
-  onToggleTheater: () => void;
 }
 
 export function VideoJsSkin({
@@ -301,8 +289,6 @@ export function VideoJsSkin({
   placeholder,
   style,
   thumbnails,
-  theater,
-  onToggleTheater,
   ...rest
 }: VideoJsSkinProps): ReactNode {
   const containerStyle = placeholder
@@ -469,29 +455,6 @@ export function VideoJsSkin({
                 <Tooltip.Popup className="media-surface media-tooltip">
                   <Tooltip.Label />
                   <Tooltip.Shortcut className="media-tooltip__kbd" />
-                </Tooltip.Popup>
-              </Tooltip.Root>
-
-              {/* Theater toggle — the one custom addition to this ejected
-                  skin. No library *Button component exists for this (no
-                  built-in "theater" concept), so it's a plain Button with a
-                  manually-controlled icon, unlike the stateful *Button
-                  components above whose icon visibility is driven by
-                  data-attributes from the library itself. */}
-              <Tooltip.Root side="top">
-                <Tooltip.Trigger
-                  render={
-                    <Button
-                      className="media-button--theater"
-                      aria-label={theater ? 'Default view' : 'Theater mode'}
-                      onClick={onToggleTheater}
-                    >
-                      <MorphIcon from={RectangleHorizontal} to={Clapperboard} active={theater} size={18} className="media-icon" />
-                    </Button>
-                  }
-                />
-                <Tooltip.Popup className="media-surface media-tooltip">
-                  <Tooltip.Label />
                 </Tooltip.Popup>
               </Tooltip.Root>
 

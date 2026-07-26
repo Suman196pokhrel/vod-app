@@ -15,30 +15,9 @@ const VideoInfo = ({ video }: VideoInfoProps) => {
 
   return (
     <div className="space-y-5">
-      {/* Title and Badges */}
-      <div className="space-y-3">
-        <h1 className="text-3xl">{video.title}</h1>
-
-        {/* Metadata Row — eyebrow treatment (docs/DESIGN_SYSTEM.md §5.2) */}
-        <p className="eyebrow flex flex-wrap items-center gap-x-2">
-          <span>{video.category}</span>
-          <span aria-hidden>·</span>
-          <span>{video.views_count} views</span>
-          {video.release_date && (
-            <>
-              <span aria-hidden>·</span>
-              <span>{new Date(video.release_date).getFullYear()}</span>
-            </>
-          )}
-          {video.age_rating && (
-            <>
-              <span aria-hidden>·</span>
-              <span>{video.age_rating}</span>
-            </>
-          )}
-        </p>
-      </div>
-
+      {/* Title and metadata now live in the detail page's hero
+          (watch/[video_id]/page.tsx) — this component is just the
+          secondary info stack beneath it: synopsis, cast, tags. */}
       {/* Synopsis — plain text over the page background, no boxed panel */}
       <div className="space-y-3">
         {video.director && (

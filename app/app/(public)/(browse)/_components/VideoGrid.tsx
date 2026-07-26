@@ -2,34 +2,45 @@
 
 import VideoCard, { VideoCardSkeleton } from "./VideoCard"
 import { usePublicVideos } from "@/hooks/video/use-public-videos"
-import { useScrollReveal } from "@/lib/motion/useScrollReveal"
 
-const VideoGrid = () => {
+// One more column per breakpoint than before — ~20% smaller cards, per
+// explicit feedback that the poster tiles were too big.
+const GRID_CLASSES =
+  "grid grid-cols-3 gap-3 sm:grid-cols-4 sm:gap-5 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7"
+
+interface VideoGridProps {
+  category: string
+}
+
+const VideoGrid = ({ category }: VideoGridProps) => {
   const { data: videos, isPending, isError } = usePublicVideos(0, 20)
-  const gridRef = useScrollReveal<HTMLDivElement>([isPending, videos?.length], {
-    stagger: true,
-  })
+  const filtered =
+    !videos || category === "all" ? videos : videos.filter((v) => v.category === category)
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl">Browse videos</h2>
 
       {isPending ? (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className={GRID_CLASSES}>
+          {Array.from({ length: 12 }).map((_, i) => (
             <VideoCardSkeleton key={i} />
           ))}
         </div>
       ) : isError ? (
         <p className="text-muted-foreground">Couldn't load videos. Try refreshing the page.</p>
-      ) : videos.length === 0 ? (
+      ) : !videos || videos.length === 0 ? (
         <p className="text-muted-foreground">No videos yet. Upload one to get started.</p>
+      ) : filtered && filtered.length === 0 ? (
+        <p className="text-muted-foreground">No videos in this category yet.</p>
       ) : (
-        <div
-          ref={gridRef}
-          className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3 xl:grid-cols-4"
-        >
-          {videos.map((video) => (
+        // Keyed on category so switching filters remounts the grid, replaying
+        // the CSS entrance animation — plain animate-in/fade-in (no GSAP,
+        // no scroll-gating) so cards are never stuck at opacity:0 waiting on
+        // a condition that might not fire. See useScrollReveal.ts for why
+        // that approach was dropped here.
+        <div key={category} className={`${GRID_CLASSES} animate-in fade-in duration-300`}>
+          {filtered?.map((video) => (
             <VideoCard key={video.id} video={video} />
           ))}
         </div>

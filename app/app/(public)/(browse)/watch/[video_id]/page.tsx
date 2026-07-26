@@ -1,134 +1,135 @@
 "use client"
-// app/home/watch/[id]/page.tsx
-import VideoPlayer from "./_components/player/VideoPlayer";
-import VideoInfo from "./_components/VideoInfo";
-import RelatedVideos from "./_components/RelatedVideos";
-import { use } from "react";
-import { useVideo } from "@/hooks/video/use-video";
-import { useTheaterMode } from "./_components/player/useTheaterMode";
-import { useAmbientColor } from "@/lib/motion/useAmbientColor";
-import { useStaggeredReveal } from "@/lib/motion/useStaggeredReveal";
-import { storageUrl } from "./_components/player/utils";
+// app/home/watch/[id]/page.tsx — title/detail page. Playback itself lives at
+// /play/[video_id] (a separate, chrome-free route); this page is the
+// HBO-Max-style "movie page" you land on before pressing Watch Now.
 
-// Width of the right sidebar (related videos column) — the only place
-// this needs to change. Referenced below via a CSS var since Tailwind's
-// grid-cols-[...] arbitrary value has to stay static text for its
-// build-time class scan; it can't take a JS variable directly.
-const SIDEBAR_WIDTH = "500px"
+import { use } from "react"
+import Image from "next/image"
+import { useRouter } from "next/navigation"
+import { Play } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import VideoInfo from "./_components/VideoInfo"
+import RelatedVideos from "./_components/RelatedVideos"
+import { useVideo } from "@/hooks/video/use-video"
+import { useAmbientColor } from "@/lib/motion/useAmbientColor"
+import { usePageFade } from "@/lib/motion/usePageFade"
+import { storageUrl } from "./_components/player/utils"
 
 const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
   const { video_id } = use(params)
+  const router = useRouter()
   const { data: video, isError } = useVideo(video_id)
-  const { theater, toggle: toggleTheater } = useTheaterMode()
   const { color } = useAmbientColor(
     video?.thumbnail_url ? storageUrl(video.thumbnail_url) : null
   )
-  const contentRef = useStaggeredReveal<HTMLDivElement>([video?.id])
+  // Whole page fades in together, fast — not a stagger, so nothing (the
+  // Watch Now button included) is ever caught half-invisible mid-sequence.
+  const pageRef = usePageFade<HTMLDivElement>([video?.id])
 
   if (isError)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-watch p-8 text-muted-foreground">
+      <div className="flex min-h-screen items-center justify-center bg-background p-8 text-muted-foreground">
         Video not found. Try going back and selecting another video.
       </div>
-    );
+    )
+
   if (!video)
     return (
-      <div className="min-h-screen bg-surface-watch">
-        <div className="mx-auto w-full max-w-[2000px] px-4 pt-4 lg:px-6">
-          <div className="skeleton aspect-video w-full rounded-xl" />
+      <div className="min-h-screen bg-background">
+        <div className="relative min-h-[84vh] w-full overflow-hidden">
+          <div className="skeleton absolute inset-0" />
         </div>
-        <div className="max-w-[2000px] mx-auto">
-          <div className="grid gap-6 p-4 lg:grid-cols-[1fr_380px] lg:p-6">
-            <div className="space-y-4">
-              <div className="skeleton h-8 w-2/3" />
-              <div className="skeleton h-4 w-1/3" />
-            </div>
-            <div className="space-y-4">
-              <div className="skeleton aspect-video w-full rounded-lg" />
-              <div className="skeleton h-4 w-full" />
-            </div>
-          </div>
+        <div className="w-full px-4 py-10 sm:px-6 lg:px-8">
+          <div className="skeleton h-4 w-full max-w-md" />
         </div>
       </div>
-    );
-
-  // Ambient glow (docs/DESIGN_SYSTEM.md §6) tints the space behind the
-  // player with the video's own artwork. Same size in both modes — only
-  // the width of its container changes (full page width in theater, the
-  // grid's left column otherwise), height is capped identically so
-  // toggling theater never changes vertical space, only horizontal.
-  // --ambient itself is set once, on the page wrapper below, and cascades
-  // down to this div along with .ambient-glow-page.
-  const playerBlock = (
-    <div className="relative w-full ">
-      <div
-        aria-hidden
-        className="ambient-glow absolute -inset-8 -z-10 rounded-4xl"
-      />
-      <VideoPlayer
-        video={video}
-        theater={theater}
-        onToggleTheater={toggleTheater}
-        className="aspect-video max-h-[78vh] w-full"
-      />
-    </div>
-  );
+    )
 
   return (
     <div
-      className="min-h-screen overflow-x-clip bg-surface-watch"
+      ref={pageRef}
+      className="min-h-screen bg-background"
       style={{ "--ambient": color ?? "transparent" } as React.CSSProperties}
     >
-      {/* Page-wide ambient — same signature tint as the player-local glow,
-          spread thin across the whole viewport so the cinematic atmosphere
-          reaches the page edges rather than staying pooled around the
-          player. Fixed + -z-10 so it never affects layout or scrolling. */}
-      <div aria-hidden className="ambient-glow-page fixed inset-0 -z-10" />
+      {/* Hero — single-video backdrop. The artwork stays the star: gradient
+          is concentrated over the left column where text sits (a fixed-width
+          fade, not a full-bleed one), leaving most of the image clearly
+          visible, matching a real title-detail page rather than a mostly-
+          black panel with a sliver of image. */}
+      <div className="relative min-h-[84vh] w-full overflow-hidden">
+        {video.thumbnail_url ? (
+          <Image
+            src={storageUrl(video.thumbnail_url)}
+            alt={video.title}
+            fill
+            className="object-cover"
+            priority
+          />
+        ) : (
+          <div className="absolute inset-0 bg-card" />
+        )}
 
-      {/* overflow-x-clip above clips the glow's intentional -inset-8 bleed
-          so it can't push the page into horizontal scroll — `clip` (not
-          `hidden`) so this div doesn't become a scroll container, which
-          would break the sidebar's lg:sticky positioning below. */}
-      <div className="mx-auto w-full max-w-[2000px]  px-4 pt-4 lg:px-6">
-        {/* One grid, three items placed by grid-column/-row — never by
-            conditionally mounting in different branches. The player
-            (and its <video>/HLS instance) stays mounted at the same
-            tree position across theater toggles; only which grid cells
-            it occupies changes, so playback never resets. */}
         <div
-          ref={contentRef}
-          className="grid grid-cols-1 gap-6 pb-4 lg:grid-cols-[minmax(0,1fr)_var(--sidebar-w)] lg:pb-6"
-          style={{ "--sidebar-w": SIDEBAR_WIDTH } as React.CSSProperties}
-        >
-          <div
-            className={`min-w-0 lg:col-start-1 lg:row-start-1  ${
-              theater ? "lg:col-span-2" : "lg:col-span-1 "
-            }`}
-          >
-            {playerBlock}
-          </div>
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.16] transition-[background] duration-(--duration-cinematic)"
+          style={{ background: color ?? "transparent" }}
+        />
 
-          <div className="min-w-0  space-y-6 lg:col-start-1 lg:row-start-2">
+        {/* Text-side fade only spans the left column's width, not the whole
+            image — the right two-thirds of the artwork stays fully visible. */}
+        <div className="absolute inset-y-0 left-0 w-full bg-linear-to-r from-background via-background/70 to-transparent md:w-2/3" />
+        {/* Bottom fade — a shallow strip for a smooth transition into the
+            grid below, not a large dark band eating into the artwork. */}
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-background to-transparent sm:h-32" />
+
+        {/* Flush against the left edge (padding only) instead of a centered
+            max-w-7xl column, which reads as "offset toward the middle" on a
+            wide screen — same fix as the browse-page hero. */}
+        <div className="relative flex min-h-[84vh] w-full flex-col justify-end px-4 py-12 sm:px-6 lg:px-8 xl:pl-16">
+          <div className="max-w-2xl space-y-5">
+            <div className="space-y-4">
+              <h1 className="font-display text-4xl text-foreground md:text-5xl">
+                {video.title}
+              </h1>
+
+              <p className="eyebrow flex flex-wrap items-center gap-x-2">
+                <span>{video.category}</span>
+                <span aria-hidden>·</span>
+                <span>{video.views_count} views</span>
+                {video.release_date && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{new Date(video.release_date).getFullYear()}</span>
+                  </>
+                )}
+                {video.age_rating && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{video.age_rating}</span>
+                  </>
+                )}
+              </p>
+            </div>
+
+            <Button
+              size="lg"
+              className="text-lg px-8"
+              onClick={() => router.push(`/play/${video.id}`)}
+            >
+              <Play className="mr-2 h-5 w-5 fill-current" />
+              Watch Now
+            </Button>
+
             <VideoInfo video={video} />
-          </div>
-
-          {/* Right Sidebar — always column 2. Spans both rows (beside
-              player + meta) by default; in theater mode the player takes
-              row 1 across both columns, so this collapses to row 2 only. */}
-          <div
-            className={`space-y-4  lg:col-start-2 lg:sticky lg:top-6 lg:self-start ${
-              theater ? "lg:row-start-2" : "lg:row-start-1 lg:row-span-2"
-            }`}
-          >
-            <RelatedVideos
-              currentVideoId={video.id}
-              category={video.category}
-            />
           </div>
         </div>
       </div>
-    </div>
-  );
-};
 
-export default WatchPage;
+      <div className="w-full px-4 pt-4 pb-16 sm:px-6 lg:px-8">
+        <RelatedVideos currentVideoId={video.id} category={video.category} />
+      </div>
+    </div>
+  )
+}
+
+export default WatchPage

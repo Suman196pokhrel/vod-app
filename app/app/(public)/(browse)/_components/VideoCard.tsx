@@ -7,10 +7,10 @@ import { Play } from "lucide-react"
 import { storageUrl } from "@/lib/utils/storage"
 import { PublicVideo } from "@/lib/types/video"
 
-// 12500 → "12.5K", 12500000 → "12.5M"
-const formatViews = (n: number) =>
-  Intl.NumberFormat("en", { notation: "compact" }).format(n)
-
+// Pure poster tile — no title, category, views, or rating on the card
+// itself. All of that lives on the detail page now (/watch/[video_id]);
+// the grid is just artwork. `alt` still carries the real title for
+// accessibility even though nothing is shown visually.
 const VideoCard = ({ video }: { video: PublicVideo }) => {
   const router = useRouter()
 
@@ -18,10 +18,14 @@ const VideoCard = ({ video }: { video: PublicVideo }) => {
     <button
       type="button"
       onClick={() => router.push(`/watch/${video.id}`)}
-      className="group -m-2 block w-full cursor-pointer rounded-xl p-2 text-left transition-all duration-(--duration-base) ease-(--ease-out-quart) hover:-translate-y-1 hover:scale-[1.02] hover:bg-accent/60 hover:shadow-2xl hover:shadow-background/60 focus-visible:-translate-y-1 focus-visible:scale-[1.02] focus-visible:bg-accent/60"
+      aria-label={video.title}
+      className="group -m-2 block w-full cursor-pointer p-2 text-left transition-all duration-(--duration-base) ease-(--ease-out-quart) hover:-translate-y-1 hover:scale-[1.02] hover:bg-accent/60 hover:shadow-2xl hover:shadow-background/60 focus-visible:-translate-y-1 focus-visible:scale-[1.02] focus-visible:bg-accent/60"
     >
-      {/* Thumbnail — poster-edge ring gives it presence at rest, not just on hover */}
-      <div className="relative aspect-video overflow-hidden rounded-lg bg-card ring-1 ring-border/60 transition-shadow duration-(--duration-base) ease-(--ease-out-quart) group-hover:ring-border">
+      {/* Thumbnail — portrait poster ratio, not the source video's native
+          16:9 (a deliberate crop toward a calmer, more premium poster-wall
+          look). Sharp corners, no radius. Neutral hover ring, not cyan —
+          this section leans neutral. */}
+      <div className="relative aspect-[2/3] overflow-hidden bg-card ring-1 ring-border transition-shadow duration-(--duration-base) ease-(--ease-out-quart) group-hover:ring-foreground/40">
         {video.thumbnail_url ? (
           <Image
             src={storageUrl(video.thumbnail_url)}
@@ -35,10 +39,11 @@ const VideoCard = ({ video }: { video: PublicVideo }) => {
           </div>
         )}
 
-        {/* Bottom gradient — always present at low strength so the thumbnail
-            reads as color-graded key art rather than a flat screenshot;
-            deepens on hover for the usual reveal feedback. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-background/45 to-transparent transition-opacity duration-(--duration-base) group-hover:from-background/80" />
+        {/* Bottom gradient — hover-only. An always-on version was tried and
+            reverted: stacked on top of a naturally dark thumbnail (a dim
+            room, a night shot) it pushed the card to near-black at rest,
+            which is worse than no gradient at all. */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-t from-background/80 to-transparent opacity-0 transition-opacity duration-(--duration-base) group-hover:opacity-100" />
 
         {/* Hover play cue — static glyph, no autoplay preview */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-(--duration-base) group-hover:opacity-100">
@@ -46,23 +51,6 @@ const VideoCard = ({ video }: { video: PublicVideo }) => {
             <Play className="h-4 w-4 fill-foreground text-foreground" />
           </div>
         </div>
-
-        {/* Age rating badge */}
-        {video.age_rating && (
-          <span className="eyebrow absolute bottom-2 right-2 rounded-sm bg-surface-watch/70 px-1.5 py-0.5 text-foreground backdrop-blur-sm">
-            {video.age_rating}
-          </span>
-        )}
-      </div>
-
-      {/* Info — separation by space, not borders */}
-      <div className="mt-3 space-y-1 px-0.5">
-        <h3 className="line-clamp-1 font-display text-base font-semibold underline-offset-4 transition-colors duration-(--duration-fast) group-hover:underline group-hover:decoration-primary">
-          {video.title}
-        </h3>
-        <p className="eyebrow">
-          {video.category} · {formatViews(video.views_count)} views
-        </p>
       </div>
     </button>
   )
@@ -74,11 +62,7 @@ const VideoCard = ({ video }: { video: PublicVideo }) => {
  */
 export const VideoCardSkeleton = () => (
   <div className="w-full">
-    <div className="skeleton aspect-video w-full rounded-lg" />
-    <div className="mt-3 space-y-2 px-0.5">
-      <div className="skeleton h-4 w-3/4" />
-      <div className="skeleton h-3 w-1/2" />
-    </div>
+    <div className="skeleton aspect-[2/3] w-full" style={{ borderRadius: 0 }} />
   </div>
 )
 

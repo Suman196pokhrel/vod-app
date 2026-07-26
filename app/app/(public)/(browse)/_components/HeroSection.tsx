@@ -68,7 +68,7 @@ const HeroSection = () => {
 
   if (isPending) {
     return (
-      <div className="relative h-[85vh] w-full overflow-hidden">
+      <div className="relative h-[84vh] w-full overflow-hidden">
         <div className="skeleton absolute inset-0" />
       </div>
     )
@@ -87,7 +87,7 @@ const HeroSection = () => {
   }
 
   return (
-    <div className="relative h-[85vh] w-full overflow-hidden">
+    <div className="relative min-h-[84vh] w-full overflow-hidden">
       {/* Backdrop — the video's own thumbnail, cross-fading on rotation */}
       <div ref={backdropRef} className="absolute inset-0">
         {currentVideo.thumbnail_url ? (
@@ -111,46 +111,47 @@ const HeroSection = () => {
           style={{ background: color ?? "transparent" }}
         />
 
-        {/* Gradient vignette — edges dissolve into the page background
-            rather than cutting off hard. Extra bottom layer makes the
-            fade-to-dark reach further than a single overlay would. */}
-        <div className="absolute inset-0 bg-linear-to-r from-background via-background/60 to-transparent" />
-        <div className="absolute inset-0 bg-linear-to-t from-background via-background/20 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-t from-background to-transparent" />
+        {/* Same treatment as the watch detail page's hero: a fixed-width
+            fade over the text column, not a full-bleed gradient, so most of
+            the artwork stays visible. */}
+        <div className="absolute inset-y-0 left-0 w-full bg-linear-to-r from-background via-background/70 to-transparent md:w-2/3" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-background to-transparent sm:h-32" />
       </div>
 
-      {/* Content */}
-      <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center">
-        <div ref={contentRef} className="max-w-2xl space-y-6">
-          <Badge variant="secondary" className="text-sm">
-            {currentVideo.category}
-          </Badge>
+      {/* Content — anchored to the bottom, flush against the left edge,
+          same position and info stack as the watch detail page's hero
+          (title -> metadata -> primary action -> synopsis -> tags). */}
+      <div className="relative flex min-h-[84vh] w-full flex-col justify-end px-4 py-12 sm:px-6 lg:px-8 xl:pl-16">
+        <div className="max-w-2xl space-y-5">
+          {/* Title/metadata cascade in; the button row does not — it stays
+              at full opacity from the first frame so it's never caught
+              mid-fade (see watch/[video_id]/page.tsx for the report that
+              caught this same pattern hiding a CTA entirely). */}
+          <div ref={contentRef} className="space-y-4">
+            <h1 className="font-display text-5xl md:text-7xl text-foreground">
+              {currentVideo.title}
+            </h1>
 
-          <h1 className="font-display text-5xl md:text-7xl text-foreground">
-            {currentVideo.title}
-          </h1>
-
-          <p className="eyebrow flex items-center gap-2 text-sm">
-            <span>{formatViews(currentVideo.views_count)} views</span>
-            {currentVideo.age_rating && (
-              <>
-                <span aria-hidden>·</span>
-                <Badge variant="outline">{currentVideo.age_rating}</Badge>
-              </>
-            )}
-          </p>
-
-          {currentVideo.description && (
-            <p className="text-lg text-muted-foreground line-clamp-3 max-w-xl">
-              {currentVideo.description}
+            <p className="eyebrow flex flex-wrap items-center gap-x-2">
+              <span>{currentVideo.category}</span>
+              <span aria-hidden>·</span>
+              <span>{formatViews(currentVideo.views_count)} views</span>
+              <span aria-hidden>·</span>
+              <span>{new Date(currentVideo.created_at).getFullYear()}</span>
+              {currentVideo.age_rating && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{currentVideo.age_rating}</span>
+                </>
+              )}
             </p>
-          )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
               size="lg"
               className="text-lg px-8"
-              onClick={() => router.push(`/watch/${currentVideo.id}`)}
+              onClick={() => router.push(`/play/${currentVideo.id}`)}
             >
               <Play className="mr-2 h-5 w-5 fill-current" />
               Play
@@ -174,6 +175,22 @@ const HeroSection = () => {
               <Plus className="h-5 w-5" />
             </Button>
           </div>
+
+          {currentVideo.description && (
+            <p className="text-lg text-muted-foreground line-clamp-3 max-w-xl">
+              {currentVideo.description}
+            </p>
+          )}
+
+          {currentVideo.tags && currentVideo.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {currentVideo.tags.slice(0, 5).map((tag, i) => (
+                <Badge key={i} variant="outline" className="font-normal">
+                  #{tag}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

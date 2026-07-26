@@ -45,13 +45,16 @@ export function useScrollReveal<T extends HTMLElement>(
     const tween = gsap.from(targets, {
       opacity: 0,
       y: 16,
-      duration: 0.4,
-      stagger: options?.stagger ? 0.08 : 0,
+      duration: 0.35,
+      stagger: options?.stagger ? 0.04 : 0,
       ease: "power1.out",
       scrollTrigger: {
         trigger: el,
         start: "top 85%",
-        toggleActions: "play none none reverse",
+        // Never reverses once played — a real bug earlier had "reverse"
+        // stranding a staggered grid at partial opacity after scrolling
+        // down past it and back up, which read as cards being broken/dark.
+        toggleActions: "play none none none",
       },
     });
 

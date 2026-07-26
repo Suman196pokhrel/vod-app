@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 import { VibeLogo } from "@/components/logos/VibeLogo";
 import { useAuthStore } from "@/lib/store";
 import { buildSignInUrl } from "@/lib/utils/safeNextPath";
+import { useScrolled } from "@/lib/motion/useScrolled";
 
 
 const HomeNavbar = () => {
@@ -17,10 +18,19 @@ const HomeNavbar = () => {
   const [hasNotifications, setHasNotifications] = useState(true);
   const pathname = usePathname();
   const { isAuthenticated, isLoading } = useAuthStore();
-
+  // Transparent-over-backdrop at the top of a hero (fixed, not sticky — it
+  // must overlay the hero rather than push it down), solid once scrolled
+  // past it so it stays legible against ordinary page content.
+  const scrolled = useScrolled();
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+    <nav
+      className={`fixed top-0 z-50 w-full transition-colors duration-(--duration-base) ${
+        scrolled
+          ? "border-b border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60"
+          : "bg-linear-to-b from-background/80 to-transparent"
+      }`}
+    >
       <div className="flex w-full items-center justify-between h-16 px-4 lg:px-8">
         {/* Left: Logo */}
         <div className="flex items-center flex-1">

@@ -7,12 +7,10 @@ import type { VideoData } from "./types"
 
 interface VideoPlayerProps {
   video: VideoData
-  theater: boolean
-  onToggleTheater: () => void
   className?: string
 }
 
-export default function VideoPlayer({ video, theater, onToggleTheater, className }: VideoPlayerProps) {
+export default function VideoPlayer({ video, className }: VideoPlayerProps) {
   const thumbnails = useStoryboardThumbnails(video.storyboard_url)
 
   if (!video.manifest_url) {
@@ -28,8 +26,6 @@ export default function VideoPlayer({ video, theater, onToggleTheater, className
       src={storageUrl(video.manifest_url)}
       poster={video.thumbnail_url ? storageUrl(video.thumbnail_url) : undefined}
       thumbnails={thumbnails}
-      theater={theater}
-      onToggleTheater={onToggleTheater}
       className={`overflow-hidden ${className ?? "aspect-video w-full"}`}
     />
   )
