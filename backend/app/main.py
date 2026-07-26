@@ -12,7 +12,7 @@ from app.models import User, Video
 from app.core.database import engine, Base
 
 # Routers
-from app.apis.routes import auth_router, healthRouter, video_router, user_router
+from app.apis.routes import auth_router, healthRouter, video_router, user_router, tus_hooks_router
 
 # Helpers
 from app.utils.origin_helpers import parse_origins
@@ -93,6 +93,7 @@ app.include_router(healthRouter)
 app.include_router(auth_router)
 app.include_router(video_router)
 app.include_router(user_router)
+app.include_router(tus_hooks_router)
 
 
 # Default route
