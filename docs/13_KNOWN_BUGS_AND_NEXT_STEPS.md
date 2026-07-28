@@ -8,26 +8,7 @@ The platform has reached MVP since this document was last substantially revised 
 
 ## Active Bugs
 
-### Bug 1: `on_transcode_complete` NameError on Total Transcoding Failure - still live
-
-**File:** `backend/app/tasks/video_tasks.py`, `on_transcode_complete(self, results: list)`
-**Severity:** Medium - causes a confusing error on total processing failure, not a common-path issue
-
-```python
-successful_results = [r for r in results if r is not None and not r.get('skipped', False)]
-
-if not successful_results:
-    logger.error("All transcoding tasks failed!")
-    with get_db_session() as db:
-        update_video_processing_status(db, video_id, "Failed", "All transcoding tasks failed!")  # video_id undefined here
-    raise Exception("No successful transcodes - cannot continue workflow")
-
-video_id = successful_results[0]['video_id']  # only assigned here, one line too late
-```
-
-`video_id` is referenced inside the `if not successful_results:` branch before it's ever assigned - assignment only happens on the next line, which never executes if every quality level failed. The result: instead of a clean `"failed"` status update, you get `NameError: name 'video_id' is not defined`. This only triggers when all 7 quality levels fail simultaneously (a corrupted source file is the realistic trigger) - rare, but confirmed still present as of this writing. Fix: pull `video_id` from the raw `results` list before the failure check, e.g. `video_id = results[0]['video_id'] if results else None`.
-
-### Bug 2: Staging Compose Exposes Database to All Interfaces - still live
+### Bug 1: Staging Compose Exposes Database to All Interfaces - still live
 
 **File:** `infra/docker-compose.staging.yml`
 **Severity:** High - security issue
@@ -47,32 +28,36 @@ api:
     - "127.0.0.1:8001:8000"
 ```
 
-Both PostgreSQL and Redis remain reachable from outside the host machine in staging. The fix is the same one-line change already applied to `api` in the same file: prefix each port mapping with `127.0.0.1:`. This is currently somewhat moot in practice: see Bug 4 below - the file can't even start yet.
+Both PostgreSQL and Redis remain reachable from outside the host machine in staging. The fix is the same one-line change already applied to `api` in the same file: prefix each port mapping with `127.0.0.1:`. This is currently somewhat moot in practice: see Bug 2 below - the file can't even start yet.
 
-### Bug 3: A Second `get_current_user` Doesn't Check Token Type and Can 500 Instead of 401 - still live
-
-**File:** `backend/app/core/security.py`, used by `apis/routes/user.py`
-**Severity:** Medium - affects `GET /user/profile`, which the frontend calls on every app load
-
-There are two different functions named `get_current_user` in this codebase. `core/dependencies.py`'s version (used by every `/videos/*` route) calls `verify_token(token, expected_type="access")` and cleanly rejects invalid/expired/wrong-type tokens with a 401. `core/security.py`'s version, used only by `GET /user/profile`, calls `decode_token()` directly instead - it never checks the token is actually an access token (a refresh token works here), and it has a live crash: `decode_token()` swallows JWT errors and returns `None` on any invalid/expired token, and `core/security.py`'s `get_current_user` then calls `.get("user_id")` on that `None` with no guard. That's an unhandled `AttributeError`, which surfaces as a **500**, not a 401. Since `GET /user/profile` is exactly the endpoint the frontend's `initialize()` calls on every app load, an expired token there doesn't cleanly trigger the axios client's refresh-and-retry interceptor the way it does everywhere else. See [04_AUTH_SYSTEM.md](./04_AUTH_SYSTEM.md) for the full detail.
-
-### Bug 4: Staging Compose Cannot Currently Start At All
+### Bug 2: Staging Compose Cannot Currently Start At All
 
 **File:** `infra/docker-compose.staging.yml`
-**Severity:** High - blocks any staging deployment, independent of Bug 2 above
+**Severity:** High - blocks any staging deployment, independent of Bug 1 above
 
 Every service in this file references `env_file: staging.env`, but no `staging.env` exists anywhere in `infra/` - only `.env.example`, `local.env`, and `prod.env` do. `docker compose -f docker-compose.staging.yml up` fails immediately as written. This file also has no `tusd` service and no Caddy routes for it, so even once the missing env file is added, resumable uploads won't work in staging without further changes. See [02_INFRASTRUCTURE.md](./02_INFRASTRUCTURE.md).
 
-### Bug 5: `uploading to storage` vs. `uploading_to_storage` String Mismatch
+### Resolved: `on_transcode_complete` NameError on Total Transcoding Failure
 
-**File:** `backend/app/tasks/video_tasks.py` (`upload_to_minio`) vs. `backend/app/utils/video_helpers.py` (`ProcessingStatus` enum)
-**Severity:** Low - cosmetic misreport during one processing stage, not a functional failure
+**File:** `backend/app/tasks/video/transcode.py`, `on_transcode_complete(self, results: list)`
 
-`upload_to_minio` writes the status string `"uploading to storage"` (with a space). The enum value it's meant to match is `uploading_to_storage` (an underscore). `GET /videos/{id}/status` wraps its enum lookup in a try/except that falls back to `queued` on a mismatch, so while this stage is actually running, the API reports `queued` at ~15% progress instead of `uploading_to_storage` at ~90%. The video still completes normally; only the reported progress is wrong for the duration of this one stage. See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md).
+`video_id` used to be referenced inside the `if not successful_results:` branch before it was ever assigned - the assignment only happened on the next line, which never executed if every quality level failed. That produced `NameError: name 'video_id' is not defined` instead of a clean `"failed"` status update whenever all 7 quality levels failed simultaneously. This is fixed: every `transcode_quality` failure path now returns an identity-carrying dict instead of bare `None`, and the all-failed branch safely extracts `video_id` via `next((r['video_id'] for r in results if r), None)` before using it.
+
+### Resolved: A Second `get_current_user` Doesn't Check Token Type and Can 500 Instead of 401
+
+**File:** `backend/app/core/security.py`
+
+There used to be two different functions named `get_current_user` in this codebase. `core/dependencies.py`'s version (used by every `/videos/*` route) calls `verify_token(token, expected_type="access")` and cleanly rejects invalid/expired/wrong-type tokens with a 401. A second version in `core/security.py`, used only by `GET /user/profile`, called `decode_token()` directly instead - it never checked the token was actually an access token, and it had a live crash: `decode_token()` swallows JWT errors and returns `None` on any invalid/expired token, and that `get_current_user` then called `.get("user_id")` on the `None` with no guard, an unhandled `AttributeError` that surfaced as a 500 instead of a 401. This is fixed: the duplicate function was deleted entirely. `core/security.py` now holds only `hash_password`/`verify_password`; the single canonical `get_current_user` lives in `core/dependencies.py`, and a new `get_current_verified_user` wrapper there preserves the email-verification check `GET /user/profile` needed. See [04_AUTH_SYSTEM.md](./04_AUTH_SYSTEM.md) for the full detail.
+
+### Resolved: `uploading to storage` vs. `uploading_to_storage` String Mismatch
+
+**File:** `backend/app/tasks/video/upload.py` (`upload_to_minio`)
+
+`upload_to_minio` used to write the status string `"uploading to storage"` (with a space) while the `ProcessingStatus` enum value it needed to match was `uploading_to_storage` (an underscore). `GET /videos/{id}/status` wraps its enum lookup in a try/except that falls back to `queued` on a mismatch, so while this stage was actually running, the API reported `queued` at ~15% progress instead of `uploading_to_storage` at ~90%. This is fixed: the task now writes the `ProcessingStatus.uploading_to_storage` enum member directly, not a string literal. See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md).
 
 ### Resolved: Delete Video Crash (was Bug 1 in an earlier revision)
 
-The `delete_video` endpoint used to call `minio_service.delete_video(video.video_url)` against a field the `Video` model doesn't have, crashing on every attempt. This is resolved: `DELETE /videos/by-id/{video_id}` now calls `VideoService.soft_delete_video`, which only ever sets `deleted_at` - it doesn't touch MinIO or `raw_video_path`/`video_url` at all. A separate `VideoService.delete_video` hard-delete method exists and correctly uses `raw_video_path`, but nothing in the running app calls it. The stale `video_url` reference survives in exactly one place: a dead, unreachable legacy helper (`create_video()` at the bottom of `video_service.py`, never imported by any route) - worth deleting as cleanup, but not a live bug.
+The `delete_video` endpoint used to call `minio_service.delete_video(video.video_url)` against a field the `Video` model doesn't have, crashing on every attempt. This is resolved: `DELETE /videos/by-id/{video_id}` now calls `VideoService.soft_delete_video`, which only ever sets `deleted_at` - it doesn't touch MinIO or `raw_video_path`/`video_url` at all. A separate `VideoService.delete_video` hard-delete method exists (`backend/app/services/video/mutations.py`) and correctly uses `raw_video_path`, but nothing in the running app calls it. The stale `video_url` reference used to also survive in a dead, unreachable legacy helper (`create_video()`, at the bottom of the old single-file `video_service.py`) - that helper has since been deleted along with the rest of the file it lived in, which was split into the `backend/app/services/video/` package.
 
 ### Resolved: Watch Page Read the Wrong Route Parameter (was Bug 3)
 
@@ -86,7 +71,7 @@ const WatchPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
 
 - and `getVideoById()` is a real, implemented function, not a stub. This bug is gone.
 
-### Bug 6: `saveDraft()` Points at a Route That Doesn't Exist
+### Bug 3: `saveDraft()` Points at a Route That Doesn't Exist
 
 **Files:** `app/lib/apis/video.ts` (`saveDraft`), `backend/app/apis/routes/video.py` (no `/draft` route)
 **Severity:** Low - currently dormant, would 404 if exercised
@@ -113,7 +98,7 @@ These aren't bugs - the code runs without crashing - but they're mocked, unwired
 - **View counting isn't actually happening** - `POST /videos/{id}/view` is implemented on the backend and works anonymously (via `get_current_user_optional`), but nothing in the frontend calls it. The plumbing exists on both ends of a wire that isn't connected.
 - **Watch history** - no backend table, no tracking. Prerequisite for "continue watching" and any recommendation feature beyond simple tag overlap.
 - **Is Public toggle only exists after the fact** - the upload form has no visibility control; `is_public` can only be flipped later from the admin videos table.
-- **Draft saving** - see Bug 6 above; the button is fake and the endpoint it would need doesn't exist yet either.
+- **Draft saving** - see Bug 3 above; the button is fake and the endpoint it would need doesn't exist yet either.
 - **No cancel button for in-progress resumable uploads** - this is a code-acknowledged gap, not speculation: `backend/app/core/config.py` explicitly documents that `tus_admission_ttl_hours` was shortened from 24h to 2h specifically because an abandoned upload has no way to be cancelled from the UI yet. See [15_RESUMABLE_UPLOADS.md](./15_RESUMABLE_UPLOADS.md).
 
 ### Admin surfaces
@@ -143,41 +128,38 @@ The "make videos watchable" phase is done. What's left is genuinely secondary - 
 
 ### Near-term: Fix what's flagged above
 
-1. **Fix the `on_transcode_complete` NameError** (Bug 1) - a few minutes
-2. **Fix the staging compose port binding** (Bug 2) - a few minutes
-3. **Create `infra/staging.env`** (Bug 4) so the staging compose can start at all
-4. **Fix the `uploading to storage` string mismatch** (Bug 5) - a few minutes
-5. **Consolidate the two `get_current_user` implementations** (Bug 3) onto one, closing the 500-vs-401 gap
-6. **Resolve the `saveDraft()` dead end** (Bug 6) - either build `POST /videos/draft` or repoint the function; then wire both upload forms' buttons to it
-7. **Wire `incrementVideoView`** from the play page - the backend half of this already works
-8. **Add a cancel button for in-progress resumable uploads**
+1. **Fix the staging compose port binding** (Bug 1) - a few minutes
+2. **Create `infra/staging.env`** (Bug 2) so the staging compose can start at all
+3. **Resolve the `saveDraft()` dead end** (Bug 3) - either build `POST /videos/draft` or repoint the function; then wire both upload forms' buttons to it
+4. **Wire `incrementVideoView`** from the play page - the backend half of this already works
+5. **Add a cancel button for in-progress resumable uploads**
 
 ### Admin completeness
 
-9. **Admin user-management API** - `GET /admin/users` with filtering and pagination; role/active-status updates
-10. **Real analytics** - start with simple DB aggregations on the videos table; graduate to event streaming for real-time dashboards later
-11. **Categories as a proper entity** - database table, CRUD endpoints, and update the video create/edit schemas to reference category IDs
-12. **Settings save** - wire the settings page to an actual persistence layer
-13. **Is Public at creation time** - add the toggle to the upload form itself
+6. **Admin user-management API** - `GET /admin/users` with filtering and pagination; role/active-status updates
+7. **Real analytics** - start with simple DB aggregations on the videos table; graduate to event streaming for real-time dashboards later
+8. **Categories as a proper entity** - database table, CRUD endpoints, and update the video create/edit schemas to reference category IDs
+9. **Settings save** - wire the settings page to an actual persistence layer
+10. **Is Public at creation time** - add the toggle to the upload form itself
 
 ### Content completeness
 
-14. **Comments** - new component, new table, new endpoints (there's no old UI to reconnect to)
-15. **Watch history table** - prerequisite for personalization and "continue watching"
+11. **Comments** - new component, new table, new endpoints (there's no old UI to reconnect to)
+12. **Watch history table** - prerequisite for personalization and "continue watching"
 
 ### Infrastructure hardening
 
-16. **Docker health checks** on PostgreSQL, MinIO, API, and worker, wired into `depends_on: condition: service_healthy`
-17. **Enable 4K transcoding** if/when the processing time tradeoff is acceptable
-18. **Backfill storyboards** for videos processed before the scrubbing-preview feature shipped
-19. **Add `tusd` and Caddy routes to the staging compose file** once Bug 4 is fixed, so staging matches local/prod capability
+13. **Docker health checks** on PostgreSQL, MinIO, API, and worker, wired into `depends_on: condition: service_healthy`
+14. **Enable 4K transcoding** if/when the processing time tradeoff is acceptable
+15. **Backfill storyboards** for videos processed before the scrubbing-preview feature shipped
+16. **Add `tusd` and Caddy routes to the staging compose file** once Bug 2 is fixed, so staging matches local/prod capability
 
 ### Future sprint: AI foundation
 
-20. **Tag-based related videos** - simple SQL, no ML required
-21. **Whisper transcription task** - runs in Celery after transcoding
-22. **Chapter generation** using an LLM on the transcript
-23. Reintroducing any orphaned AI component means re-adding its import/JSX to a page *and* giving it a real data source - not just fixing the data source in place.
+17. **Tag-based related videos** - simple SQL, no ML required
+18. **Whisper transcription task** - runs in Celery after transcoding
+19. **Chapter generation** using an LLM on the transcript
+20. Reintroducing any orphaned AI component means re-adding its import/JSX to a page *and* giving it a real data source - not just fixing the data source in place.
 
 ---
 

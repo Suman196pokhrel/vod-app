@@ -28,11 +28,11 @@ Note the video field is named `video`, not `video_file`. The `data` field is a s
 
 ## What Happens on the Server
 
-The handler in `video.py` calls `VideoService.create_video_with_files()` in `backend/app/services/video_service.py`. Here's the sequence:
+The handler in `video.py` calls `VideoService.create_video_with_files()` in `backend/app/services/video/service.py`, which delegates file validation to `validate_video_file`/`validate_thumbnail_file` in `backend/app/services/video/validation.py`. Here's the sequence:
 
 **1. Validate the video file**
 
-`VideoService` has two definitions of its validation method with the same name (`_validate_video_file`), and Python silently keeps only the second one - the first, more thorough version (magic-byte sniffing, an `ffprobe` duration/resolution check, a real enforced size cap) is dead code that never runs. What actually executes today only checks `content_type` against `video/mp4`, `video/quicktime`, and `video/webm` - no MKV or AVI, and **no size limit is enforced at the application level at all**. The same duplicate-definition issue affects `_validate_thumbnail_file`: the live version checks content-type (jpeg/png/webp) only, no dimension or size check. Worth knowing before you rely on either as a real gate.
+Validation only checks `content_type` against `video/mp4`, `video/quicktime`, and `video/webm` - no MKV or AVI, and **no size limit is enforced at the application level at all**. Thumbnail validation is the same shape: content-type check only (jpeg/png/webp), no dimension or size check. Worth knowing before you rely on either as a real gate.
 
 **2. Upload the raw video to MinIO**
 
@@ -68,7 +68,7 @@ A new `Video` record is created in PostgreSQL with:
 The workflow is started synchronously by calling `start_video_processing()` (`app/tasks/workflows.py`), which builds the chain via `create_video_processing_workflow()` and submits it with `.apply_async()`:
 
 ```python
-# video_service.py
+# services/video/service.py
 result = start_video_processing(db_video.id)
 video.celery_task_id = result.id
 ```
@@ -134,7 +134,7 @@ Some systems write uploaded files to a temp directory, then upload to storage. W
 
 ## A Resolved Bug, and a New One in Its Place
 
-An earlier version of this document described a crash: `delete_video` referenced `video.video_url`, a field the `Video` model doesn't have. That's now resolved on the live code path - the delete endpoint calls `soft_delete_video`, which only ever touches `deleted_at`, and the surviving hard-delete helper correctly uses `raw_video_path`. The stale `video_url` reference survives only inside a second, unreachable legacy helper (`create_video()`, not called by any route) - dead code, not a live bug, but a reasonable target for deletion during cleanup.
+An earlier version of this document described a crash: `delete_video` referenced `video.video_url`, a field the `Video` model doesn't have. That's now resolved on the live code path - the delete endpoint calls `soft_delete_video`, which only ever touches `deleted_at`, and the surviving hard-delete helper correctly uses `raw_video_path`. The stale `video_url` reference used to also survive inside a second, unreachable legacy helper (`create_video()`); that dead helper has since been deleted, so the reference is gone from the codebase entirely, not just unreachable.
 
 A smaller, previously undocumented gap took its place: the frontend's `saveDraft()` function (`lib/apis/video.ts`) posts to `POST /videos/draft` - a route that doesn't exist anywhere in `video.py`. It's currently harmless because the upload form's "Save Draft" button doesn't call `saveDraft()` yet (see [11_FRONTEND_VIDEO_UPLOAD.md](./11_FRONTEND_VIDEO_UPLOAD.md)), but wiring the button to the existing function as-is would 404.
 
@@ -146,7 +146,7 @@ A smaller, previously undocumented gap took its place: the frontend's `saveDraft
 - **Video preview generation** - extract a short preview clip in addition to the thumbnail
 - **Real draft saving** - either build the missing `POST /videos/draft` endpoint the frontend already expects, or point `saveDraft()` at an existing endpoint and drop the dead code
 - **Hard-delete / cleanup job** - a scheduled task that actually purges soft-deleted videos (row + MinIO files) after a retention window
-- **Real size/format enforcement on this endpoint** - the deep-validation method that already exists in the codebase (magic bytes, ffprobe checks, a real size cap) is currently unreachable dead code shadowed by a simpler duplicate; wiring it back in would close a real gap on this specific fallback path
+- **Real size/format enforcement on this endpoint** - validation today only checks `content_type`; there's no magic-byte sniffing, no `ffprobe` check, and no size cap anywhere on this fallback path. A deeper validation pass (a former dead duplicate of the live check) was removed as cleanup rather than kept as a starting point, so this would be new work, not just re-wiring existing code
 
 Resumable, chunked uploads with pause/resume are not a future upgrade - they already shipped and are the default path. See [15_RESUMABLE_UPLOADS.md](./15_RESUMABLE_UPLOADS.md).
 

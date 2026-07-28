@@ -136,15 +136,13 @@ async def create_video(
 
 There's also `get_current_user_optional`, which returns the user if a valid token is present and `None` otherwise - it never raises. This is the dependency that makes the public browse/watch experience possible: `GET /videos/by-id/{video_id}` uses it to decide whether a private video's owner is asking (200) or a stranger is (404, not 403 - see [05_VIDEO_UPLOAD.md](./05_VIDEO_UPLOAD.md)), and `POST /videos/{id}/view` uses it to let anonymous viewers count as views without requiring sign-in.
 
-### A second, different `get_current_user` exists - and it has a live bug
+Finally, `get_current_verified_user` wraps `get_current_user` and additionally enforces `is_verified`, raising 403 if the user hasn't confirmed their email. `GET /user/profile` is the one route that depends on it - `get_current_admin_user` still chains off the plain, unverified `get_current_user`, so an unverified user is blocked from `GET /user/profile` but not from any video endpoint. That asymmetry is intentional, not a bug.
 
-`apis/routes/user.py` imports a function with the same name from a different module, `core/security.py`, and it behaves differently in three ways worth knowing:
+### The second, divergent `get_current_user` is gone
 
-- It calls `decode_token()` directly instead of `verify_token(token, expected_type="access")`, so it never checks that the token is actually an access token - a refresh token works here too, which shouldn't be allowed.
-- It additionally enforces `is_verified`, raising 403 if the user hasn't confirmed their email. `core/dependencies.py`'s version never checks this at all, so an unverified user is blocked from `GET /user/profile` but not from any video endpoint.
-- It has a live bug on any invalid, expired, or malformed token: `core/jwt.py`'s `decode_token()` swallows JWT errors internally and returns `None` rather than raising, and `core/security.py`'s `get_current_user` then calls `payload.get("user_id")` on that `None` with no check in between. That's an unguarded `AttributeError`, which FastAPI turns into an unhandled **500**, not the 401 you'd expect. In practice this means an expired token on `GET /user/profile` (the endpoint the frontend calls on every app load to restore a session) doesn't cleanly trigger the axios client's refresh-and-retry interceptor the way it does everywhere else - it surfaces as a server error instead.
+A second function also named `get_current_user` used to live in `core/security.py` and get imported by `apis/routes/user.py` instead of the canonical one in `core/dependencies.py`. It called `decode_token()` directly instead of `verify_token(token, expected_type="access")`, so it never checked that the token was actually an access token, and it had a live crash on any invalid/expired token: `decode_token()` swallows JWT errors and returns `None`, and this second `get_current_user` called `payload.get("user_id")` on that `None` with no guard - an unhandled `AttributeError` that surfaced as a 500 instead of a 401.
 
-This is a real inconsistency in the codebase, not a documentation gap to paper over. If you're touching auth, know that these two `get_current_user` functions exist and diverge; consolidating them onto one implementation would remove this bug as a side effect.
+That duplicate function has been deleted entirely. `core/security.py` now holds only `hash_password`/`verify_password`; there is a single canonical `get_current_user` in `core/dependencies.py`, and `GET /user/profile` reaches it through the new `get_current_verified_user` wrapper described above, which preserves the email-verification check the route needed.
 
 ---
 

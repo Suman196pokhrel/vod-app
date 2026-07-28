@@ -113,8 +113,6 @@ The `processing_status` field tracks exactly where the video is in the pipeline:
 | `failed` | Something went wrong |
 | `generating_storyboard` | Building the scrubbing-preview sprite sheet, runs before transcoding starts |
 
-Note: a live bug means `uploading_to_storage` never actually shows up in `GET /videos/{id}/status` responses today - see [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md) for details.
-
 `processing_metadata` is a JSON field that stores what FFprobe extracted about the raw video: `{"duration_seconds": 3600, "width": 1920, "height": 1080, "codec": "h264", "bitrate": 5000000}`. The worker uses this to skip transcoding to qualities higher than the source resolution (no upscaling).
 
 `processing_error` stores the error message if status becomes `failed`.

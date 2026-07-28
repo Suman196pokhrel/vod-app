@@ -27,9 +27,9 @@ The dependency that enforces this lives in `app/core/dependencies.py` and is use
 - `get_current_admin_user` - requires a valid access token **and** admin role; raises `403` otherwise
 - `get_current_user_optional` - returns the user if a valid token is present, otherwise `None`. Never raises.
 
-`GET /user/profile` is the one exception - it uses a different, separately-defined `get_current_user` in `app/core/security.py` that doesn't check token type and has a live bug where an invalid/expired token can return `500` instead of a clean `401`. See [04_AUTH_SYSTEM.md](./04_AUTH_SYSTEM.md) for the full detail.
+`GET /user/profile` uses `get_current_verified_user`, a wrapper in `app/core/dependencies.py` that layers an `is_verified` check on top of the same `get_current_user` every other route uses. A second, divergent `get_current_user` used to live in `app/core/security.py` and have a live bug where an invalid/expired token could return `500` instead of a clean `401` - that duplicate has since been deleted. See [04_AUTH_SYSTEM.md](./04_AUTH_SYSTEM.md) for the full detail.
 
-Access tokens expire in 60 minutes. When one expires, the API returns `401`, and the frontend's Axios interceptor calls `POST /auth/refresh` transparently to get a new one (except on `GET /user/profile`, per the note above).
+Access tokens expire in 60 minutes. When one expires, the API returns `401`, and the frontend's Axios interceptor calls `POST /auth/refresh` transparently to get a new one.
 
 > **Tip:** The Swagger UI at `/docs` lets you test every endpoint live. Click **Authorize**, paste your access token, and fire requests directly from the browser.
 
@@ -365,7 +365,7 @@ The user router is mounted under the `/user` prefix (singular, not `/users`).
 
 Return the profile of the currently authenticated user.
 
-- **Auth:** Required - but note this route uses the separate `get_current_user` from `core/security.py`, not the one from `core/dependencies.py` used everywhere else (see Section 1 above)
+- **Auth:** Required - via `get_current_verified_user`, which layers an email-verification check on top of the same `get_current_user` used everywhere else (see Section 1 above)
 - **Response** (`UserResponse`, status `200`): the current user's record
 - **Notable:** A "who am I" endpoint for the frontend to confirm session state and rehydrate user info. Use this on app startup after reading a token from localStorage.
 

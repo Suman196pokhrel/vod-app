@@ -65,7 +65,7 @@ Let's walk through each stage.
 
 ## Stage 1: `prepare_video` (status: `preparing`)
 
-**Task:** `backend/app/tasks/video_tasks.py` → `prepare_video`
+**Task:** `backend/app/tasks/video/prepare.py` → `prepare_video`
 
 This task:
 1. Updates `processing_status` to `"preparing"`
@@ -80,7 +80,7 @@ The task decorator sets `max_requests=3`, which reads like a retry-count kwarg b
 
 ## Stage 1.5: `generate_storyboard` (scrubbing-preview thumbnails)
 
-**Task:** `backend/app/tasks/video_tasks.py` → `generate_storyboard`
+**Task:** `backend/app/tasks/video/storyboard.py` → `generate_storyboard`
 
 This runs immediately after `prepare_video` and before the transcode chord - it only needs the raw downloaded file and the `duration_seconds` that `prepare_video` already extracted, so it doesn't wait on any transcoded output. It produces the same kind of scrubbing thumbnail strip you'd see hovering the timeline on YouTube or Netflix.
 
@@ -152,18 +152,22 @@ H.264 codec is used for maximum compatibility. The scale filter preserves the so
 This is the callback of the `chord`, signature `on_transcode_complete(self, results: list)`. When ALL parallel transcoding tasks complete, this task runs with the list of their results.
 
 ```python
-successful_results = [r for r in results if r is not None and not r.get('skipped', False)]
+successful_results = [
+    r for r in results
+    if r is not None and not r.get('skipped', False) and not r.get('failed', False)
+]
 
 if not successful_results:
     logger.error("All transcoding tasks failed!")
+    video_id = next((r['video_id'] for r in results if r), None)
     with get_db_session() as db:
-        update_video_processing_status(db, video_id, "Failed", "All transcoding tasks failed!")
+        update_video_processing_status(db, video_id, "failed", "All transcoding tasks failed!")
     raise Exception("No successful transcodes - cannot continue workflow")
 
 video_id = successful_results[0]['video_id']
 ```
 
-**Known bug, still live:** `video_id` is only assigned on the line *after* the `if not successful_results:` block - but that block itself references `video_id` when every quality fails. The intended behavior (log a clean `"failed"` status, then raise) never gets that far: Python raises `NameError: name 'video_id' is not defined` first, so a total transcoding failure surfaces as an unhandled exception in Celery instead of a tidy failed-status update. This only triggers when all 7 quality levels fail simultaneously - rare (a corrupted source file is the realistic trigger), but confirmed still present. The fix is to pull `video_id` out of the first result *before* the failure check, e.g. `video_id = results[0]['video_id'] if results else None`.
+**Fixed:** `video_id` used to only be assigned on the line *after* the `if not successful_results:` block, while that block itself referenced `video_id` - a `NameError` on total transcoding failure instead of a clean `"failed"` status update. Every `transcode_quality` failure path now returns an identity-carrying dict instead of bare `None`, and the all-failed branch safely pulls `video_id` out of the raw `results` list via `next((r['video_id'] for r in results if r), None)` before using it.
 
 ---
 
@@ -224,7 +228,7 @@ For a long video at all quality levels, this could be thousands of files. The up
 
 The `manifest_url` stored in the database is the MinIO object path to `master.m3u8`, not a full URL. The full URL is constructed at query time from the MinIO endpoint + bucket + object path.
 
-**Known bug, still live:** the status string this stage writes has a space - `"uploading to storage"` - but the `ProcessingStatus` enum value it's meant to match is `uploading_to_storage`, with an underscore. `GET /videos/{id}/status` wraps its enum lookup in a try/except that falls back to `queued` on any mismatch, so while this stage is actually running, the API reports `status: "queued"` at roughly 15% progress instead of `uploading_to_storage` at 90%. It's a cosmetic misreport, not a processing failure - the video still completes normally - but if you're debugging why progress looks like it "jumps backward" near the end of a run, this is why.
+**Fixed:** this stage used to write the status string `"uploading to storage"` (a space) while the `ProcessingStatus` enum value it needed to match was `uploading_to_storage` (an underscore), causing `GET /videos/{id}/status` to fall back to reporting `queued` at roughly 15% progress instead of `uploading_to_storage` at 90% for the duration of this stage. It now writes the `ProcessingStatus.uploading_to_storage` enum member directly instead of a string literal, so the two can't drift apart again.
 
 ---
 
@@ -264,8 +268,6 @@ You can also check MinIO directly at http://localhost:9001 - if processing compl
 
 ## Future Upgrades
 
-- **Fix the `on_transcode_complete` NameError** - trivial, see Stage 2.5 above
-- **Fix the `uploading to storage` / `uploading_to_storage` string mismatch** - see Stage 5 above, another small, self-contained fix
 - **Enable 4K transcoding** - uncomment the 2160p step in `workflows.py` (adds significant processing time)
 - **Backfill storyboards** - a standalone task/admin action to generate scrubbing thumbnails for videos processed before the storyboard stage existed
 - **Configurable storyboard interval/grid** - currently fixed constants (5s interval, 10×10 grid, 160px tiles); could become per-video or per-quality settings

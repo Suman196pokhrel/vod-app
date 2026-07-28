@@ -134,10 +134,10 @@ This is important for anyone resuming work on this project. The platform has rea
 
 ```
 apis/routes/      ← HTTP endpoints: auth, video, user, health, tus_hooks
-services/         ← Business logic: auth_service, video_service, minio_service, ffmpeg_service, tus_service
+services/         ← Business logic: auth_service, minio_service, ffmpeg_service, tus_service, and a video/ package (validation, queries, mutations, status, download, service)
 models/           ← SQLAlchemy ORM models (database tables), including tus_upload
 schemas/          ← Pydantic schemas (request/response validation)
-tasks/            ← Celery tasks (video_tasks.py) and workflow builder (workflows.py)
+tasks/            ← Celery tasks - a video/ package (prepare, storyboard, transcode, segment, manifest, upload, finalize) and workflow builder (workflows.py)
 core/             ← database.py, config.py, jwt.py, security.py, dependencies.py
 ```
 
