@@ -1,3 +1,4 @@
+# Configures colored console logging for the application
 import logging
 from colorlog import ColoredFormatter
 

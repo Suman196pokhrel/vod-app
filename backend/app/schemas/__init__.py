@@ -1,3 +1,4 @@
+# Re-exports user and video Pydantic schemas so callers can import from app.schemas directly
 from app.schemas.user import (
     UserSignUpRequest,
     UserLoginRequest,

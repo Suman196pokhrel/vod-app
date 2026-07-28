@@ -1,4 +1,4 @@
-# app/services/video/validation.py — video/thumbnail file validation and duration parsing
+# app/services/video/validation.py - video/thumbnail file validation and duration parsing
 from fastapi import HTTPException, UploadFile
 from typing import Optional
 

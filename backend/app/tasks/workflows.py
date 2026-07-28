@@ -1,3 +1,4 @@
+# Builds the Celery chain/chord workflow that orchestrates the full video-processing pipeline
 from celery import chain, chord, group
 from app.tasks.video import (
     prepare_video,

@@ -1,4 +1,4 @@
-# app/services/video/queries.py — read-only video lookups (by id, by user, public feed, admin listing)
+# app/services/video/queries.py - read-only video lookups (by id, by user, public feed, admin listing)
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, desc, asc
 from fastapi import HTTPException

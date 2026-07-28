@@ -1,4 +1,4 @@
-# app/services/video/mutations.py — video delete/visibility/metadata/thumbnail writes
+# app/services/video/mutations.py - video delete/visibility/metadata/thumbnail writes
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, UploadFile
 from typing import Optional

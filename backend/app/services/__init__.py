@@ -1,3 +1,4 @@
+# Re-exports auth, user, email, and password-reset service functions for convenient importing
 from app.services.user_service import (
     create_user,
     

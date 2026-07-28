@@ -1,4 +1,4 @@
-# app/services/video/service.py — VideoService: the class every route calls into
+# app/services/video/service.py - VideoService: the class every route calls into
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, UploadFile
 from typing import Optional, List, Tuple

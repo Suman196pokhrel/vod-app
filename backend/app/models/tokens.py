@@ -1,3 +1,4 @@
+# SQLAlchemy model for the refresh_tokens table (session tracking and revocation)
 """
 Refresh token model for managing user sessions.
 

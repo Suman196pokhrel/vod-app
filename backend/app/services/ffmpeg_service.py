@@ -1,3 +1,4 @@
+# Runs ffprobe as a subprocess to extract video/audio metadata (resolution, duration, codec, bitrate)
 """
 FFmpeg/FFprobe utilities for video processing.
 """

@@ -1,3 +1,4 @@
+# Parses a comma-separated CORS origins env var into a list of origin strings
 
 
 def parse_origins(value: str | None) -> list[str]:
