@@ -3,7 +3,7 @@
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, desc, asc
-from app.schemas.video import VideoCreate, VideoMetadata, VideoUpdate
+from app.schemas.video import VideoMetadata, VideoUpdate
 from app.models.videos import Video
 from app.services.minio_service import minio_service
 from app.models.users import User  
@@ -560,7 +560,6 @@ class VideoService:
         Get videos for admin panel with filtering, searching, and sorting
         Returns tuple of (videos, total_count)
         """
-        print("ADMIN VIDEOS API HIT")
         # BASE QUERY — soft-deleted videos never show up here either; the
         # admin table should look exactly like it did with hard delete.
         query = db.query(Video).options(joinedload(Video.user)).filter(Video.deleted_at.is_(None))
@@ -609,28 +608,3 @@ class VideoService:
 
 # Singleton instance
 video_service = VideoService()
-
-
-# Helper function for backwards compatibility
-def create_video(db: Session, video_data: VideoCreate, user_id: str) -> Video:
-    """
-    Legacy function - creates video with URLs already provided
-    Use create_video_with_files for new uploads
-    """
-    db_video = Video(
-        title=video_data.title,
-        description=video_data.description,
-        category="uncategorized",  # Default category
-        video_url=video_data.video_url,
-        thumbnail_url=video_data.thumbnail_url,
-        duration=video_data.duration,
-        is_public=video_data.is_public,
-        user_id=user_id,
-        tags=[]
-    )
-    
-    db.add(db_video)
-    db.commit()
-    db.refresh(db_video)
-    
-    return db_video

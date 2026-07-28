@@ -1,7 +1,7 @@
 # /backend/app/apis/routes/video.py
 
 from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Query, Request
-from app.schemas.video import VideoResponse, VideoCreate, VideoList
+from app.schemas.video import VideoResponse, VideoList
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.video_service import video_service

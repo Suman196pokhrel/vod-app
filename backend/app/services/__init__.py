@@ -20,10 +20,6 @@ from app.services.password_reset_service import (
     reset_password
 )
 
-from app.services.video_service import (
-    create_video
-)
-
 __all__ = [
     "create_user",
     "authenticate_user",
@@ -35,7 +31,4 @@ __all__ = [
 
     "request_password_reset",
     "reset_password",
-
-
-    "create_video"
 ]
