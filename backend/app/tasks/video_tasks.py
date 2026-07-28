@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-@celery_app.task
+@celery_app.task(name="app.tasks.video_tasks.test_task")
 def test_task(name: str):
     """Simple test task to verify Celery is working"""
     time.sleep(10)  # Sleep for 10 seconds
@@ -22,8 +22,8 @@ def test_task(name: str):
 
 
 
-@celery_app.task(bind=True, max_requests=3)
-# STAGE 1: Prepration 
+@celery_app.task(bind=True, max_requests=3, name="app.tasks.video_tasks.prepare_video")
+# STAGE 1: Prepration
 def prepare_video(self, video_id:str):
     """
     - validate video exists in DB
@@ -141,7 +141,7 @@ def _format_vtt_timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:06.3f}"
 
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, name="app.tasks.video_tasks.generate_storyboard")
 def generate_storyboard(self, data: dict) -> dict:
     """
     Generate a sprite-sheet + WebVTT storyboard for timeline scrubbing
@@ -266,7 +266,7 @@ def generate_storyboard(self, data: dict) -> dict:
 
 # STAGE 2: Transcoding 
 
-@celery_app.task(bind=True, max_retries=2)
+@celery_app.task(bind=True, max_retries=2, name="app.tasks.video_tasks.transcode_quality")
 def transcode_quality(self, data:dict, quality:str):
     """
     Transcode video to specific quality
@@ -430,7 +430,7 @@ def transcode_quality(self, data:dict, quality:str):
 
 # Stage 2.5: Collect Transcoding Results (Chord Callback)
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, name="app.tasks.video_tasks.on_transcode_complete")
 def on_transcode_complete(self, results: list):
     """
     Called after all parallel transcoding tasks finish
@@ -488,7 +488,7 @@ def on_transcode_complete(self, results: list):
 
 # Stage 3: Segmentation
 
-@celery_app.task(bind=True, max_retries=2)
+@celery_app.task(bind=True, max_retries=2, name="app.tasks.video_tasks.segment_videos")
 def segment_videos(self, data: dict):
     """
     Create HLS segments for all qualities
@@ -632,7 +632,7 @@ def segment_videos(self, data: dict):
 
 
 # Stage 4: Manifest Creation
-@celery_app.task(bind=True, max_retries=2)
+@celery_app.task(bind=True, max_retries=2, name="app.tasks.video_tasks.create_manifest")
 def create_manifest(self, data: dict):
     """
     Create HLS playlist files (.m3u8)
@@ -739,7 +739,7 @@ def create_manifest(self, data: dict):
 
 # Stage 5: Upload to MinIO
 
-@celery_app.task(bind=True, max_retries=3)
+@celery_app.task(bind=True, max_retries=3, name="app.tasks.video_tasks.upload_to_minio")
 def upload_to_minio(self, data: dict):
     """
     Upload all HLS segments and playlists to MinIO for permanent storage.
@@ -883,7 +883,7 @@ def upload_to_minio(self, data: dict):
 
 # Stage 6: Finalization
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, name="app.tasks.video_tasks.finalize_processing")
 def finalize_processing(self, data: dict):
     """
     Final step: Update database and cleanup temporary files.
