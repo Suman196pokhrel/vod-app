@@ -453,7 +453,7 @@ def on_transcode_complete(self, results: list):
 
     if not successful_results:
         logger.error("All transcoding tasks failed!")
-        video_id = results[0]['video_id'] if results else None
+        video_id = next((r['video_id'] for r in results if r), None)
         with get_db_session() as db:
             update_video_processing_status(
                     db, video_id, "failed", "All transcoding tasks failed!"
