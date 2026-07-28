@@ -10,7 +10,6 @@ from app.models.users import User
 from app.schemas.video import VideoProcessingStatusResponse
 from app.utils.video_helpers import DEFAULT_META, STATUS_META, ProcessingStatus
 from app.core.config import get_settings
-from app.core.dependencies import _check_file_size, _detect_format_from_magic,_validate_thumbnail_with_pillow,_validate_video_with_ffprobe
 
 from fastapi import HTTPException, UploadFile
 from typing import Optional, List, Tuple
@@ -251,44 +250,6 @@ class VideoService:
                         logger.error(f"Manual cleanup may be required for thumbnail: {thumbnail_path}")
             else:
                 logger.info("Database commit successful, no cleanup required")
-    
-    def _validate_video_file(self, file: UploadFile) -> dict:
-        # 1. Size
-        _check_file_size(file, self.MAX_VIDEO_SIZE, "Video")
-        
-        # Magic bytes
-        detected = _detect_format_from_magic(file)
-        if detected not in self.ALLOWED_VIDEO_FORMATS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Video format '{detected}' not allowed. Allowed: {self.ALLOWED_VIDEO_FORMATS}"
-            )
-        
-        # 2. Deep validation with ffprobe
-        stream_info = _validate_video_with_ffprobe(file)
-        
-        # Optional: check duration, resolution limits
-        duration = float(stream_info.get("duration", 0))
-        if duration > 3600:  # 1 hour max
-            raise HTTPException(status_code=400, detail="Video exceeds 1 hour duration")
-        
-        return stream_info
-    
-    def _validate_thumbnail_file(self, file: UploadFile) -> tuple[int, int]:
-        # 1. Size
-        _check_file_size(file, self.MAX_THUMBNAIL_SIZE, "Thumbnail")
-        
-        #  Magic bytes
-        detected = _detect_format_from_magic(file)
-        if detected not in self.ALLOWED_THUMBNAIL_FORMATS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Image format '{detected}' not allowed"
-            )
-        
-        # 2. Deep validation with Pillow
-        return _validate_thumbnail_with_pillow(file)
-    
 
     def get_video_processing_status_service(
         self,
