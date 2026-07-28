@@ -412,7 +412,7 @@ def transcode_quality(self, data:dict, quality:str):
                 raise self.retry(exc=e, countdown=60)
             else:
                 logger.error(f"Final failure for {quality} after {self.max_retries} retries")
-                return None  # Don't break entire workflow
+                return {"video_id": video_id, "quality": quality, "failed": True}  # Don't break entire workflow
 
         except Exception as e:
             with get_db_session() as db:
@@ -420,7 +420,7 @@ def transcode_quality(self, data:dict, quality:str):
                         db, video_id, "failed",f"{str(e)}"
                     )
 
-            return None
+            return {"video_id": video_id, "quality": quality, "failed": True}
 
     except Exception as exc:
         # Retry logic
@@ -444,15 +444,19 @@ def on_transcode_complete(self, results: list):
  
 
     # Filter out None/failed results
-    successful_results = [r for r in results if r is not None and not r.get('skipped',False)]
+    successful_results = [
+        r for r in results
+        if r is not None and not r.get('skipped', False) and not r.get('failed', False)
+    ]
 
     logger.info(f"Successful transcodes: {len(successful_results)}/{len(results)}")
 
     if not successful_results:
         logger.error("All transcoding tasks failed!")
+        video_id = results[0]['video_id'] if results else None
         with get_db_session() as db:
             update_video_processing_status(
-                    db, video_id, "failed",f"All transcoding tasks failed!"
+                    db, video_id, "failed", "All transcoding tasks failed!"
                 )
         raise Exception("No successful transcodes - cannot continue workflow")
 
