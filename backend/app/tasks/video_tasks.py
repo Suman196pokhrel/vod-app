@@ -3,7 +3,7 @@ from .celery_dependencies import get_db_session, get_minio_client
 from app.models.videos import Video
 from app.core.config import get_settings
 from app.services.ffmpeg_service import extract_metadata
-from app.utils.video_helpers import update_video_processing_status
+from app.utils.video_helpers import update_video_processing_status, ProcessingStatus
 import os
 import time
 import logging
@@ -765,7 +765,7 @@ def upload_to_minio(self, data: dict):
 
         with get_db_session() as db:
             update_video_processing_status(
-                db, video_id, "uploading to storage")
+                db, video_id, ProcessingStatus.uploading_to_storage)
         
         # Validate segments directory exists
         if not os.path.exists(segments_dir):
