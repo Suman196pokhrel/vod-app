@@ -1,4 +1,4 @@
-# app/tasks/dependencies.py
+# app/tasks/celery_dependencies.py
 """
 Database and service dependencies for Celery tasks.
 Celery workers run in separate processes - they can't use FastAPI's dependency injection.

@@ -1,5 +1,5 @@
 from app.celery_app import celery_app
-from .dependencies import get_db_session, get_minio_client
+from .celery_dependencies import get_db_session, get_minio_client
 from app.models.videos import Video
 from app.core.config import get_settings
 from app.services.ffmpeg_service import extract_metadata
