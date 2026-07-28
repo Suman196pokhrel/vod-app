@@ -1,5 +1,5 @@
 from celery import chain, chord, group
-from app.tasks.video_tasks import (
+from app.tasks.video import (
     prepare_video,
     generate_storyboard,
     transcode_quality,
