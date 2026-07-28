@@ -1,10 +1,10 @@
-# /backend/app/apis/routes/video.py
+# FastAPI routes for video CRUD, upload, visibility, status, and admin listing
 
 from fastapi import APIRouter, Depends, status, UploadFile, File, Form, HTTPException, Query, Request
 from app.schemas.video import VideoResponse, VideoList
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.services.video_service import video_service
+from app.services.video import video_service
 from app.core.dependencies import get_current_user , get_current_admin_user, get_current_user_optional
 from app.models.users import User  
 from typing import Optional, List
@@ -253,30 +253,30 @@ def get_all_videos(
     current_admin: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-        """
+    """
     Get all videos with admin-level details including:
     - Processing status and errors
     - Private videos
     - User information
     - Full metadata
-    
+
     Requires admin privileges.
     """
-        videos, total = video_service.get_all_videos_admin(
-            db=db,
-            skip=skip,
-            limit=limit,
-            status=status,
-            processing_status=processing_status,
-            search=search,
-            user_id=user_id,
-            sort_by=sort_by,
-            sort_order=sort_order
-        )
-    
-        return PaginatedResponse(
-            items=videos,
-            total=total,
-            skip=skip,
-            limit=limit
-        )
+    videos, total = video_service.get_all_videos_admin(
+        db=db,
+        skip=skip,
+        limit=limit,
+        status=status,
+        processing_status=processing_status,
+        search=search,
+        user_id=user_id,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
+
+    return PaginatedResponse(
+        items=videos,
+        total=total,
+        skip=skip,
+        limit=limit
+    )

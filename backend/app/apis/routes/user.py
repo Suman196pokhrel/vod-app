@@ -1,3 +1,4 @@
+# FastAPI route for the current user's profile
 from fastapi import APIRouter, Depends, status
 from app.models import User
 from app.core.dependencies import get_current_verified_user

@@ -1,4 +1,4 @@
-# /app/apis/routes/tus_hooks.py
+# tusd webhook receiver (pre-create/post-finish/post-terminate) plus an admin-only upload-status poll route
 import hmac
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status

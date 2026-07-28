@@ -1,4 +1,4 @@
-#/backend/app/apis/__init__.py
+# Router package init
 from app.apis.routes.auth import auth_router
 from app.apis.routes.health import healthRouter
 from app.apis.routes.video import video_router

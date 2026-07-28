@@ -1,4 +1,4 @@
-
+# Simple health-check endpoint returning service liveness status
 from fastapi import APIRouter
 
 
