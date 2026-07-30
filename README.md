@@ -1,207 +1,234 @@
-# 🎬 VOD App — Video on Demand
+<div align="center">
 
-[![Frontend: Next.js](https://img.shields.io/badge/Frontend-Next.js-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![Backend: FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![DB: Postgres](https://img.shields.io/badge/DB-PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Queue: Redis](https://img.shields.io/badge/Queue-Redis-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Object Storage: MinIO](https://img.shields.io/badge/Object%20Storage-MinIO-C72E49?logo=minio&logoColor=white)](https://min.io/)
-[![Workers: Celery](https://img.shields.io/badge/Workers-Celery-37814A?logo=celery&logoColor=white)](https://docs.celeryq.dev/)
+# VOD
 
-Full-stack Video on Demand app with **auth**, **admin upload**, and an **async processing pipeline** (Celery + FFmpeg) that stores raw/processed assets in S3-compatible object storage.
+**Self-hosted video-on-demand platform — upload once, transcode to adaptive HLS, and stream from infrastructure you control.**
 
----
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Frontend-Next.js%2016-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/DB-PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Celery](https://img.shields.io/badge/Queue-Celery%20%2B%20Redis-37814A?logo=celery&logoColor=white)](https://docs.celeryq.dev/)
 
-## ✨ What this project demonstrates
+[Live demo](https://vod.spokhrel.dev) · [Deploy your own](#deploy-your-own) · [Architecture](#architecture)
 
-- **Modern web app architecture**: Next.js App Router + API-first backend.
-- **Layered backend design**: routes → services → models/schemas with DB migrations.
-- **Async job processing**: Redis-backed Celery workers + observability via Flower.
-- **Media pipeline basics**: upload, store, and process video assets with FFmpeg.
-- **Infra fundamentals**: Docker Compose for a complete local stack.
+<img src="docs/imgs/frontend_landing%20page.png" width="960" alt="VOD public browse feed with a hero carousel, category filter pills, and a video grid" />
 
----
+</div>
 
-## 🧱 Tech stack
+## What this is
 
-- **Frontend**: Next.js 16 (React 19), TypeScript, Tailwind CSS, Radix UI, TanStack Query, Zustand
-- **Backend**: FastAPI, SQLAlchemy, Alembic, Pydantic Settings, JWT auth
-- **Data**: PostgreSQL
-- **Async**: Celery (worker), Redis (broker/result backend), Flower (monitoring)
-- **Storage**: MinIO (S3-compatible buckets for videos/thumbnails/processed outputs)
-- **Reverse proxy (local)**: Caddy (optional, handy for “one entry point”)
-- **Media**: FFmpeg (runs in the backend/worker containers)
+Putting video online usually means handing it to a platform: unlisted YouTube links, Vimeo's paywalls, or a CDN bill that scales with every view. You inherit their player, their recommendation logic, their terms of service, and no say over encoding, storage, or takedowns.
 
----
+VOD is a complete alternative you run yourself. Admins upload through a resumable, network-drop-safe uploader; a Celery + FFmpeg pipeline transcodes to seven HLS quality levels and builds scrubbing-preview thumbnails in the background; a Next.js frontend serves a public browse feed and a custom video.js player. PostgreSQL holds the metadata, MinIO holds the bytes, Caddy is the single entry point. It's built to run on a small VPS — this repo's own production deployment runs the entire backend on a droplet with under 4 GiB of RAM.
 
-## 🏗️ Architecture (local)
+The live demo at [vod.spokhrel.dev](https://vod.spokhrel.dev) is a real deployment of this exact repository, not a hosted mockup.
 
-```text
-Browser (Next.js @ :3000)
-   │
-   │  REST + multipart upload (JWT in Authorization header)
+## Features
+
+### Streaming
+- Adaptive HLS playback across 7 quality levels, 144p–1440p (2160p/4K is implemented but commented out of the pipeline to keep dev transcodes fast)
+- Custom video.js player (`@videojs/react`) on a dedicated, chrome-free `/play/[video_id]` route, separate from the `/watch/[video_id]` detail page
+- Scrubbing-preview thumbnails — a sprite sheet + WebVTT storyboard generated during processing and parsed by the player itself
+- Video bytes (manifests, segments, thumbnails) are served directly from object storage through Caddy, never proxied through the Python process
+- Public browse feed and watch pages — no account required to watch
+
+### Processing
+- Celery chain: prepare → generate a scrubbing storyboard (best-effort, isolated so a failure here can't break transcoding) → transcode all 7 qualities in parallel (a Celery chord) → segment into 6-second HLS chunks → build the manifest → upload to object storage → finalize
+- Per-transcode FFmpeg thread count is configurable (`FFMPEG_THREADS`)
+- Soft delete — hides a video everywhere without touching its row or its files
+- Public/private visibility toggle, independent of delete
+
+### Platform
+- JWT auth with access + refresh tokens; refresh tokens are stored in the database so sessions can be revoked
+- Email verification and password reset via Resend
+- Resumable uploads (tusd + Uppy), feature-flagged via `uploads_tus_enabled` (on by default), with a legacy multipart fallback (`POST /videos/create`) when the flag is off
+- Upload admission control — caps concurrent resumable uploads and expires abandoned admission slots after a configurable TTL
+- Role-based access control (`user` / `admin`); every admin video-management endpoint is gated on the admin role
+- Short-lived presigned download URLs for the original source file
+
+## Screenshots
+
+| | |
+|---|---|
+| <img src="docs/imgs/frontend_auth_signin_page.png" width="420" alt="Sign-in screen with email and password fields"/><br>Sign in | <img src="docs/imgs/frontend_auth_signup_page.png" width="420" alt="Sign-up screen for creating a new account"/><br>Create an account |
+| <img src="docs/imgs/frontend_auth_forgotpw_page.png" width="420" alt="Forgot-password screen requesting an email address"/><br>Forgot password | <img src="docs/imgs/frontend_auth_reset_pw_page.png" width="420" alt="Reset-password screen for setting a new password"/><br>Reset password |
+| <img src="docs/imgs/frontend_video_player.png" width="420" alt="Full-screen chrome-free video player with playback controls"/><br>Full-screen player (`/play/[video_id]`) | <img src="docs/imgs/frontend_indie_page.png" width="420" alt="Video detail page with title, description, cast, and related videos"/><br>Watch detail page (`/watch/[video_id]`) |
+
+## Architecture
+
+```
+Browser
+   │  HTTPS
    ▼
-FastAPI API (@ :8000)  ────────►  PostgreSQL (@ :5432)
+Caddy  ── /storage/* ──▶ MinIO (object storage)
+   │  ── /files/*    ──▶ tusd (resumable uploads) ──▶ MinIO
    │
-   │  Enqueue processing job
+   │  everything else
    ▼
-Redis (@ :6379)  ───────►  Celery Worker (FFmpeg)
-                               │
-                               │  Download raw → transcode → HLS segments
-                               ▼
-                          MinIO (@ :9000/9001)
-                          raw + thumbnails + processed
+FastAPI ──▶ PostgreSQL
+   │
+   │  enqueue job
+   ▼
+Redis ──▶ Celery worker ──▶ FFmpeg ──▶ MinIO
 ```
 
-Key endpoints:
-- **API docs**: `http://localhost:8000/docs`
-- **Upload**: `POST /videos/create` (multipart: `video`, `thumbnail`, `data` JSON string)
-- **Status polling**: `GET /videos/{video_id}/status`
+<img src="docs/imgs/architecture_01.png" width="640" alt="Deployment topology diagram: the Next.js frontend on Vercel talking to a Caddy-fronted Docker stack (FastAPI, PostgreSQL, Celery workers, Redis, MinIO) on a single droplet"/>
 
----
+*The live demo's actual deployment — frontend on Vercel, backend stack on a single droplet.*
 
-## 🚀 Quick start (run everything & test upload)
+Caddy is the only public ingress. Everything under `/storage/*` is reverse-proxied straight to MinIO's S3 API and everything under `/files/*` goes to tusd — both bypass FastAPI entirely, so a video segment request never touches Python; it's Caddy handing back bytes from a disk-backed object store with cache headers set per file type: HLS segments get `max-age=31536000, immutable` (they never change once written), manifests get a 60-second cache (a re-processed video needs its playlist to refresh promptly), and thumbnails get a week. `/internal/*` is blocked at the edge except for the one JWT-protected status route the frontend polls; the shared secret that authenticates tusd's own webhook calls to the API never crosses the public internet, since tusd calls the API directly over the Docker network.
 
-### Prerequisites
+Everything else — auth, video CRUD, admin endpoints — goes to FastAPI, which reads/writes PostgreSQL and enqueues background work onto Redis. Upload → processing → publish: an admin uploads through tusd or the legacy multipart endpoint, either way creating a `Video` row and dispatching a Celery chain — prepare, generate the storyboard, transcode all seven qualities in parallel, segment, build the manifest, upload, finalize. The frontend polls `GET /videos/{id}/status` while this runs; the video is watchable the moment the chain completes.
 
-- **Docker** and **Docker Compose**
-- **Node.js** 20+ and **npm**
-- A local env file: copy `infra/.env.example` → `infra/local.env`
+For the design rationale behind this, see the full write-up: [spokhrel.dev/projects/proj-vod](https://spokhrel.dev/projects/proj-vod).
 
-### 1. Start backend, DB, and services (Docker)
+## Deploy your own
 
-From the **project root**:
+### Requirements
+- A server with Docker and the Compose plugin (`docker compose`). This repo's own production deployment runs the entire backend — Postgres, Redis, MinIO, tusd, the API, and a Celery worker — on a droplet with 3.72 GiB RAM and 2 GB swap; treat that as a practical floor.
+- A domain (or subdomain) with an A record pointed at the server, for Caddy's automatic TLS.
+- Node.js 20.9+ if you're building the frontend yourself instead of using a platform like Vercel.
 
+### Clone and configure
+```bash
+git clone <this-repo-url>
+cd vod-app
+cp infra/.env.example infra/prod.env
+```
+
+Edit `infra/prod.env`. Variables you **must** change:
+
+| Variable | Why |
+|---|---|
+| `POSTGRES_PASSWORD` | Database password |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Object storage root credentials |
+| `minio_access_key` / `minio_secret_key` | The same MinIO credentials, read by the app (pydantic Settings, lowercase) |
+| `REDIS_PASSWORD` | Broker/cache password |
+| `SECRET_KEY` / `jwt_secret_key` | App and JWT signing secrets — generate each with `openssl rand -hex 32` |
+| `tus_hook_shared_secret` | Authenticates tusd's webhook calls to the API; required once `uploads_tus_enabled=true` |
+| `RESEND_API_KEY` / `from_email` | Transactional email — `from_email` must match a domain verified in Resend |
+| `FRONTEND_URL` | Used in verification/reset email links — your real frontend origin |
+| `CORS_ALLOW_ORIGINS` / `ALLOWED_HOSTS` | Must list your actual domain(s), not `localhost` |
+
+> Several of these credentials appear more than once in the file under different names: `POSTGRES_PASSWORD` is also embedded in `DATABASE_URL` and `DATABASE_URL_SYNC`; `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` must match `minio_access_key`/`minio_secret_key`; `REDIS_PASSWORD` is also embedded in `REDIS_URL`, `CELERY_BROKER_URL`, and `CELERY_RESULT_BACKEND`. Change every occurrence — a mismatch breaks one service at a time instead of the whole stack, which makes it a slow bug to chase.
+
+### Caddy
+```bash
+cp infra/caddy/Caddyfile.prod.example infra/caddy/Caddyfile.prod
+```
+Open it and replace `api.yourdomain.com` with your own domain — that's the only line you need to change. It routes `/storage/*` to MinIO with per-file-type cache headers, `/files/*` to tusd, blocks the rest of `/internal/*`, and proxies everything else to FastAPI.
+
+### Start the stack
 ```bash
 cd infra
-docker compose -f docker-compose.local.yml up -d --build
+docker compose -f docker-compose.yml --env-file prod.env up -d --build
+```
+`docker-compose.yml` interpolates several `${...}` variables (bucket names, MinIO keys, the tus shared secret) at parse time, so `--env-file prod.env` is required — the `env_file:` entries inside the compose file only inject variables into the containers, not into compose's own variable substitution.
+
+### Verify TLS and health
+Because the Caddyfile's site address is a real hostname instead of `:80`, Caddy requests and renews a Let's Encrypt certificate automatically on first boot — nothing else to configure, but DNS must already resolve to the server.
+```bash
+curl https://api.yourdomain.com/health/
+# {"status":"Ok!"}
 ```
 
-This starts (local ports):
+### Make processed output public
+Playback streams straight from MinIO through Caddy's `/storage/*` proxy with no signing, so the buckets holding HLS output and thumbnails need public read. The bucket holding original uploads stays private — admins reach it only through short-lived presigned URLs.
+```bash
+docker run --rm --network host minio/mc alias set local http://127.0.0.1:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD>
+docker run --rm --network host minio/mc anonymous set download local/vod-processed
+docker run --rm --network host minio/mc anonymous set download local/vod-thumbnails
+```
 
-| Service   | Port(s)        | Purpose                          |
-|----------|-----------------|----------------------------------|
-| Postgres | 5432            | Database                         |
-| MinIO    | 9000 (API), 9001 (Console) | Video/thumbnail storage   |
-| Redis    | 6379            | Celery broker                    |
-| API      | 8000            | FastAPI backend                  |
-| Worker   | —               | Celery video processing          |
-| Flower   | 5555            | Celery monitoring                |
-| pgAdmin  | 5050            | DB UI (optional)                 |
-| Caddy    | 80              | Reverse proxy to API (optional)  |
+### Promote your first admin
+Sign up an account through the frontend, then:
+```bash
+cd infra
+docker compose -f docker-compose.yml --env-file prod.env exec postgres \
+  psql -U vod_user -d vod_db -c "UPDATE users SET role = 'ADMIN' WHERE email = 'you@example.com';"
+```
 
-Wait until the API is healthy (e.g. 30–60 seconds), then check:
+### Deploy the frontend
+`docker-compose.yml` here is the backend only — there's no Next.js service in it. Deploy `app/` separately (Vercel, or `pnpm build && pnpm start` on any Node host), and set:
+```
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+```
+Also add your domain to `images.remotePatterns` in `app/next.config.ts` — it currently only allow-lists the demo's own storage host — or Next's `<Image>` will refuse to render thumbnails.
+
+### Keeping it updated
+The frontend redeploys itself — Vercel rebuilds on every push to `main`. For the backend, SSH into the server and pull + rebuild:
+```bash
+cd vod-app && git pull
+cd infra && docker compose -f docker-compose.yml --env-file prod.env up -d --build
+```
+
+## Local development
 
 ```bash
-curl http://localhost:8000/
-# => {"message":"Hello world!, VOD here.","version":"1.0.0","docs":"/docs"}
+git clone <this-repo-url>
+cd vod-app
+cp infra/.env.example infra/local.env
+cp infra/caddy/Caddyfile.example infra/caddy/Caddyfile.local
+make dev
 ```
 
-API docs: **http://localhost:8000/docs**
-
-### 2. Initialize the frontend
-
-From the **project root**:
+> **`NEXT_PUBLIC_API_URL` must point at Caddy (port 80), not the API container directly (port 8000).** Video and thumbnail URLs are built client-side as `${NEXT_PUBLIC_API_URL}/storage/...` (`app/lib/utils/storage.ts`), and only Caddy proxies `/storage/*` to MinIO — the API on `:8000` doesn't. Pointing at `:8000` breaks every thumbnail and every playback, and does it silently: that helper has no fallback, so an unset variable renders `undefined/storage/...` in the browser.
 
 ```bash
 cd app
-npm install
-npm run dev
+pnpm install
+pnpm dev
+```
+Create `app/.env.local`:
+```
+NEXT_PUBLIC_API_URL=http://localhost
 ```
 
-Frontend runs at **http://localhost:3000**. It talks to the API at `http://localhost:8000` by default (see `NEXT_PUBLIC_API_URL` in the app if you need to change it).
+| Service | URL | Credentials |
+|---|---|---|
+| App (via Caddy) | http://localhost | - |
+| Frontend dev server | http://localhost:3000 | - |
+| Swagger / OpenAPI | http://localhost/docs | - |
+| MinIO console | http://localhost:9001 | minioadmin / minioadmin123 |
+| pgAdmin | http://localhost:5050 | admin@local.dev / admin |
+| Flower (Celery) | http://localhost:5555 | - |
+| RedisInsight | http://localhost:5540 | - |
 
-### 3. Create an account and make yourself admin (one-time)
-
-1. Open **http://localhost:3000**
-2. Sign up (e.g. **Sign up** → email, username, password)
-3. Check your email for the verification link, or in local dev you may need to **log in** and handle verification depending on your email setup
-4. Sign in at **http://localhost:3000/auth/sign-in**
-
-The Upload page lives under the admin area, which only allows users with role `admin`. New signups get role `user`, so promote your user once:
-
-- **Option A – pgAdmin:**  
-  - Open **http://localhost:5050**  
-  - Login: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` from `infra/local.env`  
-  - Add server: host `postgres`, user `vod_user`, password `vod_password`, db `vod_db`  
-  - Run:  
-    `UPDATE users SET role = 'admin' WHERE email = 'your@email.com';`
-
-- **Option B – psql:**  
-  From **infra** directory:  
-  `docker compose -f docker-compose.local.yml exec postgres psql -U vod_user -d vod_db -c "UPDATE users SET role = 'admin' WHERE email = 'your@email.com';"`
-
-### 4. Test video upload
-
-1. Log in as the admin user.
-2. Go to **Admin** (sidebar) → **Videos** → **Upload** (or **http://localhost:3000/admin/videos/upload**).
-3. Fill in:
-   - **Title**, **Description**, **Category**, etc.
-   - **Video file** (e.g. MP4)
-   - **Thumbnail** (e.g. JPEG/PNG)
-4. Submit the form.
-
-The backend stores the file in MinIO, creates a DB record, and enqueues Celery processing. You should see a processing dialog and, when done, the video in the list.
-
-- **MinIO Console:** **http://localhost:9001** (login: `minioadmin` / `minioadmin123` from `local.env`) to see buckets and uploaded files.
-- **Flower:** **http://localhost:5555** to see Celery tasks.
-
----
-
-## 🗂️ Project layout
-
-```
-vod-app/
-├── app/                    # Next.js 16 frontend (React 19, TypeScript, Tailwind)
-│   ├── app/
-│   │   ├── (public)/       # Auth (sign-in, sign-up, verify-email, forgot/reset password)
-│   │   └── (protected)/    # Home, Admin (videos, upload, analytics, categories)
-│   └── lib/                # API client, store (Zustand), utils
-├── backend/                # FastAPI app
-│   ├── app/
-│   │   ├── apis/routes/    # auth, health, video, user
-│   │   ├── core/           # config, database, security, dependencies
-│   │   ├── models/         # SQLAlchemy models (User, Video, …)
-│   │   ├── schemas/        # Pydantic request/response
-│   │   ├── services/       # Business logic (auth, video, minio, …)
-│   │   └── utils/
-│   ├── alembic/            # DB migrations
-│   └── requirements.txt
-└── infra/
-    ├── local.env           # Local env vars (do not commit secrets)
-    ├── docker-compose.local.yml
-    └── caddy/
-        └── Caddyfile.local # Caddy proxy to API (used by compose)
+The `api` container mounts `../backend:/app` and runs `uvicorn --reload`, so API changes pick up live. The `worker` container does **not** mount the source — it only has what was baked in at `docker build` time — so any change to a Celery task needs a rebuild, not a restart:
+```bash
+make build
 ```
 
----
+## Tech stack
 
-## ⚙️ Configuration
+| Layer | Choice |
+|---|---|
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4 |
+| Player | video.js via `@videojs/react`, custom skin |
+| State | Zustand (auth), TanStack Query (server state) |
+| Backend | FastAPI, SQLAlchemy (sync/psycopg2), Alembic, Pydantic Settings |
+| Database | PostgreSQL 16 |
+| Queue | Celery + Redis 7 |
+| Object storage | MinIO (S3-compatible) |
+| Uploads | tusd + Uppy (resumable), legacy multipart fallback |
+| Reverse proxy | Caddy 2 |
+| Media | FFmpeg — H.264 → HLS, 7 quality levels |
+| Email | Resend |
 
-- **Backend (Docker):** All settings come from **infra/local.env** via `docker-compose.local.yml` (`env_file: local.env`). The API uses `DATABASE_URL_SYNC` for the DB, MinIO and Redis vars for storage and Celery.
-- **Frontend:** Optional **app/.env.local**:  
-  `NEXT_PUBLIC_API_URL=http://localhost:8000`  
-  If unset, the app uses `http://localhost:8000` (see `app/lib/utils/constants.ts` and `app/lib/apis/client.ts`).
+## Roadmap
 
----
+- [ ] AI features — automatic transcription, chapter detection, semantic search
+- [ ] Pluggable storage backends for CDN-backed delivery (S3 + CloudFront, R2, etc.), beyond MinIO-only
+- [ ] Automated tests and CI
+- [ ] Comments — removed during a redesign; no UI or backend exists today
+- [ ] Admin user-management and analytics backends (the panels exist; the endpoints don't)
+- [ ] Docker health checks, so `depends_on` waits for readiness instead of just container start
 
-## 🧰 Useful commands
+## Contributing
 
-| Task              | Command |
-|-------------------|--------|
-| Start all services | `cd infra && docker compose -f docker-compose.local.yml up -d --build` |
-| Stop all          | `cd infra && docker compose -f docker-compose.local.yml down` |
-| View API logs     | `cd infra && docker compose -f docker-compose.local.yml logs -f api` |
-| View worker logs  | `cd infra && docker compose -f docker-compose.local.yml logs -f worker` |
-| Frontend dev      | `cd app && npm run dev` |
-| Run migrations    | From `backend/`: ensure `DATABASE_URL_SYNC` points to DB (e.g. `postgres:5432` inside Docker or `localhost:5432` on host), then `alembic upgrade head` |
+Issues and pull requests are welcome. Contributions are accepted under this project's AGPL-3.0 license.
 
----
+## License
 
-## 🎞️ Video upload flow (high-level)
-
-1. **Frontend:** User submits the form on `/admin/videos/upload`; the app sends `POST /videos/create` with `multipart/form-data` (video file, thumbnail file, JSON metadata).
-2. **Backend:** `POST /videos/create` (auth required) → `video_service.create_video_with_files()` → uploads to MinIO, creates `Video` row, enqueues Celery task for processing.
-3. **Celery worker:** Picks up the task, runs FFmpeg (transcode, thumbnails, etc.), writes outputs to MinIO, updates video status in the DB.
-4. **Frontend:** Can poll `GET /videos/{id}/status` to show processing progress (as in the upload page dialog).
-
-If something fails, check API logs, Flower for failed tasks, and MinIO for objects; ensure the user is logged in and has `admin` role when using the admin upload UI.
+[AGPL-3.0](LICENSE). Free to use, modify, and self-host; if you run a modified version as a network service, you must publish your modified source under the same license.

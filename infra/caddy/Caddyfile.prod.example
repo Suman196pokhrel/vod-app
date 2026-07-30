@@ -1,0 +1,67 @@
+# =============================================================================
+# Caddy Production Config
+# Copy to Caddyfile.prod and replace the domain below with your own — that's
+# the only line that needs to change.
+# =============================================================================
+
+api.yourdomain.com {
+    # Compress text responses only. Video segments and images are already
+    # compressed, so gzipping them wastes CPU for ~0 gain.
+    encode {
+        zstd
+        gzip 5
+        match {
+            header Content-Type text/*
+            header Content-Type application/json*
+            header Content-Type application/vnd.apple.mpegurl*
+        }
+    }
+
+    # Matchers used by the /storage block below.
+    @segments  path *.ts *.m4s
+    @manifests path *.m3u8
+    @images    path *.jpg *.jpeg *.png *.webp
+
+    # tusd resumable uploads (dormant while uploads_tus_enabled=false).
+    # Uses `handle`, NOT `handle_path`: tusd expects the /files/ prefix and
+    # ignores X-Forwarded-Prefix, so stripping it breaks routing.
+    handle /files/* {
+        reverse_proxy 127.0.0.1:1080 {
+            flush_interval -1
+        }
+    }
+
+    # Upload-status bridge the frontend polls. Public on purpose — auth is a
+    # JWT header, no secret in the URL. Must precede the /internal/* block.
+    handle /internal/tus/hooks/uploads/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # Everything else under /internal/ is private. The tusd hook endpoint
+    # carries a shared secret in its query string; tusd calls it over the
+    # Docker network, never through Caddy, so blocking here costs nothing.
+    handle /internal/* {
+        respond 404
+    }
+
+    # MinIO object storage: HLS manifests, segments, thumbnails.
+    handle_path /storage/* {
+        # Segments never change once written -> cache for a year.
+        header @segments  Cache-Control "public, max-age=31536000, immutable"
+        header @segments  Content-Type  "video/mp2t"
+
+        # Manifests can change if a video is re-processed -> short cache.
+        header @manifests Cache-Control "public, max-age=60"
+        header @manifests Content-Type  "application/vnd.apple.mpegurl"
+
+        header @images    Cache-Control "public, max-age=604800"
+
+        # Frontend (vod.*) and storage (api.vod.*) are different origins.
+        header ?Access-Control-Allow-Origin "*"
+
+        reverse_proxy 127.0.0.1:9000
+    }
+
+    # Everything else -> FastAPI
+    reverse_proxy 127.0.0.1:8000
+}
