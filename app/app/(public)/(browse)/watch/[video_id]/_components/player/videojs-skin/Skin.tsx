@@ -24,6 +24,30 @@ import { videoFeatures } from '@videojs/react/video';
 import { HlsJsVideo } from '@videojs/react/media/hlsjs-video';
 import './player.css';
 
+// hls.js tuning. Defined at module scope so the object identity is stable —
+// an inline literal would be a new object every render and can re-init the engine.
+const HLS_CONFIG = {
+  // Buffer deep. We can't shrink the RTT to the origin, so instead get far
+  // enough ahead of the playhead that latency stops being felt.
+  maxBufferLength: 60,        // seconds of forward buffer to target
+  maxMaxBufferLength: 120,    // hard ceiling when bandwidth allows
+  maxBufferSize: 120 * 1000 * 1000, // bytes; the real cap on the above
+  backBufferLength: 30,       // drop buffered data older than this
+
+  // Don't download 1080p into a 600px-wide player.
+  capLevelToPlayerSize: true,
+
+  // First quality guess before any bandwidth is measured. Conservative =
+  // playback starts fast, then ABR ramps up.
+  abrEwmaDefaultEstimate: 1_000_000, // 1 Mbps
+
+  // VOD, not live.
+  lowLatencyMode: false,
+
+  // Be more persistent about recovering a stall before surfacing an error.
+  nudgeMaxRetry: 5,
+} as const;
+
 const TOP_STATUS_ACTIONS = ['toggleSubtitles', 'toggleFullscreen', 'togglePictureInPicture'] as const;
 
 const CENTER_STATUS_ACTIONS = ['togglePaused'] as const;
@@ -305,7 +329,7 @@ export function VideoJsSkin({
         {/* autoPlay+muted (not in the doc's base example) — browsers block
             unmuted autoplay outright, muted is the only version that
             reliably plays without a user gesture. */}
-        <HlsJsVideo src={src} autoPlay playsInline />
+        <HlsJsVideo src={src} config={HLS_CONFIG} autoPlay playsInline />
 
         {poster && (
           <Poster src={isString(poster) ? poster : undefined} render={isRenderProp(poster) ? poster : undefined} />
