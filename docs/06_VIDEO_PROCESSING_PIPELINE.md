@@ -63,6 +63,23 @@ Let's walk through each stage.
 
 ---
 
+## Multiple Videos: One Pipeline at a Time
+
+Production runs the Celery worker with `--concurrency=1` (`infra/docker-compose.yml`), a deliberate choice, since the box is a single 2-vCPU, ~4 GiB droplet and FFmpeg is memory-hungry. That means exactly one task, from the entire system, executes at any instant. Celery doesn't know or care which video a task belongs to. Every task from every video's chain lands in the same default broker queue.
+
+Left alone, that causes a specific problem: each video's transcode chord fires all 7 `transcode_quality` tasks into that shared queue as soon as its (fast) `prepare_video`/`generate_storyboard` steps finish. Upload several videos close together and all of their 7-task batches land in the queue around the same time. A short video's remaining stages (`segment_videos`, `create_manifest`, `upload_to_minio`, `finalize_processing`) only get enqueued once its own transcodes finish, so they land at the back of the queue, behind other videos' still-pending transcode tasks. In the admin table that video looks stuck on whatever stage it last reached, even though nothing is actually broken, it's just waiting its turn behind other videos' heavier work.
+
+To prevent this, only one video's pipeline is dispatched at a time. The mechanism lives in `backend/app/tasks/workflows.py`:
+
+- A Redis lock (`video_processing:active_lock`) marks "something is currently processing." Whoever holds it is the only video whose chain is allowed to run.
+- When a video is created, `try_advance_queue()` tries to acquire the lock. If it succeeds, the oldest video still sitting at `processing_status = "queued"` gets dispatched immediately. If it fails, because something else already holds the lock, the new video just stays `"queued"` in the database. Uploading is never blocked by this, the video row is always created right away, it just doesn't start processing until its turn comes.
+- Every dispatched chain has `advance_processing_queue` attached as both its success callback (`link`) and its error callback (`link_error`), so the moment a pipeline ends, whether it completed or failed, the lock releases and the next oldest queued video, if any, is dispatched.
+- The lock carries a 6-hour TTL as a dead-man's switch, not the normal release path. It only matters if a worker dies mid-task (OOM, or a redeploy killing the container mid-pipeline) and nothing runs to release the lock. Without the TTL, that would wedge every future upload behind a lock nobody's holding anymore.
+
+One consequence worth knowing: a video that fails outright (every quality transcode fails, see `on_transcode_complete` below) still releases the lock and advances the queue. One bad upload doesn't jam everything queued behind it.
+
+---
+
 ## Stage 1: `prepare_video` (status: `preparing`)
 
 **Task:** `backend/app/tasks/video/prepare.py` → `prepare_video`
@@ -271,7 +288,7 @@ You can also check MinIO directly at http://localhost:9001 - if processing compl
 - **Enable 4K transcoding** - uncomment the 2160p step in `workflows.py` (adds significant processing time)
 - **Backfill storyboards** - a standalone task/admin action to generate scrubbing thumbnails for videos processed before the storyboard stage existed
 - **Configurable storyboard interval/grid** - currently fixed constants (5s interval, 10×10 grid, 160px tiles); could become per-video or per-quality settings
-- **`link_error` on the chain** - so `finalize_processing` (or an equivalent cleanup step) actually runs and removes the temp directory even when a stage fails and raises, not just on the happy path
+- **Temp-directory cleanup on failure** - the chain now has a `link_error` (see "Multiple Videos: One Pipeline at a Time" above), but it's used to advance the processing queue, not to clean up `/tmp`. A failed video's working directory under `processing_temp_dir` is still only removed by `finalize_processing`, which never runs if an earlier stage fails and raises - a dedicated cleanup step is still open
 - **Webhook notifications** - push a webhook when processing completes instead of requiring the client to poll
 - **Multiple workers** - scale horizontally by running more Celery worker containers
 - **Progress percentage** - expose per-stage progress within each task (e.g., FFmpeg progress parsing)

@@ -175,15 +175,13 @@ class VideoService:
                 logger.info(f"Database record created successfully: video_id={db_video.id}")
 
                 if db_committed:
-                   from app.tasks.workflows import start_video_processing
+                   from app.tasks.workflows import try_advance_queue
 
                    try:
-                    task_result = start_video_processing(db_video.id)
-                    db_video.celery_task_id = task_result.id
-                    db.commit()
-                    logger.info(f"Video processing pipeline started for video_id: {task_result.id}")
+                    try_advance_queue()
+                    logger.info(f"Queued for processing: video_id={db_video.id}")
                    except Exception as e:
-                       logger.error(f"Failed to start processing workflow: {str(e)}")
+                       logger.error(f"Failed to advance processing queue: {str(e)}")
 
             except Exception as e:
                 logger.error(f"Database insertion failed: {str(e)}")

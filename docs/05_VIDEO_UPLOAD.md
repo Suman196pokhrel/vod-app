@@ -63,17 +63,16 @@ A new `Video` record is created in PostgreSQL with:
 - All metadata fields (title, description, category, tags, etc.)
 - `user_id = current_user.id`
 
-**6. Enqueue the Celery processing workflow**
+**6. Try to enqueue the Celery processing workflow**
 
-The workflow is started synchronously by calling `start_video_processing()` (`app/tasks/workflows.py`), which builds the chain via `create_video_processing_workflow()` and submits it with `.apply_async()`:
+The API calls `try_advance_queue()` (`app/tasks/workflows.py`), not `start_video_processing()` directly:
 
 ```python
 # services/video/service.py
-result = start_video_processing(db_video.id)
-video.celery_task_id = result.id
+try_advance_queue()
 ```
 
-This is a synchronous call that submits the task to Redis and returns immediately with a task ID. The actual processing starts in the Celery worker asynchronously. This is the exact same entry point the resumable-upload flow's post-finish hook calls, so from this point on a video's journey through the pipeline is identical regardless of which upload path created it.
+Only one video's pipeline processes at a time (see [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md#multiple-videos-one-pipeline-at-a-time)), so `try_advance_queue()` first checks whether anything else is already running. If nothing is, it dispatches the oldest `"queued"` video's chain via `start_video_processing()` (which builds the chain with `create_video_processing_workflow()`, submits it with `.apply_async()`, and stamps `video.celery_task_id` on whichever row actually got dispatched). If something else is already processing, this call is a no-op and the video simply stays at `processing_status = "queued"` until its turn. Either way, this is synchronous and returns immediately, it never blocks the upload response. This is the exact same entry point the resumable-upload flow's post-finish hook calls, so from this point on a video's journey through the pipeline is identical regardless of which upload path created it.
 
 **7. Return the video record**
 

@@ -12,7 +12,7 @@ from app.core.jwt import verify_token
 from app.models.tus_upload import TusUpload
 from app.models.users import User
 from app.models.videos import Video
-from app.tasks.workflows import start_video_processing
+from app.tasks.workflows import try_advance_queue
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -202,11 +202,9 @@ def handle_post_finish(event: dict) -> dict:
         release_upload(upload_id)
 
         try:
-            task_result = start_video_processing(video.id)
-            video.celery_task_id = task_result.id
-            db.commit()
+            try_advance_queue()
         except Exception as e:
-            logger.error(f"Failed to start processing workflow for {video.id}: {str(e)}")
+            logger.error(f"Failed to advance processing queue for {video.id}: {str(e)}")
 
         return {"RejectUpload": False}
     finally:
