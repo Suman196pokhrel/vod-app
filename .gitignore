@@ -107,3 +107,7 @@ docs/design-system-reference/
 
 
 files.zip
+
+# Brag launch-video skill working dirs and outputs
+brag/
+brag-output*/
