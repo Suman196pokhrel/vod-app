@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { useVideo } from "@/hooks/video/use-video"
 import { usePageFade } from "@/lib/motion/usePageFade"
+import { PlayerLoader } from "@/components/loaders/PlayerLoader"
 import VideoPlayer from "@/app/(public)/(browse)/watch/[video_id]/_components/player/VideoPlayer"
 
 // Deliberately outside every route group — (browse)/layout.tsx renders the
@@ -23,12 +24,7 @@ const PlayPage = ({ params }: { params: Promise<{ video_id: string }> }) => {
       </div>
     )
 
-  if (!video)
-    return (
-      <div className="h-screen w-full bg-surface-watch p-4">
-        <div className="skeleton h-full w-full" />
-      </div>
-    )
+  if (!video) return <PlayerLoader />
 
   return (
     // Fills the whole browser viewport at rest — no letterboxing, no

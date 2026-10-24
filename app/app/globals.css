@@ -37,6 +37,14 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Logo "bop" on the player's loading screen (components/loaders/PlayerLoader.tsx) */
+  --animate-bop: bop 1.2s var(--ease-out-quart) infinite;
+
+  @keyframes bop {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.12); }
+  }
 }
 
 :root {
