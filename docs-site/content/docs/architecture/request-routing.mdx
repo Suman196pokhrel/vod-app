@@ -1,0 +1,59 @@
+---
+title: Request routing
+description: How Caddy splits public traffic between the API, object storage and the upload server.
+---
+
+Every request to `api.vod.spokhrel.dev` reaches **Caddy** first. Caddy terminates TLS (certificates from Let's Encrypt, managed automatically) and forwards the request by path prefix. The order matters: the first matching route wins.
+
+<Placeholder kind="flow" title="Caddy routing: one public host, four destinations by path prefix">
+  Decision tree from an incoming request to tusd, the API, a 404, MinIO or the API catch-all.
+</Placeholder>
+
+## Routing table
+
+| Path | Goes to | Purpose |
+|---|---|---|
+| `/files/*` | **tusd** | Resumable uploads (tus protocol). The `/files` prefix is kept because tusd serves from `/files/`. Response buffering is turned off (`flush_interval -1`) so upload progress streams back immediately. |
+| `/internal/tus/hooks/uploads/*` | **API** | The one internal route the browser may call: after an upload finishes, the frontend polls it (with an admin token) to learn the new video's ID. |
+| `/internal/*` (everything else) | **404** at the edge | Internal service-to-service routes, such as tusd's hook endpoint, are never reachable from the internet. tusd calls them directly over the private Docker network. |
+| `/storage/*` | **MinIO** (S3 API) | HLS playlists, segments, thumbnails and storyboards. Caddy strips the `/storage` prefix, so `/storage/<bucket>/<key>` becomes the S3 path `/<bucket>/<key>`. |
+| everything else | **API** (FastAPI) | Auth, video metadata, admin actions, processing status. |
+
+## Why video bytes bypass the API
+
+A segment request such as
+
+```text
+GET /storage/vod-processed/<video_id>/segments/720p/segment_0003.ts
+```
+
+goes Caddy → MinIO → browser. Python never handles it. This keeps API capacity for real API work, lets Caddy stream large responses efficiently, and means delivery can later move behind a CDN without touching application code.
+
+## Caching
+
+Production responses carry cache headers chosen per file type:
+
+| File | `Cache-Control` | Reason |
+|---|---|---|
+| Segments (`.ts`) | `public, max-age=31536000, immutable` | A segment's bytes never change once written, so browsers and any CDN can keep it for a year. |
+| Playlists (`.m3u8`) | `public, max-age=60` | A re-processed video must pick up its new playlist quickly. |
+
+## How the frontend finds media
+
+The database stores object paths, not URLs. The frontend turns a stored path into a URL with one helper:
+
+```ts title="app/lib/utils/storage.ts"
+// "/vod-processed/<id>/segments/master.m3u8"
+//   → "https://api.vod.spokhrel.dev/storage/vod-processed/<id>/segments/master.m3u8"
+storageUrl(path)  // `${NEXT_PUBLIC_API_URL}/storage/${path without its leading slash}`
+```
+
+That is why `NEXT_PUBLIC_API_URL` must point at Caddy: only Caddy knows the `/storage` route.
+
+## Private originals
+
+Processed output and thumbnails are served publicly through `/storage`. Original uploads are not: an admin download goes through `GET /videos/by-id/{id}/download-url`, which returns a **presigned URL** valid for 15 minutes with `Content-Disposition: attachment`. The URL is signed for the public host and rewritten onto `/storage`, so it still flows through Caddy.
+
+## Local differences
+
+Locally, Caddy listens on plain HTTP port `80` on a Docker bridge network and reaches services by container name (`api:8000`, `minio:9000`, `tusd:1080`). In production Caddy uses the host network and reaches them on loopback ports (`127.0.0.1:8000`, `127.0.0.1:9000`, `127.0.0.1:1080`). See [Caddy](/docs/infrastructure/caddy).

@@ -1,0 +1,132 @@
+---
+title: Upload to playback
+description: The full journey of one video, from the admin's file picker to a viewer's player.
+---
+
+This page follows a single video through the whole system using the default resumable-upload path. Each step links to the page that covers it in depth.
+
+<Placeholder kind="sequence" title="Upload-to-playback sequence: Admin browser, Caddy, tusd, MinIO, FastAPI, PostgreSQL, Redis, Celery worker, Viewer browser">
+  Swimlane sequence diagram covering steps 1–12 below, with the async boundary (step 6) clearly marked.
+</Placeholder>
+
+## 1. Ingest
+
+<Steps>
+<Step>
+
+### The admin picks a file
+
+On `/admin/videos/upload`, the form requires a video, a thumbnail, a title and a category. Uppy is configured for one file and 50 MB chunks. It attaches the title, category, MIME type and the admin's **access token** as tus upload metadata.
+
+</Step>
+<Step>
+
+### tusd asks the API whether to accept it (`pre-create` hook)
+
+Before accepting any bytes, tusd calls the API. The API:
+
+- verifies the access token and that the user is an **admin**,
+- checks that `title` and `category` are present,
+- checks the declared size (default maximum 50 GB) and MIME type (`video/mp4`, `video/quicktime`, `video/webm`),
+- applies **admission control**: if 8 uploads are already active it rejects with **503** and `Retry-After: 30`,
+- creates a `tus_uploads` row, reserves a Redis slot (expires after 2 hours), assigns the upload ID,
+- and removes the token from the metadata so it is never stored next to the file.
+
+</Step>
+<Step>
+
+### Chunks stream into MinIO
+
+The browser sends `PATCH` requests with 50 MB chunks to `/files/…`. tusd writes them into the raw-videos bucket under the `tus-uploads/` prefix using **S3 multipart upload**. If the network drops, Uppy asks tusd for the current offset and resumes from there.
+
+</Step>
+<Step>
+
+### The upload finishes (`post-finish` hook)
+
+tusd calls the API again. The API creates the `videos` row with `processing_status = "queued"`, `status = "draft"` and `is_public = false` (nothing is public until an admin reviews it), marks the upload `completed`, releases the admission slot and calls `start_next_video_if_idle()`.
+
+The hook is **idempotent**: if tusd retries the delivery, an already-completed upload is not created twice.
+
+</Step>
+<Step>
+
+### The browser learns the video ID
+
+The browser only knows the tus upload ID. It polls `GET /internal/tus/hooks/uploads/{upload_id}` every 1.5 seconds (up to 21 attempts) until the response contains the new `video_id`, then uploads the thumbnail (`POST /videos/{id}/thumbnail`) and saves the form details (`PATCH /videos/by-id/{id}`) in parallel.
+
+</Step>
+</Steps>
+
+Details: [Resumable uploads](/docs/backend/resumable-uploads), [Upload flow (frontend)](/docs/frontend/upload-flow).
+
+## 2. Processing
+
+<Steps>
+<Step>
+
+### Waiting for a turn
+
+`start_next_video_if_idle()` picks the **oldest** `queued` video and tries to take the Redis lock `video_processing:active_lock` with `SET NX`. If another video is processing, nothing happens: this video waits in the database. When the running pipeline ends, it starts the next one itself.
+
+</Step>
+<Step>
+
+### The Celery chain runs
+
+The worker downloads the original, runs `ffprobe`, builds the scrubbing storyboard, transcodes every rendition up to the source resolution, cuts each into 6-second HLS segments, writes the master playlist, uploads everything to the processed bucket and marks the video `completed` with its `manifest_url`.
+
+</Step>
+<Step>
+
+### The admin watches progress
+
+The upload dialog polls `GET /videos/{id}/status`. Each pipeline stage writes its own status, which the API maps to a fixed percentage (for example `transcoding` = 50%, `uploading_to_storage` = 90%).
+
+</Step>
+</Steps>
+
+Details: [Processing queue](/docs/pipeline/processing-queue), [Stages](/docs/pipeline/stages).
+
+## 3. Publish and play
+
+<Steps>
+<Step>
+
+### The admin publishes
+
+The video starts as a private draft. From the admin videos table the admin edits details and toggles visibility; once it is public and published it appears in `GET /videos/`, the public feed.
+
+</Step>
+<Step>
+
+### A viewer opens it
+
+`/watch/{id}` shows the detail page. **Play** opens `/play/{id}`, a full-screen player. If `manifest_url` is still empty, the player shows "This video is still processing" instead.
+
+</Step>
+<Step>
+
+### Adaptive streaming
+
+The player loads `master.m3u8` from `/storage/...`, picks a starting rendition, then fetches segments through Caddy straight from MinIO. hls.js measures throughput and switches rendition between segments. Hovering the timeline shows thumbnails from the storyboard VTT.
+
+</Step>
+</Steps>
+
+Details: [Player](/docs/frontend/player), [HLS output](/docs/pipeline/hls-output).
+
+## Where state lives during the journey
+
+| Moment | PostgreSQL | Redis | MinIO |
+|---|---|---|---|
+| Uploading | `tus_uploads` row (`created`) | Admission slot | Multipart parts in the raw bucket |
+| Queued | `videos` row (`queued`) | — | Original in the raw bucket |
+| Processing | Status updated per stage | Lock holds this video's ID; Celery messages | Storyboard written to the thumbnails bucket |
+| Completed | `manifest_url`, `available_qualities` | Lock released | HLS output in the processed bucket |
+
+<Callout title="The legacy path">
+  With `NEXT_PUBLIC_UPLOADS_TUS_ENABLED=false`, the form instead sends one multipart request to
+  `POST /videos/create`. The API streams the file into MinIO itself, creates the row and calls the
+  same `start_next_video_if_idle()`. From step 6 on, both paths are identical.
+</Callout>

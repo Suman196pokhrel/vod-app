@@ -1,0 +1,82 @@
+---
+title: High-level design
+description: The components of VOD, what each one owns, and how they connect.
+---
+
+VOD splits into three planes that scale and fail independently:
+
+- **Control plane**: the FastAPI service. Small JSON requests: auth, metadata, admin actions, processing status.
+- **Data plane**: bulk bytes. Uploads go browser → tusd → MinIO; playback goes MinIO → Caddy → browser. Neither path passes through Python.
+- **Processing plane**: the Celery worker running FFmpeg, fed by a Redis-backed queue.
+
+The frontend is a separate deployment on Vercel and talks to the backend only over HTTPS.
+
+<Placeholder kind="architecture" title="Container diagram (C4 level 2): Vercel frontend, Caddy, FastAPI, Celery worker, PostgreSQL, Redis, MinIO, tusd">
+  Show the three planes as coloured bands; arrows labelled with protocol (HTTPS, S3 API, Redis protocol, SQL, tus hooks).
+</Placeholder>
+
+## Components
+
+| Component | Runs where | Owns | Talks to |
+|---|---|---|---|
+| **Next.js frontend** | Vercel | Pages, player, admin UI, client auth state | Caddy over HTTPS |
+| **Caddy** | Backend VPS, host network | TLS, the single public entry point, path-based routing | API, MinIO, tusd (loopback ports) |
+| **FastAPI API** | Backend VPS, container | Auth, video metadata, status, tus hook handling, dispatching processing | PostgreSQL, Redis, MinIO |
+| **Celery worker** | Backend VPS, container (concurrency 1 in production) | Transcoding, packaging, uploading HLS output | Redis (broker), PostgreSQL, MinIO |
+| **PostgreSQL 16** | Backend VPS, private network only | Users, videos, tokens, upload sessions | — |
+| **Redis 7** | Backend VPS, private network only | Celery messages and results, the processing lock, upload admission slots | — |
+| **MinIO** | Backend VPS | Raw uploads, thumbnails, HLS segments and playlists | — |
+| **tusd** | Backend VPS | The tus upload protocol; streaming chunks into MinIO | MinIO (S3 multipart), API (hooks) |
+
+The API and worker are built from the **same Docker image** (`backend/Dockerfile`); they differ only in the start command (`uvicorn` vs `celery worker`).
+
+## Design principles
+
+<Accordions>
+<Accordion title="Keep bulk bytes away from Python">
+
+A Python web process is a poor pipe for gigabytes. Uploads are handled by tusd (Go), which writes straight into MinIO using S3 multipart uploads. Playback segments are fetched from MinIO by Caddy. FastAPI only sees small hook calls and JSON requests, so a large upload or a popular video does not tie up API workers.
+
+</Accordion>
+<Accordion title="Do heavy work asynchronously">
+
+Transcoding a long video takes minutes of CPU per rendition. The API never waits for it: an upload creates a `queued` database row and returns. A Celery worker does the processing, and the frontend polls `GET /videos/{id}/status` for progress.
+
+</Accordion>
+<Accordion title="One pipeline at a time">
+
+On a small server, two FFmpeg pipelines competing for the same CPU make both slow and can exhaust memory. A Redis lock serialises processing: videos are processed one after another, oldest first. See [ADR 0002](/docs/decisions/adr-0002-processing-queue).
+
+</Accordion>
+<Accordion title="One public entry point">
+
+Only Caddy is reachable from the internet. PostgreSQL and Redis publish no ports at all; the API, MinIO and tusd listen on loopback ports that only Caddy uses. Internal-only API routes are blocked at the edge.
+
+</Accordion>
+<Accordion title="Store keys, not URLs">
+
+The database stores object paths such as `/vod-processed/<video_id>/segments/master.m3u8`, never full URLs. The frontend builds the public URL (`<API host>/storage/<path>`), so changing domains or storage does not require a data migration.
+
+</Accordion>
+</Accordions>
+
+## The main flows
+
+| Flow | Path | Details |
+|---|---|---|
+| Browse and metadata | Browser → Caddy → FastAPI → PostgreSQL | [Request routing](/docs/architecture/request-routing) |
+| Upload | Browser (Uppy) → Caddy → tusd → MinIO, with tusd → FastAPI hooks | [Resumable uploads](/docs/backend/resumable-uploads) |
+| Processing | FastAPI → Redis → Celery worker → FFmpeg → MinIO, status in PostgreSQL | [Pipeline](/docs/pipeline) |
+| Playback | Browser (hls.js) → Caddy → MinIO | [Upload to playback](/docs/architecture/upload-to-playback) |
+
+## Scaling characteristics
+
+| Part | Scales by | Current limit |
+|---|---|---|
+| Frontend | Vercel's edge network | Effectively none for this traffic |
+| API | More Uvicorn workers or API containers | One Uvicorn process today |
+| Processing | More workers, on more machines | One worker, one video at a time, by design ([why](/docs/decisions/adr-0002-processing-queue)) |
+| Delivery | A CDN in front of `/storage` | Every segment is served from the one server today |
+| Storage | MinIO disks, or swapping to S3/R2 | The server's disk |
+
+What changes at higher scale is covered in [Improvements](/docs/roadmap/improvements) and the [system design walkthrough](/docs/interview/system-design-walkthrough).

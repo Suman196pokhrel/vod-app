@@ -1,0 +1,65 @@
+---
+title: Data and storage
+description: What lives in PostgreSQL, Redis and MinIO, and why each store was chosen for it.
+---
+
+VOD uses three stores, each for the kind of data it is good at.
+
+<Placeholder kind="architecture" title="Three stores: PostgreSQL (records), Redis (coordination), MinIO (bytes)">
+  Three columns listing what each store holds, with arrows from the API and worker.
+</Placeholder>
+
+## PostgreSQL: the system of record
+
+Anything that must survive restarts and be queried lives here: users, videos and their metadata, refresh tokens, email-verification and password-reset tokens, and tus upload sessions. A video's `processing_status` column is also the **queue**: "waiting to be processed" simply means `processing_status = 'queued'`, ordered by `created_at`.
+
+Full schema: [Data model](/docs/backend/data-model).
+
+## Redis: coordination and messaging
+
+Redis holds short-lived, fast-changing state:
+
+| Key or use | Purpose | Lifetime |
+|---|---|---|
+| Celery broker queue | Task messages waiting for the worker | Until consumed |
+| Celery result backend | Task results, including the chord's bookkeeping for parallel transcodes | 24 hours (`result_expires`) |
+| `video_processing:active_lock` | Which video is processing right now (value = video ID) | Until the pipeline ends; 6-hour safety expiry |
+| `tus:active:<upload_id>` | One key per active upload, for admission control | Until the upload finishes or is cancelled; 2-hour safety expiry |
+
+Nothing in Redis is the only copy of important data. If Redis were wiped, the videos table still says which videos are queued.
+
+## MinIO: the bytes
+
+MinIO is S3-compatible object storage. VOD uses three buckets:
+
+| Bucket (default name) | Contents | Access |
+|---|---|---|
+| `vod-videos` | Original uploads: `user-<id>/<uuid>.<ext>` (legacy path) or `tus-uploads/<id>` (tus path) | Private; admin downloads use 15-minute presigned URLs |
+| `vod-thumbnails` | Poster thumbnails, and storyboards at `<video_id>/storyboard/sprite_NNN.jpg` + `storyboard.vtt` | Served publicly through `/storage` |
+| `vod-processed` | HLS output at `<video_id>/segments/master.m3u8`, `<quality>/playlist.m3u8`, `<quality>/segment_NNNN.ts` | Served publicly through `/storage` |
+
+<Files>
+  <Folder name="vod-processed" defaultOpen>
+    <Folder name="<video_id>" defaultOpen>
+      <Folder name="segments" defaultOpen>
+        <File name="master.m3u8" />
+        <Folder name="1080p">
+          <File name="playlist.m3u8" />
+          <File name="segment_0000.ts" />
+          <File name="segment_0001.ts" />
+        </Folder>
+        <Folder name="720p" />
+        <Folder name="480p" />
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
+
+The worker's intermediate files (the downloaded original, full-length MP4 renditions, segments before upload) live in a temporary directory on the worker, `/app/tmp/video_processing/<video_id>/`, and are deleted when the pipeline finishes successfully.
+
+## Why object storage instead of the filesystem
+
+- **S3 API portability**: the same code paths work against MinIO locally and in production, and the storage layer can move to a managed S3-compatible service.
+- **Multipart uploads**: tusd can write a 50 GB file as parts without holding it anywhere else.
+- **Clean separation**: the database never stores file contents, only object paths.
+- **Delivery through the proxy**: Caddy fetches objects over HTTP, which is the same shape a CDN would use.
