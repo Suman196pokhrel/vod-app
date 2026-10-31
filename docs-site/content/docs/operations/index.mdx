@@ -1,0 +1,51 @@
+---
+title: Operations overview
+description: How production is run day to day, and where to look when something breaks.
+---
+
+This section is the runbook for the production backend: deploying, setting up a server, managing secrets, debugging and recovering from incidents. It describes procedures and commands; it never contains secret values.
+
+<Placeholder kind="flow" title="Operations map: deploy → verify → monitor → debug → recover">
+  One loop diagram linking each page in this section.
+</Placeholder>
+
+## At a glance
+
+| | |
+|---|---|
+| Provider | Hetzner Cloud, one VPS |
+| Memory | 3.72 GiB RAM + 2 GB swap (recorded in `infra/docker-compose.yml`) |
+| Repository on the server | `~/vod-app` |
+| Compose project | Run from `~/vod-app/infra` with `docker-compose.yml` and `prod.env` |
+| Public hostname | `api.vod.spokhrel.dev` (Caddy, automatic HTTPS) |
+| Frontend / docs | Vercel, deployed on push to `main` |
+
+All commands in this section are run **on the server, from `~/vod-app/infra`**, unless stated otherwise. For brevity they use this alias:
+
+```bash
+alias dc='docker compose -f docker-compose.yml --env-file prod.env'
+```
+
+<Callout type="warn" title="Always pass the env file">
+  Without `--env-file prod.env`, Compose fills in values for PostgreSQL, Redis, MinIO and tusd from
+  `infra/.env` or built-in defaults, and may recreate those containers with the wrong configuration.
+</Callout>
+
+## Pages
+
+<Cards>
+  <Card href="/docs/operations/deploy" title="Deploy" description="Release a new backend version, verify it, roll it back." />
+  <Card href="/docs/operations/server-setup" title="Server setup" description="Build a production server from scratch." />
+  <Card href="/docs/operations/secrets" title="Secrets" description="Every secret: what it protects, where it lives, how to rotate it." />
+  <Card href="/docs/operations/debugging" title="Debugging" description="Commands for logs, the queue, the database, storage and Redis." />
+  <Card href="/docs/operations/playbooks" title="Playbooks" description="Symptom → checks → fix, for the incidents seen so far." />
+</Cards>
+
+## Daily health check
+
+```bash
+dc ps                                            # every service Up
+curl -s https://api.vod.spokhrel.dev/health/     # {"status":"Ok!"}
+dc logs --since 24h worker | grep "\[queue\]"    # processing activity
+df -h /                                          # disk headroom
+```

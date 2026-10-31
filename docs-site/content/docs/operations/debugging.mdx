@@ -1,0 +1,119 @@
+---
+title: Debugging
+description: Commands for inspecting logs, the processing queue, the database, storage and Redis in production.
+---
+
+Run from `~/vod-app/infra` on the server with the `dc` alias:
+
+```bash
+alias dc='docker compose -f docker-compose.yml --env-file prod.env'
+```
+
+<Placeholder kind="flow" title="Where to look first: symptom → layer (frontend, API, queue, worker, storage) → command">
+  Decision chart pointing to the sections below.
+</Placeholder>
+
+## Logs
+
+```bash
+dc logs -f worker                                   # follow the pipeline
+dc logs worker --since 2h | grep "\[queue\]"        # queue events only
+dc logs --timestamps worker | grep "<video_id>"     # one video's whole story
+dc logs worker --since 24h | grep -iE "error|traceback|raised unexpected"
+dc logs api --since 1h | grep -iE "error|traceback"
+dc logs caddy --since 1h                            # TLS and proxy errors
+```
+
+Each pipeline stage logs its start and result, so grepping a video ID shows exactly where it stopped. Celery logs `Task … raised unexpected` with the exception for any failed task.
+
+## The processing queue
+
+```bash
+# Which video holds the processing slot (nil = idle)
+dc exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning GET video_processing:active_lock'
+
+# How long until the lock expires on its own (seconds; -2 = no lock)
+dc exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning TTL video_processing:active_lock'
+
+# Active upload admission slots
+dc exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning --scan --pattern "tus:active:*"'
+```
+
+## The database
+
+```bash
+dc exec postgres psql -U vod_user -d vod_db
+```
+
+```sql
+-- Where every recent video is
+SELECT id, title, processing_status, processing_error, manifest_url IS NOT NULL AS playable, created_at
+FROM videos WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 15;
+
+-- Queue depth by state
+SELECT processing_status, COUNT(*) FROM videos WHERE deleted_at IS NULL GROUP BY 1;
+
+-- Videos stuck in an in-progress state for over an hour
+SELECT id, title, processing_status, updated_at FROM videos
+WHERE processing_status NOT IN ('queued', 'completed', 'failed')
+  AND updated_at < now() - interval '1 hour';
+
+-- Recent uploads and their tus sessions
+SELECT upload_id, status, video_id, created_at FROM tus_uploads ORDER BY created_at DESC LIMIT 10;
+```
+
+### Using pgAdmin over SSH
+
+PostgreSQL publishes no port, so a desktop client needs an SSH tunnel to the container's address on the Docker network:
+
+```bash
+dc exec postgres hostname -i      # or:
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(dc ps -q postgres)
+```
+
+In pgAdmin: **Connection** host = that address, port 5432, database `vod_db`, user `vod_user`; **SSH Tunnel** on, tunnel host = the server, your SSH user and private key. The container address can change when the container is recreated.
+
+Treat production as read-only from a GUI: editing cells in a grid writes straight to the live database.
+
+## Re-queue a failed video
+
+```sql
+UPDATE videos SET processing_status = 'queued', processing_error = NULL WHERE id = '<video_id>';
+```
+
+Then start the queue (it does nothing if another video is processing; that pipeline will pick this one up when it ends):
+
+```bash
+dc exec worker python -c "from app.tasks.processing_queue import start_next_video_if_idle; print(start_next_video_if_idle())"
+```
+
+It prints the video ID it started, or `None`.
+
+## Storage
+
+```bash
+# Is the HLS output there?
+docker run --rm --network host --entrypoint sh minio/mc -c '
+  mc alias set local http://127.0.0.1:9000 <MINIO_ROOT_USER> <MINIO_ROOT_PASSWORD> >/dev/null &&
+  mc ls --recursive local/vod-processed/<video_id>/segments/ | head'
+
+# From anywhere: does it serve, with the right headers?
+curl -sI https://api.vod.spokhrel.dev/storage/vod-processed/<video_id>/segments/master.m3u8
+curl -s  https://api.vod.spokhrel.dev/storage/vod-processed/<video_id>/segments/master.m3u8
+```
+
+## Disk
+
+```bash
+df -h /
+docker system df                                    # images, containers, volumes
+dc exec worker du -sh /app/tmp/video_processing     # leftovers from failed runs
+sudo du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail   # container log sizes
+```
+
+## Celery state
+
+```bash
+dc exec worker celery -A app.celery_app:celery_app inspect active      # running tasks
+dc exec worker celery -A app.celery_app:celery_app inspect reserved    # prefetched tasks
+```

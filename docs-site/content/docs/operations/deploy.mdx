@@ -1,0 +1,114 @@
+---
+title: Deploy
+description: Release, verify and roll back the production backend.
+---
+
+Frontend and docs deploy automatically on Vercel when `main` changes. This page covers the **backend**, which is deployed by hand.
+
+<Placeholder kind="flow" title="Backend release: pre-checks → pull → build → migrate → verify → (rollback)">
+  Include the decision point "is a video processing right now?".
+</Placeholder>
+
+## 1. Pre-checks
+
+<Steps>
+<Step>
+
+### Connect
+
+```bash
+ssh vod              # SSH config alias on the admin's machine
+cd ~/vod-app/infra
+alias dc='docker compose -f docker-compose.yml --env-file prod.env'
+```
+
+</Step>
+<Step>
+
+### Is a video processing?
+
+Restarting the worker fails whatever it is processing. Check the lock first:
+
+```bash
+dc exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning GET video_processing:active_lock'
+```
+
+Empty output (`nil`) means the worker is idle. Otherwise either wait, or deploy anyway and re-queue that video afterwards.
+
+</Step>
+<Step>
+
+### Know what you are deploying
+
+```bash
+cd ~/vod-app
+git fetch && git log --oneline HEAD..origin/main      # incoming commits
+git diff --stat HEAD origin/main -- backend/alembic   # any new migrations?
+git rev-parse --short HEAD                            # note this for rollback
+```
+
+</Step>
+</Steps>
+
+## 2. Release
+
+```bash
+cd ~/vod-app && git pull origin main
+cd infra
+dc up -d --build api worker
+```
+
+Only `api` and `worker` are rebuilt; infrastructure containers are untouched unless their configuration changed. If `infra/caddy/Caddyfile.prod` changed, also run `dc restart caddy`.
+
+### Migrations
+
+If the release contains new files in `backend/alembic/versions/`:
+
+```bash
+dc exec api alembic upgrade head
+dc exec api alembic current        # should print the new head revision
+```
+
+The API's startup `create_all()` creates new tables but never alters existing ones, so skipping this breaks any release that changes a column.
+
+## 3. Verify
+
+```bash
+dc ps                                                    # api and worker Up
+curl -s https://api.vod.spokhrel.dev/health/             # {"status":"Ok!"}
+dc logs --since 5m api | tail -20                        # no tracebacks
+dc logs --since 5m worker | grep -E "ready|\[queue\]"    # "celery@… ready" and the recovery line
+```
+
+On startup the worker logs one line such as:
+
+```text
+[queue] Worker startup recovery: purged 0 message(s), marked 0 interrupted video(s) failed: []
+```
+
+If it marked a video failed, re-queue it ([Debugging](/docs/operations/debugging#re-queue-a-failed-video)).
+
+Finally, open the site, play a video and, if the release touched the pipeline, upload a short test video and watch it reach `completed`.
+
+## 4. Roll back
+
+```bash
+cd ~/vod-app
+git checkout <previous-commit>        # the hash noted in pre-checks
+cd infra && dc up -d --build api worker
+```
+
+If the bad release ran a migration, downgrade it first while the new code is still checked out:
+
+```bash
+dc exec api alembic downgrade -1
+```
+
+Return to `main` with `git checkout main` once the fix is pushed.
+
+## What a deploy interrupts
+
+| Recreated | Impact |
+|---|---|
+| `api` | Seconds of failed requests while Uvicorn restarts; tus hooks fail during that window |
+| `worker` | The video being processed is marked failed on restart and must be re-queued |

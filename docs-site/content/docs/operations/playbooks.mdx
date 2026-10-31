@@ -1,0 +1,89 @@
+---
+title: Playbooks
+description: Step-by-step responses to the incidents seen in production, from symptom to fix.
+---
+
+Each playbook goes **symptom → checks → likely causes → fix**. Commands assume the `dc` alias from [Debugging](/docs/operations/debugging).
+
+<Placeholder kind="flow" title="Triage tree for the playbooks below">
+  Entry point: "what does the user see?" branching to each playbook.
+</Placeholder>
+
+<Accordions>
+<Accordion title="A video says 'still processing' long after upload">
+
+**Checks**
+
+1. Database row: `processing_status`, `processing_error`, `manifest_url` ([queries](/docs/operations/debugging#the-database)).
+2. The lock: which video holds it, and its TTL.
+3. The worker log for that video ID.
+
+**Likely causes**
+
+| What you see | Cause | Fix |
+|---|---|---|
+| `queued`, lock empty | Nothing restarted the queue | Run `start_next_video_if_idle()` |
+| `queued`, lock held by another video | Waiting its turn | Wait; check the other video is progressing |
+| An in-progress status, no recent log lines | Worker interrupted | Restart the worker (recovery marks it failed), then re-queue |
+| `failed` with an error | The pipeline failed | Read the error, fix the cause, re-queue |
+| An error in the log *between* stages | A Celery-level failure | See the [2026-10 incident](/docs/decisions/incident-2026-10-stuck-videos) |
+
+A visible thumbnail proves nothing: it is stored at upload time, not by the pipeline.
+
+</Accordion>
+<Accordion title="Processing failed">
+
+1. Read `processing_error` and grep the worker log for the video ID.
+2. `ffprobe` errors mean the file is unreadable or not a video: ask for a different file.
+3. FFmpeg or MinIO errors may be transient: re-queue once.
+4. `Pipeline stopped during '…'` names the stage and task that raised.
+5. "Interrupted … by a worker restart": re-queue.
+
+</Accordion>
+<Accordion title="Uploads fail or never start">
+
+| Symptom | Check | Fix |
+|---|---|---|
+| 503 with `Retry-After` | Count `tus:active:*` keys | The cap (8) is full; slots expire after 2 hours, or finish/cancel the active uploads |
+| "Invalid or expired token" | The admin's session | Sign in again, then upload |
+| Upload completes but "processing didn't start" | `dc logs api` around that time for the `post-finish` hook | Check the `tus_uploads` row; if a video row exists, re-queue it |
+| Fails immediately | `dc logs tusd`, `dc logs api` | tusd or API down, or the hook secret differs between them |
+
+</Accordion>
+<Accordion title="API or the whole site is down">
+
+1. `dc ps`: is every service `Up`? Start anything that is not: `dc up -d <service>`.
+2. `curl -s https://api.vod.spokhrel.dev/health/` from outside, and `curl -s http://127.0.0.1:8000/health/` on the server. If the second works but the first does not, the problem is Caddy or DNS.
+3. `dc logs caddy`: certificate or config errors.
+4. `dc logs api`: a startup error naming a missing setting means `prod.env` is incomplete.
+5. `free -h` and `dmesg -T | grep -i oom`: was a container killed for memory?
+
+</Accordion>
+<Accordion title="Videos won't play (thumbnails or player 404)">
+
+1. `curl -sI` the master playlist under `/storage/...` ([Debugging](/docs/operations/debugging#storage)).
+2. 404 with an S3 `NoSuchKey` error: the object is missing; check `manifest_url` matches what is in the bucket, or re-process.
+3. 403 / Access Denied: the bucket lost public read; re-apply it ([Server setup](/docs/operations/server-setup)).
+4. Works with curl but not in the browser: check the frontend's `NEXT_PUBLIC_API_URL` in Vercel.
+
+</Accordion>
+<Accordion title="Disk is filling up">
+
+1. `df -h /`, then `docker system df`.
+2. Worker leftovers: `dc exec worker du -sh /app/tmp/video_processing`. Directories for videos that are not processing can be removed; recreating the worker clears them all.
+3. Container logs: check `/var/lib/docker/containers/*/*-json.log`; configure rotation in `/etc/docker/daemon.json` if they are large.
+4. Old images: `docker image prune`.
+5. MinIO data: originals of soft-deleted videos are still stored.
+
+</Accordion>
+<Accordion title="The site shows no Sign in button or avatar">
+
+A known frontend session-restore bug. Clear the site's local storage (or sign out, if possible) and reload. Tracked in [Improvements](/docs/roadmap/improvements).
+
+</Accordion>
+<Accordion title="After a deploy, a video is marked failed">
+
+Expected if it was processing during the deploy: the worker's startup recovery fails interrupted videos. Re-queue it. Next time, check the lock before deploying ([Deploy](/docs/operations/deploy)).
+
+</Accordion>
+</Accordions>
