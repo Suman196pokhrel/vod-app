@@ -1,0 +1,114 @@
+---
+title: Pipeline overview
+description: How an uploaded file becomes an adaptive HLS stream, using a Celery workflow and FFmpeg.
+---
+
+Processing a video means downloading the original, inspecting it, generating scrubbing previews, transcoding several renditions, packaging them as HLS and publishing the result to object storage. That takes minutes of CPU per video, so it runs in a **Celery worker**, never inside an API request.
+
+<Placeholder kind="animation" title="Animated pipeline: one source file fanning out into seven renditions, then into segments and a master playlist">
+  Short looping animation for the top of the Pipeline section.
+</Placeholder>
+
+## The workflow
+
+The pipeline is a single **Celery canvas** built in `backend/app/tasks/workflows.py`:
+
+```python title="backend/app/tasks/workflows.py"
+workflow = chain(
+    prepare_video.s(video_id),
+    generate_storyboard.s(),
+    chord(
+        group(
+            # transcode_quality.s("2160p"),  # 4K, disabled
+            transcode_quality.s("1440p"),
+            transcode_quality.s("1080p"),
+            transcode_quality.s("720p"),
+            transcode_quality.s("480p"),
+            transcode_quality.s("360p"),
+            transcode_quality.s("240p"),
+            transcode_quality.s("144p"),
+        ),
+        on_transcode_complete.s(),
+    ),
+    segment_videos.s(),
+    create_manifest.s(),
+    upload_to_minio.s(),
+    finalize_processing.s(),
+)
+```
+
+When the [processing queue](/docs/pipeline/processing-queue) dispatches it, it appends one more step, `on_pipeline_success`, and attaches `on_pipeline_failed` as the error handler.
+
+<Placeholder kind="flow" title="Workflow graph: prepare → storyboard → chord(7× transcode) → aggregate → segment → manifest → upload → finalize → on_pipeline_success, with on_pipeline_failed as the error branch">
+  Mark which steps are sequential and which run as the chord's parallel group.
+</Placeholder>
+
+## Celery primitives used
+
+| Primitive | Meaning | Where |
+|---|---|---|
+| **Signature** (`.s()`) | A task call that can be passed around. A step's return value becomes the next step's first argument. | Every step |
+| **Immutable signature** (`.si()`) | Ignores the previous step's result | `on_pipeline_success` |
+| **chain** | Run steps one after another | The whole pipeline |
+| **group** | Run tasks independently, possibly in parallel | The seven transcodes |
+| **chord** | A group plus a callback that runs once every task in the group has finished, receiving all their results | Transcodes → `on_transcode_complete` |
+
+Each step returns a dictionary (`video_id`, paths, metadata, results) that the next step reads. The chord's callback receives a **list** of the seven transcode results and aggregates them into one dictionary for the rest of the chain.
+
+## Stages at a glance
+
+| # | Task | Status written | Does |
+|---|---|---|---|
+| 1 | `prepare_video` | `preparing` | Downloads the original from MinIO, runs `ffprobe`, stores metadata |
+| 2 | `generate_storyboard` | `generating_storyboard` | Sprite sheets + WebVTT for timeline previews (best effort) |
+| 3 | `transcode_quality` ×7 | `transcoding` | H.264/AAC MP4 per rendition, skipping any above the source height |
+| 4 | `on_transcode_complete` | `aggregating` | Collects successful renditions; fails if none succeeded |
+| 5 | `segment_videos` | `segmenting` | Cuts each MP4 into 6-second HLS `.ts` segments |
+| 6 | `create_manifest` | `creating_manifest` | Writes `master.m3u8` listing every rendition |
+| 7 | `upload_to_minio` | `uploading_to_storage` | Uploads playlists and segments to the processed bucket |
+| 8 | `finalize_processing` | `finalizing` → `completed` | Saves `manifest_url` and qualities, deletes the work directory |
+| 9 | `on_pipeline_success` | — | Releases the processing lock, starts the next queued video |
+
+Full details: [Stages](/docs/pipeline/stages).
+
+## Parallel in theory, sequential in production
+
+The chord lets all seven transcodes run at once, but how many actually run in parallel depends on the worker's **concurrency** (the number of worker processes):
+
+| Environment | Concurrency | Effect |
+|---|---|---|
+| Local (`docker-compose.local.yml`) | 3 | Up to three renditions encode at the same time |
+| Production (`docker-compose.yml`) | 1 | Renditions encode one after another |
+
+Production is deliberately set to 1. FFmpeg is CPU- and memory-hungry, and the backend shares one small server with the API, database and storage. One encode at a time keeps the API responsive and memory predictable. The trade-off is longer processing time per video.
+
+## Where files live during processing
+
+Each video gets a working directory on the worker, `/app/tmp/video_processing/<video_id>/`:
+
+<Files>
+  <Folder name="<video_id>" defaultOpen>
+    <File name="raw.<ext>" />
+    <Folder name="storyboard">
+      <File name="sprite_000.jpg" />
+      <File name="storyboard.vtt" />
+    </Folder>
+    <Folder name="transcoded">
+      <File name="1080p.mp4" />
+      <File name="720p.mp4" />
+    </Folder>
+    <Folder name="segments">
+      <File name="master.m3u8" />
+      <Folder name="1080p">
+        <File name="playlist.m3u8" />
+        <File name="segment_0000.ts" />
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
+
+Every stage reads the previous stage's files from this local directory, which is why the whole pipeline for one video runs on the same worker. The directory is deleted by `finalize_processing` when processing succeeds.
+
+## Time limits
+
+Celery is configured (`backend/app/celery_app.py`) with a **50-minute soft** and **60-minute hard** time limit per task. A single rendition or upload step that runs longer is interrupted. This matters for long, high-resolution sources on a small server; see [Improvements](/docs/roadmap/improvements).

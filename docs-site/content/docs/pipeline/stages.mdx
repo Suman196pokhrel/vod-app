@@ -1,0 +1,158 @@
+---
+title: Stages
+description: Each pipeline task in detail, with the exact FFmpeg commands, retries and failure behaviour.
+---
+
+All tasks live in `backend/app/tasks/video/`. Each one writes its own `processing_status` when it starts, so the admin's progress dialog follows along.
+
+<Placeholder kind="flow" title="Data passed between stages: the dictionary each task returns and the next task reads">
+  Show the keys added at each step (local_path, work_dir, metadata → transcoded_files → segment info → master path → manifest_url).
+</Placeholder>
+
+## 1. prepare_video
+
+**Status:** `preparing` · **File:** `prepare.py`
+
+1. Loads the video row and refuses to continue unless `processing_status` is exactly `queued` (protects against processing a video twice).
+2. Sets `preparing`, then creates the working directory `/app/tmp/video_processing/<video_id>/` with `transcoded/` and `segments/`, first removing any leftover directory from an earlier attempt.
+3. Downloads the original from the raw bucket.
+4. Runs **ffprobe** and stores the result in `processing_metadata`:
+
+```bash
+ffprobe -v quiet -print_format json -show_format -show_streams <raw file>
+```
+
+It records duration, width, height, video codec, bitrate, frame rate, file size, audio codec and audio bitrate from the first video and audio streams.
+
+**Returns:** `video_id`, `local_path`, `work_dir`, `transcoded_dir`, `segments_dir`, `metadata`.
+**Failure:** a download error is retried after 60 seconds; a probe error (for example a corrupt file) marks the video `failed` immediately, since retrying would not help.
+
+## 2. generate_storyboard
+
+**Status:** `generating_storyboard` · **File:** `storyboard.py`
+
+Builds the thumbnails shown when hovering the player's timeline. One frame every 5 seconds, 160 px wide, tiled 10 × 10 into JPEG sprite sheets:
+
+```bash
+ffmpeg -y -i <raw file> \
+  -vf fps=1/5,scale=160:-2,tile=10x10 \
+  -vsync 0 -start_number 0 -q:v 4 \
+  <work_dir>/storyboard/sprite_%03d.jpg
+```
+
+It then measures the real tile size with ffprobe (the `-2` in `scale` rounds the height to keep the aspect ratio, so it is measured rather than computed), and writes a **WebVTT** file with one cue per 5-second window:
+
+```text title="storyboard.vtt"
+WEBVTT
+
+00:00:00.000 --> 00:00:05.000
+sprite_000.jpg#xywh=0,0,160,90
+
+00:00:05.000 --> 00:00:10.000
+sprite_000.jpg#xywh=160,0,160,90
+```
+
+The `#xywh=x,y,w,h` media fragment tells the player which rectangle of the sprite sheet to show. Sheets and VTT are uploaded to `vod-thumbnails/<video_id>/storyboard/`, and `storyboard_url` is saved.
+
+**Failure:** best effort by design. Any error is logged and the step returns its input unchanged; a missing preview must never block playback.
+
+## 3. transcode_quality (×7)
+
+**Status:** `transcoding` · **File:** `transcode.py` · **Retries:** 2, 60 seconds apart
+
+One task per rendition. Renditions taller than the source are skipped (no upscaling). For each remaining one:
+
+```bash
+ffmpeg -i <raw file> \
+  -c:v libx264 -threads <FFMPEG_THREADS> -preset medium -crf 23 \
+  -vf "scale=w=<W>:h=<H>:force_original_aspect_ratio=decrease,pad=w=<W>:h=<H>:x=(ow-iw)/2:y=(oh-ih)/2:color=black" \
+  -b:v <bitrate> \
+  -c:a aac -b:a 128k \
+  -y <work_dir>/transcoded/<quality>.mp4
+```
+
+| Flag | Effect |
+|---|---|
+| `-c:v libx264` | H.264, the most widely supported codec for browser playback |
+| `-preset medium` | x264's default speed/size balance |
+| `-crf 23` | Quality-based rate control (x264's default quality level) |
+| `scale=…force_original_aspect_ratio=decrease` | Fit inside the target box without stretching |
+| `pad=…color=black` | Fill the rest of the box with black bars, so every rendition has the exact target size |
+| `-c:a aac -b:a 128k` | AAC audio at 128 kbps, encoded again for every rendition |
+
+**Returns:** `{video_id, quality, output_path, file_size}`, or a marker that the rendition was skipped or failed.
+**Failure:** one rendition failing does not stop the others; `on_transcode_complete` decides.
+
+## 4. on_transcode_complete
+
+**Status:** `aggregating` · the chord callback
+
+Receives the list of all transcode results, keeps the successful ones and builds `transcoded_files: {quality: {path, size}}`. If **no** rendition succeeded, it marks the video `failed` and raises, stopping the chain.
+
+## 5. segment_videos
+
+**Status:** `segmenting` · **File:** `segment.py` · **Retries:** 2
+
+Splits each MP4 into HLS segments **without re-encoding** (`-c copy` only rewraps the stream, so this step is fast):
+
+```bash
+ffmpeg -i <quality>.mp4 \
+  -c copy -f hls \
+  -hls_time 6 -hls_list_size 0 \
+  -hls_segment_filename <segments>/<quality>/segment_%4d.ts \
+  -y <segments>/<quality>/playlist.m3u8
+```
+
+`-hls_time 6` targets 6-second segments; `-hls_list_size 0` keeps every segment in the playlist (a VOD playlist, not a sliding live window). Because the stream is copied, a segment can only start on an existing keyframe, so real segment lengths vary around the target.
+
+## 6. create_manifest
+
+**Status:** `creating_manifest` · **File:** `manifest.py` · **Retries:** 2
+
+Writes `master.m3u8` in Python, highest quality first:
+
+```text title="master.m3u8"
+#EXTM3U
+#EXT-X-VERSION:3
+
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080
+1080p/playlist.m3u8
+
+#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720
+720p/playlist.m3u8
+```
+
+This is the real start of a production master playlist for a 1080p source.
+
+`BANDWIDTH` is the rendition's configured bitrate in bits per second (`5000k` → `5000000`).
+
+## 7. upload_to_minio
+
+**Status:** `uploading_to_storage` · **File:** `upload.py` · **Retries:** 3
+
+Uploads the master playlist and every rendition's playlist and segments to `vod-processed/<video_id>/segments/`, one file at a time. The intermediate MP4s are not uploaded.
+
+## 8. finalize_processing
+
+**Status:** `finalizing` → `completed` · **File:** `finalize.py`
+
+Sets `processing_status = completed`, `manifest_url = /vod-processed/<video_id>/segments/master.m3u8`, `available_qualities`, clears `processing_error` and `celery_task_id`, then deletes the working directory.
+
+## 9. on_pipeline_success
+
+Not a media step: releases the processing lock and starts the next queued video. See [Processing queue](/docs/pipeline/processing-queue).
+
+## Retry summary
+
+| Task | Max retries | Delay |
+|---|---|---|
+| `prepare_video` | 3 (Celery default) | 60 s, download errors only |
+| `generate_storyboard` | none (errors are swallowed) | — |
+| `transcode_quality` | 2 | 60 s |
+| `on_transcode_complete` | none | — |
+| `segment_videos` | 2 | 60 s |
+| `create_manifest` | 2 | 60 s |
+| `upload_to_minio` | 3 | 60 s |
+| `finalize_processing` | none | — |
+
+Every retry waits a fixed 60 seconds; there is no exponential backoff.

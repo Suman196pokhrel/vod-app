@@ -1,0 +1,74 @@
+---
+title: Failure handling
+description: How each kind of failure is detected, recorded and recovered from.
+---
+
+A pipeline can fail inside a task (a bad file, an FFmpeg error), between tasks (an error in Celery itself), or by losing the worker entirely. Each case has a different handler, and every one of them ends with the video marked `failed` and the queue moving on.
+
+<Placeholder kind="flow" title="Failure decision tree: task error → retry? → task marks failed → link_error → on_pipeline_failed → next video; worker death → startup recovery">
+  One diagram covering all three failure classes and where each is caught.
+</Placeholder>
+
+## Three layers of handling
+
+<Accordions>
+<Accordion title="1. Inside a task: retry, skip or fail">
+
+Each task catches its own errors and chooses a response:
+
+| Response | Used when | Example |
+|---|---|---|
+| **Retry** after 60 s | The error may be transient | MinIO download or upload error, FFmpeg segment failure |
+| **Skip** | Losing this part should not lose the video | One rendition failing; the storyboard failing |
+| **Fail** | Retrying cannot help | ffprobe cannot read the file; no rendition succeeded |
+
+A task that fails writes `processing_status = failed` and a message to `processing_error`, then raises so the chain stops.
+
+</Accordion>
+<Accordion title="2. Anything a task does not handle: on_pipeline_failed">
+
+The chain is dispatched with `link_error=on_pipeline_failed.s(video_id)`. Celery attaches it to every step, so whatever raises — a task's final failure, an unexpected exception, or an error Celery hits while handing off between steps — triggers it.
+
+It marks the video `failed` (never overwriting `completed`), records the stage, task and exception if no message exists yet, then releases the processing lock and starts the next queued video.
+
+Example of a recorded message:
+
+```text
+Pipeline stopped during 'generating_storyboard' (app.tasks.video_tasks.generate_storyboard): TypeError('…')
+```
+
+</Accordion>
+<Accordion title="3. The worker itself dies: startup recovery">
+
+An out-of-memory kill or a redeploy stops the process before any callback runs. When the worker starts again, `recover_after_worker_restart()` purges leftover messages, clears the lock, marks every in-progress video `failed` ("interrupted by a worker restart") and starts the queue. See [Processing queue](/docs/pipeline/processing-queue#recovering-after-a-worker-restart).
+
+</Accordion>
+</Accordions>
+
+## What a failure looks like from outside
+
+| Where | What you see |
+|---|---|
+| Admin upload dialog | The status poll returns `is_failed: true` and the error message |
+| Admin videos table | Processing status `failed` |
+| Watch page | "This video is still processing" (no `manifest_url`), for any video that has not completed |
+| Worker logs | The task's own error lines, plus a `[queue] Pipeline failed for video_id: …` line |
+
+## Retrying
+
+A failed video is retried by setting it back to `queued`. `prepare_video` clears any leftover working directory from the earlier run before starting.
+
+## Safety limits
+
+| Limit | Value | Protects against |
+|---|---|---|
+| Soft time limit per task | 50 minutes | A runaway encode |
+| Hard time limit per task | 60 minutes | A task that ignores the soft limit |
+| Processing lock TTL | 6 hours | A lock left behind if nothing else releases it |
+| tus admission slot TTL | 2 hours | Abandoned uploads holding upload capacity |
+
+## Known gaps
+
+- The working directory is cleaned only on success, so failed runs leave intermediate files on the worker until the video is retried or the container is recreated.
+- Retry handling inside some tasks (transcode, segment, upload) has edge cases where a retry is counted twice or swallowed. These are tracked in [Improvements](/docs/roadmap/improvements).
+- A deploy that restarts the worker fails whatever is processing at that moment; it must be re-queued.

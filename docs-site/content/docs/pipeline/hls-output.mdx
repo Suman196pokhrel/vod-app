@@ -1,0 +1,110 @@
+---
+title: HLS output
+description: The bitrate ladder, segment layout and playlists the pipeline produces, and how players use them.
+---
+
+**HLS (HTTP Live Streaming)** delivers video as many small segment files listed in text playlists (`.m3u8`). A player downloads the **master playlist**, picks a rendition based on measured bandwidth and screen size, and fetches that rendition's segments one by one, switching up or down between segments as conditions change. That is **adaptive bitrate (ABR) streaming**.
+
+<Placeholder kind="animation" title="ABR in action: bandwidth drops, the player steps down from 1080p to 480p at the next segment boundary, then climbs back">
+  Timeline animation with a bandwidth graph above and the chosen rendition below.
+</Placeholder>
+
+## The bitrate ladder
+
+Defined as `QUALITY_SETTINGS` in `backend/app/core/config.py`:
+
+| Rendition | Resolution | Video bitrate | Status |
+|---|---|---|---|
+| 2160p | 3840 × 2160 | 20,000 kbps | Defined, disabled in the workflow |
+| 1440p | 2560 × 1440 | 10,000 kbps | Active |
+| 1080p | 1920 × 1080 | 5,000 kbps | Active |
+| 720p | 1280 × 720 | 2,500 kbps | Active |
+| 480p | 854 × 480 | 1,000 kbps | Active |
+| 360p | 640 × 360 | 500 kbps | Active |
+| 240p | 426 × 240 | 300 kbps | Active |
+| 144p | 256 × 144 | 200 kbps | Active |
+
+Every rendition also has 128 kbps AAC audio.
+
+### Which renditions a video gets
+
+- **No upscaling:** a rendition is skipped when its height is greater than the source height. A 1080p source gets 1080p and below (six renditions); a 720p source gets five.
+- **Fixed frame size:** every rendition is scaled to fit inside its box and **padded with black** to the exact width and height, so a vertical or ultra-wide source keeps its shape inside a 16:9 frame.
+- The list actually produced is stored in `available_qualities`.
+
+<Placeholder kind="chart" title="Ladder chart: resolution vs bitrate for the seven active renditions">
+  Bar or step chart; optionally overlay measured file sizes per rendition for a sample video.
+</Placeholder>
+
+## Output layout
+
+```text
+vod-processed/<video_id>/segments/
+├── master.m3u8
+├── 1080p/
+│   ├── playlist.m3u8
+│   ├── segment_0000.ts
+│   ├── segment_0001.ts
+│   └── …
+├── 720p/
+└── …
+```
+
+Segments are **MPEG-TS** (`.ts`) files, numbered with four digits.
+
+## Playlists
+
+<Tabs items={['Master playlist', 'Media playlist']}>
+<Tab value="Master playlist">
+
+Written by `create_manifest`. One `EXT-X-STREAM-INF` entry per rendition, highest first, with `BANDWIDTH` (bits per second, from the configured bitrate) and `RESOLUTION`:
+
+```text
+#EXTM3U
+#EXT-X-VERSION:3
+
+#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080
+1080p/playlist.m3u8
+```
+
+</Tab>
+<Tab value="Media playlist">
+
+Written by FFmpeg's HLS muxer during `segment_videos`. From a real production video:
+
+```text
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:8
+#EXT-X-MEDIA-SEQUENCE:0
+#EXTINF:8.500000,
+segment_0000.ts
+#EXTINF:4.433333,
+segment_0001.ts
+```
+
+`EXTINF` is each segment's real duration; `TARGETDURATION` is the longest one, rounded up.
+
+</Tab>
+</Tabs>
+
+## Why segment lengths vary
+
+The target is 6 seconds, but the playlist above has segments of 8.5 s and 4.4 s. Segmenting uses `-c copy`, which cannot create keyframes, so FFmpeg can only cut where the encoder happened to put one. The transcode step does not force keyframes at fixed intervals, so each rendition's keyframes, and therefore its segment boundaries, land in different places.
+
+This still plays correctly, but it is not ideal for ABR: when renditions' segments are aligned, a player can switch quality at any boundary cleanly. Forcing a keyframe every 6 seconds during transcoding (for example `-force_key_frames "expr:gte(t,n_forced*6)" -sc_threshold 0`) would give aligned, exactly 6-second segments. See [Improvements](/docs/roadmap/improvements).
+
+## Delivery
+
+Playlists and segments are served by Caddy from MinIO under `/storage/`:
+
+| File | Cache |
+|---|---|
+| `.ts` segments | `public, max-age=31536000, immutable` |
+| `.m3u8` playlists | `public, max-age=60` |
+
+Segments never change once written, so they can be cached for a year by browsers and any CDN in front.
+
+## In the player
+
+The frontend uses video.js with an hls.js-backed element. It caps the chosen quality to the player's size, starts with a 1 Mbps bandwidth estimate, and lets the viewer override the automatic choice from a quality menu. Details: [Player](/docs/frontend/player).

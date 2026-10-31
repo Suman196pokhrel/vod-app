@@ -1,0 +1,145 @@
+---
+title: Processing queue
+description: How a Redis lock runs one video's pipeline at a time, oldest first, and recovers from crashes.
+---
+
+Uploads can arrive in bursts, but the server should only process **one video at a time**. The processing queue (`backend/app/tasks/processing_queue.py`) enforces that with a PostgreSQL column as the queue and a Redis key as the lock.
+
+<Placeholder kind="state" title="Processing queue: queued rows, the active lock, and the hand-off when a pipeline ends (success or failure)">
+  Animate three uploads arriving together: the first takes the lock, the others wait, and each pipeline end hands the lock to the next oldest.
+</Placeholder>
+
+## Why serialise at all
+
+The worker already runs one task at a time in production, but that alone does not keep videos in order. Without coordination, three uploads would put three chains into the same broker queue at once. Their tasks would interleave, so a short video's later stages could wait behind another video's transcodes, and every video would finish late. Running one **pipeline** at a time makes each video finish as early as possible, in upload order. See [ADR 0002](/docs/decisions/adr-0002-processing-queue) for the alternatives considered.
+
+## The pieces
+
+| Piece | What it is |
+|---|---|
+| The queue | Rows in `videos` with `processing_status = 'queued'`, ordered by `created_at` |
+| The lock | Redis key `video_processing:active_lock`; its **value is the ID of the video being processed** |
+| Lock TTL | 6 hours: a dead-man's switch, not the normal release path |
+| Start | `start_next_video_if_idle()` |
+| Success hand-off | `on_pipeline_success`, the last step of every pipeline chain |
+| Failure hand-off | `on_pipeline_failed`, the chain's `link_error` |
+| Recovery | `recover_after_worker_restart()`, run on worker startup |
+
+## Starting the next video
+
+```python title="backend/app/tasks/processing_queue.py (simplified)"
+def start_next_video_if_idle() -> str | None:
+    video_id = _get_oldest_queued_video_id()
+    if video_id is None:
+        return None
+
+    # SET NX: only succeeds if no lock exists, i.e. nothing is processing.
+    if not redis.set(PROCESSING_LOCK_KEY, video_id, nx=True, ex=PROCESSING_LOCK_TTL_SECONDS):
+        return None
+
+    try:
+        pipeline = create_video_processing_workflow(video_id) | on_pipeline_success.si(video_id)
+        result = pipeline.apply_async(link_error=on_pipeline_failed.s(video_id))
+    except Exception:
+        _release_lock(video_id)   # nothing was dispatched, so free the slot now
+        raise
+    ...
+```
+
+It is safe to call from anywhere, any number of times: after every upload, and at the end of every pipeline. It does nothing unless it finds a queued video **and** wins the lock. `SET NX` is atomic, so two callers racing for the same video cannot both start it.
+
+## Handing the lock back
+
+The pipeline returns the lock itself, exactly once, however it ends.
+
+<Tabs items={['On success', 'On failure']}>
+<Tab value="On success">
+
+`on_pipeline_success(video_id)` runs as the **last step of the chain**, after `finalize_processing`. It releases the lock and calls `start_next_video_if_idle()`.
+
+</Tab>
+<Tab value="On failure">
+
+`on_pipeline_failed(request, exc, traceback, video_id)` is attached as the chain's `link_error`, so it runs when any step raises, including errors Celery hits **between** steps that no task can catch itself. Because its signature starts with `(request, exc, traceback)`, Celery calls it directly in the failing worker process with the real exception. It:
+
+1. sets the video to `failed`, unless it already `completed`;
+2. writes `processing_error` (stage, failing task and exception) unless a task already recorded a more specific message;
+3. releases the lock and starts the next video, in a `finally` block so this happens even if the database update fails.
+
+</Tab>
+</Tabs>
+
+### Releasing safely
+
+The lock is released with a small Lua script that deletes it **only if it still holds this video's ID**:
+
+```lua
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+    return redis.call('DEL', KEYS[1])
+end
+return 0
+```
+
+Redis runs a Lua script atomically, so the check and the delete cannot be split by another client. A late or duplicate callback from one video can never free the slot of the video that started after it.
+
+<Callout type="warn" title="Never pass link= to the pipeline's apply_async">
+  Success is a chain step, not a `link=` callback, for a reason. Celery attaches a chain-level `link`
+  to the transcode chord, which forwards it to its group, and `group.apply_async()` rejects it with
+  `TypeError: Cannot add link to group: use a chord`. That broke every pipeline once; see the
+  [incident write-up](/docs/decisions/incident-2026-10-stuck-videos). `link_error` is safe: a chord applies it to its callback only.
+</Callout>
+
+## Recovering after a worker restart
+
+If the worker is killed mid-pipeline (out of memory, a redeploy, a reboot), no callback runs. `recover_after_worker_restart()` is connected to Celery's **`worker_init`** signal, which fires after task modules are imported and before the worker consumes any message:
+
+<Steps>
+<Step>
+
+### Purge leftover messages
+
+Drops the interrupted pipeline's queued tasks, so a stray transcode cannot flip a failed video back to `transcoding`.
+
+</Step>
+<Step>
+
+### Clear the lock
+
+Nothing can be processing yet, so any lock is a leftover.
+
+</Step>
+<Step>
+
+### Mark interrupted videos failed
+
+Every video in an in-progress status becomes `failed` with "Processing was interrupted during '…' by a worker restart. Set the video back to 'queued' to retry."
+
+</Step>
+<Step>
+
+### Start the queue
+
+Calls `start_next_video_if_idle()`.
+
+</Step>
+</Steps>
+
+It then calls `engine.dispose()`: the handler runs in the worker's parent process before it forks its pool, and forked children must not share the parent's PostgreSQL connections. Errors are logged and never stop the worker from starting.
+
+<Callout title="Assumes a single worker">
+  With one worker, nothing can be running at the moment it starts, so anything that looks in progress
+  was interrupted. With several workers, a starting worker would wrongly fail another worker's live
+  pipeline. Scaling out needs a different ownership model (for example heartbeats per video).
+</Callout>
+
+## Retrying a failed video
+
+Set it back to `queued` (and clear `processing_error`), then call `start_next_video_if_idle()` or let the next upload or pipeline end trigger it. `prepare_video` refuses any video whose status is not exactly `queued`, so a video cannot be processed twice by accident, and it clears any leftover working directory from the earlier attempt.
+
+## Observability
+
+Every queue event is logged with a `[queue]` prefix (started, finished, failed, startup recovery), and the lock's value names the video currently processing:
+
+```bash
+docker compose logs worker | grep "\[queue\]"
+```
