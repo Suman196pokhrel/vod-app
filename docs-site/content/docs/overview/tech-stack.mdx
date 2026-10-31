@@ -1,0 +1,65 @@
+---
+title: Tech stack
+description: Every major technology in VOD, the version in use, and why it was chosen.
+---
+
+Versions are the ones pinned in `backend/requirements.txt`, `app/package.json` and `infra/docker-compose.yml`.
+
+<Placeholder kind="architecture" title="Tech stack layered by tier: client, edge, application, async processing, data">
+  Stacked-layer diagram with each technology logo placed in its tier.
+</Placeholder>
+
+## Backend
+
+| Technology | Version | Role | Why |
+|---|---|---|---|
+| **Python** | 3.12 (`python:3.12-slim` image) | Language for API and worker | One language and one Docker image for both the web tier and the processing tier |
+| **FastAPI** | 0.139.2 | HTTP API | Type-driven request validation with Pydantic, automatic OpenAPI docs, dependency injection for auth |
+| **Uvicorn** | 0.34.2 | ASGI server | Standard server for FastAPI |
+| **Pydantic / pydantic-settings** | 2.13.4 / 2.14.2 | Schemas and configuration | Request/response validation; typed settings loaded from environment variables |
+| **SQLAlchemy** | 2.0.51 | ORM | Mature ORM; used **synchronously** with the `psycopg2` driver |
+| **Alembic** | 1.15.2 | Database migrations | Versioned schema changes for SQLAlchemy models |
+| **Celery** | 5.6.3 | Background task queue | Workflow primitives (`chain`, `group`, `chord`) that fit a multi-stage, partly parallel pipeline; retries; Flower dashboard |
+| **python-jose** | 3.4.0 | JWT encode/decode | Access and refresh tokens |
+| **passlib + bcrypt** | 1.7.4 / 4.3.0 | Password hashing | Adaptive, salted hashing |
+| **minio** (Python SDK) | 7.2.20 | Object storage client | Talks to MinIO over the S3 API |
+| **redis-py** | 8.0.1 | Redis client | Processing lock, upload admission slots |
+| **Resend** | 2.34.0 | Transactional email | Verification links and password-reset codes |
+| **FFmpeg / ffprobe** | Debian package in the image | Media processing | Industry-standard transcoder; probing, scaling, H.264/AAC encoding, HLS segmentation, sprite sheets |
+
+## Data and infrastructure
+
+| Technology | Version | Role |
+|---|---|---|
+| **PostgreSQL** | 16 (`postgres:16-alpine`) | System of record: users, videos, tokens, upload sessions |
+| **Redis** | 7 (`redis:7-alpine`) | Celery broker and result backend; the processing lock; tus admission slots |
+| **MinIO** | `minio/minio:latest` | S3-compatible object storage for originals, thumbnails, HLS output |
+| **tusd** | v2.9.2 | tus protocol server that streams uploads into MinIO |
+| **Caddy** | 2 (`caddy:2-alpine`) | Reverse proxy, automatic HTTPS, the single public entry point |
+| **Docker Compose** | — | Runs every backend service, locally and in production |
+
+## Frontend
+
+| Technology | Version | Role |
+|---|---|---|
+| **Next.js** (App Router) | 16.1.0 | Framework and routing; deployed on **Vercel** |
+| **React** | 19.2.3 | UI |
+| **TypeScript** | 5 | Types |
+| **Tailwind CSS** | 4 | Styling, with **shadcn/ui** components (Radix primitives) |
+| **TanStack Query** | 5 | Server-state fetching and caching |
+| **Zustand** | 5 | Client auth state |
+| **Axios** | 1.13 | HTTP client with auth interceptors |
+| **@videojs/react** | 10.0.0-beta.25 | Player, using its hls.js-backed `HlsJsVideo` element for adaptive streaming |
+| **Uppy + @uppy/tus** | 5 | Resumable upload client |
+| **React Hook Form + Zod** | 7 / 4 | Forms and validation |
+| **GSAP** | 3 | Motion |
+
+## Key choices in one line each
+
+- **HLS over progressive MP4**: lets the player switch quality mid-stream as bandwidth changes, and segments cache well.
+- **Object storage served by the proxy**: video bytes go MinIO → Caddy → browser and never pass through Python.
+- **tus for uploads**: large files survive network drops and resume from the last chunk.
+- **One processing pipeline at a time**: predictable CPU and memory use on a small server.
+- **Separate frontend hosting**: the frontend scales on Vercel's edge independently of the backend VPS.
+
+Each of these is explained in depth in [Architecture](/docs/architecture) and [Decisions & Incidents](/docs/decisions).

@@ -1,0 +1,1 @@
+{ "title": "Backend", "description": "FastAPI service, auth, data model and API", "icon": "Server", "root": true, "pages": ["index", "auth", "data-model", "video-service", "resumable-uploads", "configuration", "api-reference"] }

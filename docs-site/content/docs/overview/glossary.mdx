@@ -1,0 +1,50 @@
+---
+title: Glossary
+description: The video, streaming and infrastructure terms used across these docs.
+---
+
+## Video and streaming
+
+| Term | Meaning |
+|---|---|
+| **VOD** | Video on demand: pre-recorded content a viewer can start at any time, as opposed to live streaming. |
+| **Transcoding** | Decoding a video and re-encoding it, usually to a different codec, resolution or bitrate. |
+| **Rendition** | One encoded version of a video at a specific resolution and bitrate (for example 720p at 2,500 kbps). VOD produces up to seven. |
+| **Bitrate ladder** | The full set of renditions offered for one video, from highest to lowest quality. |
+| **ABR (adaptive bitrate streaming)** | The player measures bandwidth and switches between renditions mid-playback to avoid buffering. |
+| **HLS** | HTTP Live Streaming, Apple's ABR protocol. Video is cut into short segment files listed in `.m3u8` playlists, served over plain HTTP. |
+| **Segment** | A short chunk of a rendition. VOD targets 6 seconds and uses MPEG-TS (`.ts`) segments. |
+| **Media playlist** | An `.m3u8` file listing one rendition's segments in order. |
+| **Master (multivariant) playlist** | The top-level `.m3u8` that lists every rendition with its bandwidth and resolution; the player loads it first. |
+| **Keyframe (I-frame)** | A frame that can be decoded on its own. Segments can only start on a keyframe. |
+| **GOP** | Group of pictures: a keyframe and the frames that depend on it until the next keyframe. |
+| **H.264 / AVC** | The video codec VOD outputs (encoder: `libx264`), chosen for universal browser support. |
+| **AAC** | The audio codec VOD outputs (128 kbps). |
+| **CRF** | Constant Rate Factor: an x264 quality setting (VOD uses 23) that targets constant visual quality rather than a fixed bitrate. |
+| **Storyboard / scrubbing preview** | Thumbnails shown when hovering the player timeline. VOD stores them as **sprite sheets** (many thumbnails tiled in one image) indexed by a **WebVTT** file. |
+| **ffprobe** | FFmpeg's inspection tool; VOD uses it to read duration, resolution, codecs and bitrate. |
+
+## Uploads
+
+| Term | Meaning |
+|---|---|
+| **tus** | An open HTTP protocol for resumable uploads: the client sends the file in chunks and can resume from the last acknowledged offset. |
+| **tusd** | The reference tus server. In VOD it writes chunks into MinIO and calls the API through **hooks** (`pre-create`, `post-finish`, `post-terminate`). |
+| **Uppy** | The browser upload library VOD uses, with its tus plugin. |
+| **Admission control** | Limiting how many uploads can run at once (VOD: 8 by default), rejecting extra ones with HTTP 503 and `Retry-After`. |
+
+## Backend and infrastructure
+
+| Term | Meaning |
+|---|---|
+| **Celery task** | A Python function run by a background worker instead of inside the web request. |
+| **Chain / group / chord** | Celery workflow primitives: a **chain** runs tasks in order; a **group** runs tasks in parallel; a **chord** is a group plus a callback that runs once all of them finish. |
+| **Broker** | Where queued task messages wait (Redis in VOD). |
+| **Processing lock** | The Redis key `video_processing:active_lock` that allows only one video's pipeline at a time. |
+| **Object storage** | Storage for files ("objects") addressed by bucket and key over an HTTP API, like Amazon S3. VOD uses MinIO. |
+| **Bucket** | A top-level container in object storage. VOD uses three: raw uploads, thumbnails, processed HLS. |
+| **Presigned URL** | A time-limited URL that grants access to one private object without credentials. VOD uses one for admin downloads of originals. |
+| **Reverse proxy** | A server that receives public requests and forwards them to internal services. VOD's is Caddy. |
+| **JWT** | JSON Web Token: a signed token carrying claims. VOD issues a short-lived **access token** and a longer-lived **refresh token**. |
+| **Soft delete** | Marking a row deleted (`deleted_at` timestamp) instead of removing it. |
+| **ADR** | Architecture Decision Record: a short document explaining one design decision and its alternatives. |

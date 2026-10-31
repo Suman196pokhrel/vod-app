@@ -1,0 +1,15 @@
+{
+  "title": "VOD Docs",
+  "pages": [
+    "index",
+    "overview",
+    "architecture",
+    "backend",
+    "pipeline",
+    "frontend",
+    "infrastructure",
+    "decisions",
+    "roadmap",
+    "interview"
+  ]
+}

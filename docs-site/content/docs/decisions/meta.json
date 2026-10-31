@@ -1,0 +1,1 @@
+{ "title": "Decisions & Incidents", "description": "Why things are built the way they are", "icon": "Scale", "root": true, "pages": ["index", "adr-0001-resumable-uploads", "adr-0002-processing-queue", "incident-2026-10-stuck-videos"] }

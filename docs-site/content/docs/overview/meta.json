@@ -1,0 +1,1 @@
+{ "title": "Overview", "description": "What VOD is and how to run it", "icon": "BookOpen", "root": true, "pages": ["index", "tech-stack", "getting-started", "glossary"] }

@@ -1,0 +1,130 @@
+---
+title: Getting started
+description: Run the full VOD stack on your machine.
+---
+
+The backend stack (API, worker, PostgreSQL, Redis, MinIO, tusd, Caddy and some dev tools) runs in Docker. The frontend runs separately with `pnpm`. For the full explanation of each service, see [Local development](/docs/infrastructure/local-development).
+
+## Prerequisites
+
+- **Docker** with the Compose plugin
+- **Node.js** and **pnpm** for the frontend
+- **make** (optional, for the shortcuts)
+
+## Setup
+
+<Steps>
+<Step>
+
+### Clone and create the config files
+
+```bash
+git clone https://github.com/Suman196pokhrel/vod-app.git
+cd vod-app
+cp infra/.env.example infra/local.env
+cp infra/caddy/Caddyfile.example infra/caddy/Caddyfile.local
+```
+
+<Callout type="warn" title="Two manual additions are currently needed">
+  The templates are missing two things the stack needs:
+
+  1. Add the required `MAX_VIDEO_SIZE` and `MAX_THUMBNAIL_SIZE` settings to `infra/local.env`. The
+     backend's settings class requires both (`backend/app/core/config.py`) and refuses to start without them.
+  2. Add a `/storage/*` route to `infra/caddy/Caddyfile.local` that proxies to `minio:9000`
+     (`handle_path /storage/* { reverse_proxy minio:9000 }`). Without it, thumbnails and video playback return 404.
+</Callout>
+
+</Step>
+<Step>
+
+### Start the backend stack
+
+```bash
+make dev
+```
+
+This runs `docker compose -f infra/docker-compose.local.yml --env-file infra/local.env up -d`. Images build automatically the first time.
+
+</Step>
+<Step>
+
+### Apply database migrations
+
+```bash
+make shell            # opens a shell in the api container
+alembic upgrade head
+```
+
+</Step>
+<Step>
+
+### Start the frontend
+
+```bash
+cd app
+pnpm install
+pnpm dev
+```
+
+Create `app/.env.local`:
+
+```bash title="app/.env.local"
+NEXT_PUBLIC_API_URL=http://localhost
+```
+
+<Callout type="warn" title="Point the frontend at Caddy, not the API">
+  Video and thumbnail URLs are built in the browser as `${NEXT_PUBLIC_API_URL}/storage/...`
+  (`app/lib/utils/storage.ts`), and only Caddy routes `/storage/*` to MinIO. Pointing at the API
+  container on port `8000` breaks every thumbnail and every playback.
+</Callout>
+
+</Step>
+<Step>
+
+### Create an admin account
+
+Sign up in the app, verify the email, then promote the user to admin directly in the database (there is no admin-promotion endpoint):
+
+```sql
+UPDATE users SET role = 'ADMIN' WHERE email = 'you@example.com';
+```
+
+Open a database shell with `make db`.
+
+</Step>
+</Steps>
+
+## Local URLs
+
+| Service | URL |
+|---|---|
+| App through Caddy | http://localhost |
+| Frontend dev server | http://localhost:3000 |
+| API docs (Swagger) | http://localhost/docs |
+| MinIO console | http://localhost:9001 |
+| pgAdmin | http://localhost:5050 |
+| Flower (Celery dashboard) | http://localhost:5555 |
+| RedisInsight | http://localhost:5540 |
+| This docs site | http://localhost:3001 (`make docs`) |
+
+Default local credentials are in `infra/docker-compose.local.yml` and your `infra/local.env`.
+
+## Everyday commands
+
+| Command | What it does |
+|---|---|
+| `make dev` | Start the stack |
+| `make build` | Rebuild images and start (needed after changing **worker** code or `requirements.txt`) |
+| `make down` | Stop the stack |
+| `make restart` | Stop, then start |
+| `make logs s=worker` | Follow one service's logs |
+| `make shell` | Bash inside the API container |
+| `make db` | `psql` session |
+| `make clean` | Stop and **delete all data volumes** |
+| `make docs` | Run this docs site on port 3001 |
+
+<Callout title="Which changes need a rebuild">
+  The `api` container mounts `backend/` and runs `uvicorn --reload`, so API code changes apply
+  immediately. The `worker` container does **not** mount the source: Celery task changes need
+  `make build`.
+</Callout>

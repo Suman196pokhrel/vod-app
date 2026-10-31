@@ -1,0 +1,1 @@
+{ "title": "Pipeline", "description": "Celery + FFmpeg video processing", "icon": "Workflow", "root": true, "pages": ["index", "processing-queue", "stages", "hls-output", "failure-handling"] }

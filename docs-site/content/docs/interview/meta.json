@@ -1,0 +1,1 @@
+{ "title": "Interview Guide", "description": "Presenting and defending the design", "icon": "MessagesSquare", "root": true, "pages": ["index", "system-design-walkthrough", "trade-offs", "questions"] }

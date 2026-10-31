@@ -1,0 +1,1 @@
+{ "title": "Architecture", "description": "High-level design and end-to-end flows", "icon": "Network", "root": true, "pages": ["index", "request-routing", "upload-to-playback", "data-and-storage"] }

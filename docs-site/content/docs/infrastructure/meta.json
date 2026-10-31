@@ -1,0 +1,1 @@
+{ "title": "Infrastructure", "description": "Docker Compose, Caddy, local dev and deployment", "icon": "Container", "root": true, "pages": ["index", "docker-compose", "caddy", "local-development", "deployment"] }

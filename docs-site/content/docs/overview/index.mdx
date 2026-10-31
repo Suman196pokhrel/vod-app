@@ -1,0 +1,82 @@
+---
+title: What is VOD
+description: A self-hosted video-on-demand platform, end to end.
+---
+
+VOD is a complete, self-hostable alternative to a hosted video platform. It covers the whole lifecycle of a video: **ingest** (resumable upload), **processing** (transcoding to multi-bitrate HLS plus scrubbing previews), **storage** (object storage), **delivery** (HLS over HTTP through a reverse proxy) and **playback** (an adaptive player in the browser).
+
+It is deliberately built to run on one small virtual server, which shapes many of the design decisions in these docs.
+
+<Placeholder kind="flow" title="The life of a video: upload → queue → transcode → package → store → stream">
+  Five-stage horizontal flow, each stage labelled with the component that owns it (tusd, Celery queue, FFmpeg worker, MinIO, Caddy + player).
+</Placeholder>
+
+## Who uses it
+
+| Role | Can do | Needs an account |
+|---|---|---|
+| **Viewer** | Browse the public feed, open a title's detail page, watch in the full-screen player | No |
+| **Admin** | Upload videos, edit metadata, change visibility, soft-delete, download originals | Yes, with the `ADMIN` role |
+
+Browsing and watching are public, like YouTube: there is no sign-up wall in front of content. Signing in is only needed for the admin panel.
+
+## What it does today
+
+<Steps>
+<Step>
+
+### Resumable upload
+
+Admins upload through [**tus**](https://tus.io), an open protocol for resumable uploads, using **Uppy** in the browser and **tusd** on the server. A dropped connection resumes from the last chunk instead of restarting. Upload bytes go straight from tusd into MinIO and never pass through the Python API. A legacy single-request multipart upload still exists behind a feature flag.
+
+</Step>
+<Step>
+
+### Queued, one-at-a-time processing
+
+Every new video becomes a `queued` row in PostgreSQL. A Redis lock makes sure only one video is processed at a time, oldest first, so a burst of uploads cannot overload the server. See [Processing queue](/docs/pipeline/processing-queue).
+
+</Step>
+<Step>
+
+### Transcoding to adaptive HLS
+
+A Celery chain runs FFmpeg to produce up to seven H.264 renditions (1440p down to 144p, never upscaling the source), splits each into 6-second HLS segments and writes a master playlist. It also generates sprite-sheet thumbnails and a WebVTT track for timeline scrubbing previews. See [Pipeline](/docs/pipeline).
+
+</Step>
+<Step>
+
+### Delivery and playback
+
+Segments and playlists live in MinIO and are served through Caddy under `/storage/*`, so video bytes never touch Python. The frontend's player uses **hls.js** to switch quality automatically based on bandwidth, with a manual quality menu and hover thumbnails on the timeline.
+
+</Step>
+</Steps>
+
+## Project status
+
+VOD is at **MVP** stage. The core viewer journey (browse, watch, play) and the admin video lifecycle (upload, edit, visibility, soft delete) are real and backed by the API. Several admin pages (dashboard statistics, users, analytics, categories, settings) are UI-only. The [Roadmap](/docs/roadmap) lists exactly what is real and what is not.
+
+## Repository layout
+
+<Files>
+  <Folder name="vod-app" defaultOpen>
+    <Folder name="app" />
+    <Folder name="backend" />
+    <Folder name="infra" />
+    <Folder name="docs-site" />
+    <Folder name="docs" />
+    <File name="makefile" />
+  </Folder>
+</Files>
+
+| Folder | What it is |
+|---|---|
+| `app/` | Next.js frontend, deployed on Vercel |
+| `backend/` | FastAPI API and Celery worker, built as one Docker image |
+| `infra/` | Docker Compose files (local, staging, production) and Caddy configs |
+| `docs-site/` | This documentation site (Fumadocs on Next.js), deployed on Vercel |
+| `docs/` | Older Markdown docs, being migrated into this site |
+| `makefile` | Shortcuts for the local Docker stack (`make dev`, `make logs s=api`, …) |
+
+Each top-level folder is an independent project with its own dependencies. They talk to each other over HTTP at runtime, not through shared code.

@@ -1,0 +1,1 @@
+{ "title": "Frontend", "description": "Next.js browse, watch, player and admin", "icon": "Monitor", "root": true, "pages": ["index", "data-and-auth", "browse-and-watch", "player", "upload-flow", "admin-panel", "design-system"] }

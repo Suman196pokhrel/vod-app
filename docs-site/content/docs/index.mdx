@@ -1,18 +1,43 @@
 ---
 title: VOD Documentation
-description: How VOD, a self-hosted video-on-demand platform, is designed and built.
+description: How VOD, a self-hosted video-on-demand platform, is designed, built and run.
 ---
 
-VOD lets admins upload videos, transcodes them into adaptive HLS streams in the
-background, and serves them through a public browse-and-watch frontend.
+**VOD** is a self-hosted video-on-demand platform. Admins upload videos through a resumable uploader; a background pipeline built on **Celery** and **FFmpeg** transcodes each file into an **adaptive bitrate (ABR) HLS** stream with up to seven quality levels; viewers browse and watch through a **Next.js** frontend with a custom **video.js** player. The backend is a **FastAPI** service with **PostgreSQL**, **Redis** and **MinIO** (S3-compatible object storage), fronted by **Caddy** and run with **Docker Compose** on a single small VPS.
 
-This site is being written. It will cover the system section by section:
+<Placeholder kind="architecture" title="VOD at a glance: browser, Vercel frontend, Caddy, API, worker, Postgres, Redis, MinIO, tusd">
+  One-screen system context diagram (C4 level 1/2) that every section links back to.
+</Placeholder>
+
+## How these docs are organised
+
+Each section covers one part of the system and stays inside it. Use the section switcher at the top of the sidebar.
 
 <Cards>
-  <Card title="Overview" description="What VOD is and its high-level design" />
-  <Card title="Architecture" description="How the pieces talk to each other, end to end" />
-  <Card title="Backend" description="FastAPI, data models, auth and the API" />
-  <Card title="Pipeline" description="The Celery + FFmpeg processing pipeline and its queue" />
-  <Card title="Frontend" description="The Next.js browse, watch, player and admin apps" />
-  <Card title="Infrastructure" description="Docker Compose, Caddy, deployment and local development" />
+  <Card href="/docs/overview" title="Overview" description="What VOD is, the tech stack, local setup and a glossary of terms." />
+  <Card href="/docs/architecture" title="Architecture" description="High-level design, request routing and the upload-to-playback flow end to end." />
+  <Card href="/docs/backend" title="Backend" description="The FastAPI service: auth, data model, video service, resumable uploads and the API." />
+  <Card href="/docs/pipeline" title="Pipeline" description="The Celery + FFmpeg processing pipeline, its one-at-a-time queue and HLS output." />
+  <Card href="/docs/frontend" title="Frontend" description="The Next.js app: routing, data and auth, the player, uploads and the admin panel." />
+  <Card href="/docs/infrastructure" title="Infrastructure" description="Docker Compose, Caddy, local development and how production is deployed." />
+  <Card href="/docs/decisions" title="Decisions & Incidents" description="Architecture decision records and incident write-ups." />
+  <Card href="/docs/roadmap" title="Roadmap" description="What is real today, what is not, and the improvement plan." />
+  <Card href="/docs/interview" title="Interview Guide" description="A system-design walkthrough, trade-offs and likely questions." />
 </Cards>
+
+## How each page is written
+
+Most pages follow the same shape so they are quick to scan:
+
+1. **Summary**: what the part does, in a few lines.
+2. **Diagram**: where a picture explains it faster.
+3. **How it works**: numbered steps, with links to the source files.
+4. **Failure modes**: what goes wrong and how the system reacts.
+5. **Trade-offs**: why it was built this way and what that costs.
+
+<Callout title="Source of truth">
+  Everything here was written from the code in the
+  [vod-app repository](https://github.com/Suman196pokhrel/vod-app). File references such as
+  `backend/app/tasks/processing_queue.py` point at that repository. If a page and the code
+  disagree, the code wins, and the page should be fixed.
+</Callout>
