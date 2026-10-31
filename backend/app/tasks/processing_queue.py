@@ -9,7 +9,8 @@ How the queue works (full write-up: docs/06_VIDEO_PROCESSING_PIPELINE.md,
    video it starts. While that lock exists, every other call is a no-op.
 3. The pipeline hands the lock back itself, however it ends:
    - success: on_pipeline_success, appended as the chain's LAST STEP
-   - failure: on_pipeline_failed, attached as the chain's link_error
+   - failure: on_pipeline_failed, attached as the chain's link_error, which
+     also marks the video "failed" with the real exception
    Both release the lock and call start_next_video_if_idle() again.
 
 Never pass `link=` to the pipeline's apply_async(). Celery attaches it to the
@@ -82,7 +83,7 @@ def start_next_video_if_idle() -> str | None:
 
     try:
         pipeline = create_video_processing_workflow(video_id) | on_pipeline_success.si(video_id)
-        result = pipeline.apply_async(link_error=on_pipeline_failed.si(video_id))
+        result = pipeline.apply_async(link_error=on_pipeline_failed.s(video_id))
     except Exception:
         # Nothing was dispatched, so nothing would ever release the lock -
         # give it back now instead of wedging the queue for 6 hours.
@@ -110,12 +111,34 @@ def on_pipeline_success(video_id: str):
 
 
 @celery_app.task(name="app.tasks.video_tasks.on_pipeline_failed")
-def on_pipeline_failed(video_id: str):
+def on_pipeline_failed(request, exc, traceback, video_id: str):
     """
-    link_error of every pipeline chain, runs when any step raises: hands the
-    processing slot to the next queued video, so one bad upload never jams
-    everything queued behind it.
+    link_error of every pipeline chain, runs when any step raises - including
+    errors Celery hits *between* steps, which no task's own try/except can
+    catch. Marks the video failed, then hands the processing slot to the next
+    queued video, so one bad upload never jams everything queued behind it.
+
+    Because this task's signature starts with (request, exc, traceback),
+    Celery calls it directly inside the failing worker process with the real
+    exception, instead of as a separate task that only gets a task id.
+    video_id is the partial argument bound by on_pipeline_failed.s(video_id).
     """
-    logger.warning(f"[queue] Pipeline failed for video_id: {video_id}")
-    _release_lock(video_id)
-    start_next_video_if_idle()
+    logger.error(f"[queue] Pipeline failed for video_id: {video_id} in {request.task}: {exc!r}")
+
+    try:
+        with get_db_session() as db:
+            video = db.query(Video).filter(Video.id == video_id).first()
+            # Never overwrite a video that already finished - e.g. if only the
+            # on_pipeline_success step itself failed.
+            if video and video.processing_status != "completed":
+                stage = video.processing_status
+                video.processing_status = "failed"
+                # Keep a more specific message a task already wrote
+                # (segment_videos, create_manifest, ... set their own).
+                if not video.processing_error:
+                    video.processing_error = (
+                        f"Pipeline stopped during '{stage}' ({request.task}): {exc!r}"
+                    )[:1000]
+    finally:
+        _release_lock(video_id)
+        start_next_video_if_idle()
