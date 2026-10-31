@@ -175,10 +175,10 @@ class VideoService:
                 logger.info(f"Database record created successfully: video_id={db_video.id}")
 
                 if db_committed:
-                   from app.tasks.workflows import try_advance_queue
+                   from app.tasks.processing_queue import start_next_video_if_idle
 
                    try:
-                    try_advance_queue()
+                    start_next_video_if_idle()
                     logger.info(f"Queued for processing: video_id={db_video.id}")
                    except Exception as e:
                        logger.error(f"Failed to advance processing queue: {str(e)}")

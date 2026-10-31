@@ -12,7 +12,7 @@ from app.core.jwt import verify_token
 from app.models.tus_upload import TusUpload
 from app.models.users import User
 from app.models.videos import Video
-from app.tasks.workflows import try_advance_queue
+from app.tasks.processing_queue import start_next_video_if_idle
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -202,7 +202,7 @@ def handle_post_finish(event: dict) -> dict:
         release_upload(upload_id)
 
         try:
-            try_advance_queue()
+            start_next_video_if_idle()
         except Exception as e:
             logger.error(f"Failed to advance processing queue for {video.id}: {str(e)}")
 
