@@ -2,7 +2,7 @@
 #   VOD App — Developer Makefile
 # ─────────────────────────────────────────────
 
-.PHONY: help dev build down restart logs shell db clean
+.PHONY: help dev build down restart logs shell db clean docs
 
 .DEFAULT_GOAL := help
 
@@ -30,6 +30,7 @@ help:
 	@printf "  $(CYAN)%-12s$(RESET) %s\n" "shell"   "Shell into the api container"
 	@printf "  $(CYAN)%-12s$(RESET) %s\n" "db"      "Open a psql session"
 	@printf "  $(CYAN)%-12s$(RESET) %s\n" "clean"   "Stop and remove volumes"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "docs"    "Run the docs site on :3001"
 	@printf "\n"
 
 # ── Core ──────────────────────────────────────
@@ -68,3 +69,9 @@ clean:
 	@printf "$(CYAN)▶ Removing containers and volumes…$(RESET)\n"
 	@cd $(INFRA_DIR) && docker compose -f docker-compose.local.yml --env-file local.env down -v
 	@printf "$(GREEN)✔ Clean$(RESET)\n"
+
+# ── Docs site ─────────────────────────────────
+
+docs:
+	@printf "$(CYAN)▶ Starting docs site on http://localhost:3001…$(RESET)\n"
+	@cd docs-site && pnpm install --silent && pnpm dev

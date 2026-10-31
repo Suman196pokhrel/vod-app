@@ -1,13 +1,18 @@
 ---
-title: Hello World
-description: Your first document
+title: VOD Documentation
+description: How VOD, a self-hosted video-on-demand platform, is designed and built.
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+VOD lets admins upload videos, transcodes them into adaptive HLS streams in the
+background, and serves them through a public browse-and-watch frontend.
 
-## What is Next?
+This site is being written. It will cover the system section by section:
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card title="Overview" description="What VOD is and its high-level design" />
+  <Card title="Architecture" description="How the pieces talk to each other, end to end" />
+  <Card title="Backend" description="FastAPI, data models, auth and the API" />
+  <Card title="Pipeline" description="The Celery + FFmpeg processing pipeline and its queue" />
+  <Card title="Frontend" description="The Next.js browse, watch, player and admin apps" />
+  <Card title="Infrastructure" description="Docker Compose, Caddy, deployment and local development" />
 </Cards>

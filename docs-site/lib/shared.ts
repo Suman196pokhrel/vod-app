@@ -1,15 +1,18 @@
 import { createGetUrl } from 'fumadocs-core/source';
 
-export const appName = 'My App';
+export const appName = 'VOD Docs';
+export const siteUrl = 'https://docs.vod.spokhrel.dev';
 export const docsRoute = '/docs';
 export const docsImageRoute = '/og/docs';
 export const docsContentRoute = '/llms.mdx/docs';
 
-// fill this with your actual GitHub info, for example:
+// Used for the GitHub link and each page's "Edit on GitHub" link.
+// contentDir is relative to the repo root: this app lives in docs-site/.
 export const gitConfig = {
-  user: 'fuma-nama',
-  repo: 'fumadocs',
+  user: 'Suman196pokhrel',
+  repo: 'vod-app',
   branch: 'main',
+  contentDir: 'docs-site/content/docs',
 };
 
 const getContentUrl = createGetUrl(docsContentRoute);

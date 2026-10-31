@@ -1,10 +1,22 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import './global.css';
 import { Inter } from 'next/font/google';
+import type { Metadata } from 'next';
+import { appName, siteUrl } from '@/lib/shared';
 
 const inter = Inter({
   subsets: ['latin'],
 });
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: appName,
+    template: `%s | ${appName}`,
+  },
+  description:
+    'Architecture, pipeline, frontend and infrastructure documentation for VOD, a self-hosted video-on-demand platform.',
+};
 
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (

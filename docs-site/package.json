@@ -1,11 +1,11 @@
 {
-  "name": "docs-site",
-  "version": "0.0.52",
+  "name": "vod-docs",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
-    "start": "next start",
+    "dev": "next dev --port 3001",
+    "start": "next start --port 3001",
     "types:check": "next typegen && tsc --noEmit",
     "lint": "eslint"
   },
@@ -25,10 +25,10 @@
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.4.2",
     "postcss": "^8.5.31",
     "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "16.4.2"
+    "typescript": "^5.9.3"
   }
 }

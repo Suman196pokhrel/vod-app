@@ -1,45 +1,41 @@
 # docs-site
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+The documentation website for VOD, published at
+[docs.vod.spokhrel.dev](https://docs.vod.spokhrel.dev). Built with
+[Fumadocs](https://fumadocs.dev) on Next.js.
 
-Run development server:
+This is an independent project inside the `vod-app` repo, like `app/` and
+`backend/`: it has its own dependencies and shares no code with them.
+
+## Develop
+
+Run every command from this folder (there is no `package.json` at the repo root):
 
 ```bash
-npm run dev
-# or
-pnpm dev
-# or
-yarn dev
+cd docs-site
+pnpm install
+pnpm dev        # http://localhost:3001 (the frontend keeps :3000)
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+Or from the repo root: `make docs`.
 
-## Explore
+## Write
 
-In the project, you can see:
+Pages are MDX files in `content/docs/`. The file path is the URL:
+`content/docs/pipeline/queue.mdx` → `/docs/pipeline/queue`.
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+## Deploy
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+Deployed by its own Vercel project, connected to the same GitHub repo with
+**Root Directory** set to `docs-site/`.
 
-### Fumadocs MDX
+## Layout
 
-Collections are defined with the [Macro API](https://fumadocs.dev/docs/mdx/macro) in `lib/source.ts`.
-
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
-
-## Learn More
-
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+| Path                      | What it is                                    |
+| ------------------------- | --------------------------------------------- |
+| `content/docs/`           | The documentation pages (MDX)                 |
+| `app/(home)`              | Landing page                                  |
+| `app/docs`                | Docs layout and page renderer                 |
+| `app/api/search/route.ts` | Built-in search                               |
+| `lib/shared.ts`           | Site name, URL and GitHub repo settings       |
+| `lib/source.ts`           | Content source (reads `content/docs/`)        |
