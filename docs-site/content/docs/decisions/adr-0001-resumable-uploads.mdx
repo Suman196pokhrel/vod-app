@@ -1,0 +1,92 @@
+---
+title: "ADR 0001: Resumable uploads with tus"
+description: Why uploads go through tusd and Uppy instead of a single request to the API.
+---
+
+| | |
+|---|---|
+| **Status** | Accepted, implemented |
+| **Date** | 2026-07-26 |
+| **Area** | Upload and ingest |
+
+## Context
+
+Uploads originally went through a single multipart request: the browser streamed the whole file to FastAPI, which forwarded it to MinIO. That had three problems:
+
+1. **Blocking.** Every byte passed through the application server, tying up API resources for the length of the upload.
+2. **Not resilient.** A dropped connection meant starting again from zero.
+3. **Not scalable to the target.** Files up to **50 GB** and several concurrent uploaders were required.
+
+**Requirements:** 50 GB files, concurrent uploads, resume without resending completed data, bytes kept off the application server, fully self-hosted on the existing MinIO.
+
+## Decision
+
+Adopt the **tus** protocol: **tusd** as a dedicated ingest service writing to MinIO through its S3 store, and **Uppy** in the browser. Separate the planes:
+
+- **Data plane:** browser → tusd → MinIO. Bytes never reach FastAPI.
+- **Control plane:** FastAPI takes part only through tusd hooks: it authorises uploads (`pre-create`) and turns finished uploads into videos (`post-finish`).
+
+<Placeholder kind="architecture" title="Control plane vs data plane for uploads">
+  Two lanes: bytes (Uppy → tusd → MinIO) and decisions (tusd ↔ FastAPI hooks).
+</Placeholder>
+
+## Alternatives considered
+
+<Accordions>
+<Accordion title="A. Keep proxying through FastAPI, but stream asynchronously">
+
+Simplest change, and the backend sees every byte. But every byte still crosses the application server, which is the root problem, and resume would have to be built by hand. **Rejected.**
+
+</Accordion>
+<Accordion title="B. Presigned single PUT straight to storage">
+
+Very simple and bypasses the backend, but there is no resume and a single PUT is capped at 5 GB. **Rejected** (fails the 50 GB requirement).
+
+</Accordion>
+<Accordion title="C. Presigned S3 multipart (Uppy + a signing endpoint)">
+
+Bytes bypass the server, scales well, handles 50 GB, no extra service. But resume is per part rather than per byte, more orchestration must be written, and MinIO must be reachable from browsers with CORS. **Rejected for now**, kept as the main fallback.
+
+</Accordion>
+<Accordion title="D. A managed video service (Mux, Cloudflare Stream, api.video)">
+
+Would replace ingest, transcoding, storage and delivery. But it adds per-GB cost and lock-in, some services cap file size below 50 GB, and it removes most of the system this project exists to build. **Rejected.**
+
+</Accordion>
+<Accordion title="E. A Python tus server inside FastAPI">
+
+No extra service, hooks become function calls. But Python tus servers are far less proven than tusd on very large files under concurrency. **Rejected** on maturity risk.
+
+</Accordion>
+</Accordions>
+
+## Consequences
+
+**Positive**
+
+- Interruptions cost one chunk, not the whole file.
+- Uploads no longer load the API.
+- One component provides both the resumable protocol and efficient S3 multipart writes.
+- The browser talks only to tusd; MinIO is not exposed for uploads.
+
+**Trade-offs**
+
+- tusd is one more stateful service, with a volume for its working data.
+- Every byte hops twice (browser → tusd → MinIO), so the ingest host is the bandwidth bottleneck at scale.
+- tusd's upload locks are per instance, so several tusd instances would need sticky routing.
+- `pre-create` becomes availability-critical: if the API is down, uploads cannot start.
+- `post-finish` must be idempotent, because hooks can be delivered more than once.
+- The upload token must still be valid when the upload starts.
+- Abandoned multipart uploads accumulate in MinIO and need a cleanup policy.
+
+## As built
+
+| Follow-up from the ADR | Outcome |
+|---|---|
+| Part size well under S3's 10,000-part limit | 50 MB parts (`tus_part_size_mb`), enough for 50 GB in about 1,000 parts |
+| Admission control in `pre-create`, fail fast with 503 + `Retry-After` | Implemented: Redis key per active upload, cap 8, `Retry-After: 30` |
+| Stream request bodies at the proxy | Implemented: `flush_interval -1` on `/files/*` |
+| Serve finished files from storage, not tusd | Implemented: playback goes through `/storage` to MinIO |
+| Keep the upload token out of stored metadata | Implemented: `pre-create` strips it |
+| Idempotent `post-finish` | Implemented |
+| Lifecycle cleanup for abandoned multipart uploads | Not yet implemented |

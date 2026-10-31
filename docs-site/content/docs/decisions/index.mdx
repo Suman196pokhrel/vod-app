@@ -1,0 +1,27 @@
+---
+title: Decisions & Incidents
+description: Architecture decision records and incident write-ups.
+---
+
+This section records **why** the system is the way it is. Explainer pages elsewhere describe the system as it is now; the history behind it lives here.
+
+## Architecture Decision Records
+
+An **ADR** captures one significant decision: the context, the options considered, the choice and its consequences. ADRs are not rewritten when things change; a new ADR supersedes an old one.
+
+| ADR | Decision | Status |
+|---|---|---|
+| [0001](/docs/decisions/adr-0001-resumable-uploads) | Resumable uploads with tus (tusd + Uppy), keeping bytes off the API | Accepted, implemented |
+| [0002](/docs/decisions/adr-0002-processing-queue) | Process one video at a time with a Redis lock and a database-backed queue | Accepted, implemented |
+
+## Incidents
+
+Incident write-ups follow a blameless format: impact, timeline, root cause, fix and what changed afterwards.
+
+| Date | Incident | Severity |
+|---|---|---|
+| [2026-10](/docs/decisions/incident-2026-10-stuck-videos) | Every new upload stuck at "still processing" | High: no new video could be published |
+
+<Placeholder kind="chart" title="Timeline of decisions and incidents">
+  Horizontal timeline from the first upload pipeline to today, marking ADRs and incidents.
+</Placeholder>

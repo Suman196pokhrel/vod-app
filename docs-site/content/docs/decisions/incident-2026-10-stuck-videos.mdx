@@ -1,0 +1,112 @@
+---
+title: "Incident: uploads stuck at 'still processing'"
+description: Every new upload failed silently after the storyboard step because of a Celery callback misplacement.
+---
+
+| | |
+|---|---|
+| **Severity** | High: no newly uploaded video could be played |
+| **Duration** | From the 2026-07-31 deploy until the fix was deployed (pushed 2026-10-31, confirmed live 2026-11-01) |
+| **Affected** | Every video uploaded in that window (in practice, the first upload after the deploy, on 2026-10-24) |
+| **Detected by** | Manual check on 2026-10-31: a video uploaded a week earlier showed its thumbnail but said "This video is still processing" |
+
+## Summary
+
+A change that serialised video processing attached its "pipeline finished" callback with Celery's `link=` option. Celery placed that callback on the transcode **chord**, which forwarded it to its **group** of transcode tasks. `group.apply_async()` rejects `link` with a `TypeError`, so every pipeline crashed right after generating the storyboard. No transcode ran, no error was recorded, and the video stayed at `generating_storyboard` indefinitely.
+
+## Timeline (UTC)
+
+| When | Event |
+|---|---|
+| 2026-07-31 00:04–00:13 | Three videos upload and process normally (old code) |
+| 2026-07-31 01:35 | Commit adds the processing lock with `link`/`link_error` callbacks |
+| 2026-07-31 01:37 | Worker restarted with the new code |
+| 2026-10-24 02:29 | First upload since the deploy. Storyboard completes; the pipeline crashes 7 ms later |
+| 2026-10-31 | Noticed during an upload-flow check; investigated, reproduced locally, fix written, tested and pushed |
+| 2026-11-01 | Confirmed in production: the affected video re-queued and processed successfully |
+
+## Investigation
+
+<Steps>
+<Step>
+
+### Rule out the obvious
+
+The thumbnail is stored at upload time, so its presence proved nothing about processing. The "still processing" message is shown whenever `manifest_url` is empty.
+
+</Step>
+<Step>
+
+### Find where it stopped
+
+The database row showed `processing_status = generating_storyboard`, a filled `storyboard_url` and an empty `processing_error`. The storyboard step writes its URL as its very last action, so that step had finished; the transcode step, which first sets `transcoding`, had never started.
+
+</Step>
+<Step>
+
+### Read the worker log
+
+```text
+[storyboard] ✓ Complete for 72b4e3c1-…: 1 sheet(s), 9 cues
+RuntimeWarning: Exception raised outside body: TypeError('Cannot add link to group: use a chord')
+Task generate_storyboard[…] raised unexpected: TypeError('Cannot add link to group: use a chord')
+Task advance_processing_queue[…] received
+```
+
+The worker had not restarted and had not run out of memory (an early hypothesis, ruled out). The error happened in Celery's own code while dispatching the next step.
+
+</Step>
+<Step>
+
+### Correlate with changes
+
+Three videos processed fine just before the lock was deployed; the only upload after it failed. The lock change was the only place passing callbacks to `apply_async`.
+
+</Step>
+<Step>
+
+### Reproduce and confirm the mechanism
+
+A local upload failed identically. Inspecting the messages Celery builds (without sending them) showed `link` set on the chord with the callbacks, and absent without them.
+
+</Step>
+</Steps>
+
+## Root cause
+
+```python
+# before
+workflow.apply_async(
+    link=advance_processing_queue.si(),
+    link_error=advance_processing_queue.si(),
+)
+```
+
+Celery folds every step after a chord into the chord's body, so a chain-level `link` is attached to the last signature it can see: the chord. When launched, the chord passes its options to the header group, and in Celery 5.6.3 `group.apply_async()` raises `TypeError('Cannot add link to group: use a chord')` for any `link`.
+
+Two weaknesses turned one bug into a silent outage:
+
+- The error callback only released the lock; it did not mark the video failed.
+- Nothing alerted on videos sitting in a processing state for too long.
+
+<Placeholder kind="flow" title="Where Celery put the callback: chain → chord(link) → group(link) → TypeError">
+  Before/after diagram of the canvas options.
+</Placeholder>
+
+## Fix
+
+| Change | Effect |
+|---|---|
+| Success hand-off moved to the **last step of the chain** (`on_pipeline_success`) | No callback is attached to the chord any more |
+| `link_error` now runs `on_pipeline_failed`, which marks the video `failed` with the real exception | Crashes are visible instead of silent |
+| Worker **startup recovery** | Videos interrupted by a restart are failed and the queue restarts |
+| `prepare_video` clears leftover working directories | Failed videos can be re-queued |
+
+Verified locally (a previously stuck video completed; a bad file failed cleanly and the next video started; a worker restart mid-transcode recovered) and in production (the affected video was re-queued and now plays with six renditions).
+
+## Lessons
+
+- **Callbacks on Celery canvases are not intuitive.** A chain's `link` does not mean "after the whole chain" when the chain contains a chord. Put completion logic in the chain as a step.
+- **Every failure path must leave a visible state.** A stuck intermediate status with no error looked like slow processing, not failure.
+- **Test the whole pipeline after changing how it is dispatched.** The bug sat undetected for almost three months because no upload happened in between.
+- **Alert on stuck work**, for example any video in a processing state for more than a set time.

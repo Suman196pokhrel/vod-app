@@ -1,0 +1,47 @@
+---
+title: Presenting VOD
+description: How to introduce the project in 30 seconds, 2 minutes and 10 minutes.
+---
+
+## The 30-second version
+
+> VOD is a self-hosted video platform I built end to end. Admins upload large files through resumable tus uploads that go straight into object storage; a Celery and FFmpeg pipeline transcodes them into adaptive HLS with up to seven quality levels and scrubbing previews; viewers watch through a Next.js frontend with an hls.js player. It runs on one small VPS with Docker Compose behind Caddy, so a lot of the design is about keeping heavy work off the API and processing predictable on limited hardware.
+
+## The 2-minute version
+
+Walk the life of one video, naming one design decision per step:
+
+1. **Upload**: tus protocol through tusd into MinIO. *Bytes never touch Python; the API only authorises through hooks.* ([ADR 0001](/docs/decisions/adr-0001-resumable-uploads))
+2. **Queue**: a `queued` row plus a Redis lock. *One pipeline at a time, oldest first, so a burst of uploads cannot overload the server.* ([ADR 0002](/docs/decisions/adr-0002-processing-queue))
+3. **Process**: a Celery chain with a chord for renditions. *Each stage writes its status, so the UI shows progress.*
+4. **Deliver**: HLS segments served by Caddy directly from MinIO with immutable caching. *Ready for a CDN without code changes.*
+5. **Play**: hls.js adaptive streaming, quality menu, sprite-sheet thumbnails.
+
+Close with one real incident: the [chord callback bug](/docs/decisions/incident-2026-10-stuck-videos), how it was found and what changed.
+
+<Placeholder kind="architecture" title="Whiteboard version: the five boxes you draw in an interview">
+  Deliberately minimal: Browser, Caddy, API, Worker, Storage, with the two async boundaries marked.
+</Placeholder>
+
+## The 10-minute version
+
+Use the [system design walkthrough](/docs/interview/system-design-walkthrough): requirements, high-level design, two deep dives (upload and processing), then scaling. Keep [Trade-offs](/docs/interview/trade-offs) and [Questions](/docs/interview/questions) ready for follow-ups.
+
+## What to emphasise
+
+| Strength | Evidence |
+|---|---|
+| Separation of planes | tusd and Caddy move bytes; FastAPI only handles control |
+| Async processing with visible state | Per-stage `processing_status`, failure handler, startup recovery |
+| Designing for constrained hardware | Concurrency 1, memory limits, one-at-a-time queue |
+| Debugging distributed systems | The incident: from symptom to Celery internals to a tested fix |
+| Honest engineering | A documented list of what is not done yet ([Current status](/docs/roadmap)) |
+
+## What to be ready to admit
+
+Be upfront about these, and pair each with the fix:
+
+- No automated tests or CI yet → the test plan in [Improvements](/docs/roadmap/improvements#3-reliability-and-operations).
+- Single server, single worker → the [scale path](/docs/roadmap/improvements#4-scale).
+- The transcode pipeline decodes the source many times → single-pass encoding.
+- Segments are not keyframe-aligned → forced keyframes.

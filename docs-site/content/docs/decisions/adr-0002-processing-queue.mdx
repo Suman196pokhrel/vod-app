@@ -1,0 +1,69 @@
+---
+title: "ADR 0002: One video at a time"
+description: Why processing is serialised with a Redis lock and a database-backed queue.
+---
+
+| | |
+|---|---|
+| **Status** | Accepted, implemented (revised after the [2026-10 incident](/docs/decisions/incident-2026-10-stuck-videos)) |
+| **Date** | 2026-07-31 |
+| **Area** | Processing pipeline |
+
+<Callout title="Written after the fact">
+  This ADR was written retrospectively from the code and commit history. The context and decision
+  are as implemented; the alternatives are the realistic options for this setup.
+</Callout>
+
+## Context
+
+Production runs the Celery worker with **concurrency 1** on a small server, so exactly one task runs at any moment. Every upload dispatched its own Celery chain immediately, into the same broker queue.
+
+With several uploads close together, their tasks **interleaved**. Each video's chord put seven transcode tasks into the queue as soon as its quick first steps finished; a short video's later steps (segment, manifest, upload, finalize) were only enqueued after its own transcodes, so they landed behind other videos' pending transcodes. In the admin table, videos looked frozen on a stage for as long as everyone else's transcodes took. Total work was the same, but every video finished late.
+
+## Decision
+
+Run **one video's pipeline at a time, oldest first**:
+
+- The **queue** is the `videos` table: `processing_status = 'queued'`, ordered by `created_at`. Uploads only insert rows; they never block.
+- A **Redis lock** (`video_processing:active_lock`, `SET NX`, value = video ID, 6-hour TTL) marks which video is processing.
+- Each pipeline **hands the lock to the next video** when it ends, on success (a final chain step) or failure (`link_error`).
+- On worker startup, leftover state is cleaned up and the queue is restarted.
+
+Mechanics: [Processing queue](/docs/pipeline/processing-queue).
+
+<Placeholder kind="chart" title="Before vs after: three uploads processed interleaved vs one at a time (finish times per video)">
+  Gantt-style comparison showing every video finishing earlier except the last.
+</Placeholder>
+
+## Alternatives
+
+| Option | Why not |
+|---|---|
+| **Do nothing** (rely on concurrency 1) | Bounds CPU, but not completion time: interleaving makes every video finish late |
+| **Higher worker concurrency** | Parallel FFmpeg processes compete for the same CPU and memory on a small server and risk out-of-memory kills |
+| **Celery task priorities** to favour later stages | Broker-dependent with Redis, hard to reason about, and still interleaves at the transcode stage |
+| **A queue in Redis only** | Duplicates state already in PostgreSQL; the database row already says "queued" and survives a Redis wipe |
+| **One dedicated queue or worker per video** | Not possible with one small server |
+
+## Consequences
+
+**Positive**
+
+- Predictable resource use: one FFmpeg pipeline at a time.
+- Each video finishes as early as possible, in upload order.
+- Queue state is visible and editable with plain SQL; retrying a video is setting it back to `queued`.
+
+**Trade-offs**
+
+- Throughput is capped at one video at a time, even if the server has spare capacity.
+- The lock must be released on **every** ending, which proved subtle (see below).
+- Startup recovery assumes a single worker; scaling out needs a different ownership model, such as per-video heartbeats.
+
+## Revision after the 2026-10 incident
+
+The first implementation released the lock through `apply_async(link=…, link_error=…)`. Celery attached the `link` to the transcode chord, which made every pipeline crash after the storyboard step. The design was revised:
+
+- The success hand-off became the **last step of the chain**.
+- The failure handler now also **marks the video failed** with the real exception.
+- **Startup recovery** was added for workers that die mid-pipeline.
+- The lock value became the **video ID**, released with an owner check.

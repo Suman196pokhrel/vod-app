@@ -1,0 +1,78 @@
+---
+title: System design walkthrough
+description: VOD presented as a system design answer, from requirements to scaling.
+---
+
+This page follows the structure of a system design interview. Numbers marked *illustrative* are back-of-envelope estimates, not measurements.
+
+## 1. Requirements
+
+**Functional**
+
+- Admins upload videos up to 50 GB, resumably.
+- Uploaded videos are transcoded to adaptive streams with timeline previews.
+- Anyone can browse and watch published videos; quality adapts to bandwidth.
+- Admins manage metadata, visibility and deletion, and see processing progress.
+
+**Non-functional**
+
+- Uploads survive network interruptions.
+- Large uploads and playback must not degrade the API.
+- Processing must not exhaust a small server.
+- Playback starts quickly and avoids rebuffering.
+- Self-hosted, low cost.
+
+## 2. High-level design
+
+<Placeholder kind="architecture" title="High-level design: client, edge (Caddy), control plane (FastAPI + PostgreSQL), processing (Redis + Celery + FFmpeg), storage (MinIO), ingest (tusd)">
+  The diagram you would draw first, before any deep dive.
+</Placeholder>
+
+| Concern | Component | Reason |
+|---|---|---|
+| Edge, TLS, routing | Caddy | Automatic HTTPS, path routing, streaming proxy |
+| Control plane | FastAPI + PostgreSQL | Typed API, relational metadata |
+| Ingest | tusd → MinIO | Resumable, bytes bypass the API |
+| Async work | Redis + Celery | Workflow primitives, retries |
+| Media processing | FFmpeg | Industry standard |
+| Storage | MinIO (S3 API) | Self-hosted, portable to S3 |
+| Delivery | Caddy → MinIO, HLS | Cacheable segments, ABR |
+
+## 3. Deep dive: upload
+
+1. Client asks to create an upload; tusd calls `pre-create`; the API checks auth, size, type and an **admission cap** (503 + `Retry-After` when full).
+2. Chunks stream to tusd, which writes S3 multipart parts to MinIO.
+3. On completion, `post-finish` creates the video row (idempotently) and enqueues processing.
+
+**Why not presigned uploads?** A single presigned PUT caps at 5 GB with no resume; presigned multipart works but resumes per part and exposes storage to browsers. See [ADR 0001](/docs/decisions/adr-0001-resumable-uploads).
+
+## 4. Deep dive: processing
+
+1. A Redis lock (`SET NX`, value = video ID) lets one pipeline run at a time; the queue is the `queued` rows ordered by creation time.
+2. A Celery chain: probe → storyboard → chord of transcodes → segment → manifest → upload → finalize → release lock.
+3. Failures run a `link_error` handler that marks the video failed and starts the next one; a worker restart triggers recovery.
+
+**Illustrative cost:** a 10-minute 1080p source produces six renditions. With roughly 6-second segments that is about 100 segments per rendition, about 600 segment files plus seven playlists. Total output size is roughly the sum of the rendition bitrates times duration: (5000 + 2500 + 1000 + 500 + 300 + 200 kbps video + 6 × 128 kbps audio) × 600 s ≈ 10.3 Mbps × 600 s ≈ **770 MB** (*illustrative*, actual CRF output varies).
+
+## 5. Deep dive: delivery
+
+The player loads `master.m3u8`, then segments. Segments are immutable, so they carry `max-age=31536000, immutable`; playlists get 60 seconds. Segment requests never reach Python.
+
+**Illustrative load:** 1,000 concurrent viewers at an average 2.5 Mbps is 2.5 Gbps of egress, far beyond one small VPS. That is the first thing to move (to a CDN).
+
+## 6. Scaling to 10× and 100×
+
+| Pressure | 10× | 100× |
+|---|---|---|
+| Playback bandwidth | CDN in front of `/storage` | CDN plus object storage designed for egress (S3/R2), multi-region |
+| Processing backlog | Separate worker machines; per-video heartbeats instead of single-worker recovery | GPU or hardware encoders, chunked parallel encoding, per-title ladders |
+| API load | Multiple Uvicorn workers, read replicas | Stateless API fleet behind a load balancer, caching of the public feed |
+| Uploads | Raise admission cap with more ingest capacity | Several tusd instances with sticky routing, or presigned multipart direct to storage |
+| Storage | Bigger disks | Managed object storage, lifecycle policies, tiering for cold originals |
+| Data | Indexes for the feed query | Search engine for discovery, analytics pipeline for views |
+
+## 7. What I would do differently
+
+- Encode all renditions in a single FFmpeg pass with aligned keyframes from the start.
+- Put the success hand-off inside the chain from day one (see the [incident](/docs/decisions/incident-2026-10-stuck-videos)).
+- Start with CI, automated migrations and an end-to-end pipeline test.

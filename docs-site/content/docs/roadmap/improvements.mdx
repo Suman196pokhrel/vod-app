@@ -1,0 +1,100 @@
+---
+title: Improvements
+description: The prioritised plan for correctness, pipeline performance, reliability and scale.
+---
+
+Ordered by impact. Each item names the current behaviour it changes.
+
+<Placeholder kind="chart" title="Improvement roadmap: impact vs effort for each item below">
+  2×2 matrix (quick wins, big bets, fill-ins, deprioritised).
+</Placeholder>
+
+## 1. Correctness (small, high value)
+
+| Change | Why |
+|---|---|
+| Fix session restore in the auth store (always clear the loading state; never refresh while logging out) | Returning users sometimes see neither Sign in nor their avatar |
+| Stop status polling at `completed` / `failed` | Callbacks currently repeat on every tick |
+| Re-raise Celery's `Retry` instead of catching it in transcode, segment and upload tasks | A swallowed or duplicated retry can confuse the chord or fork the pipeline |
+| Let `prepare_video` accept its own retry | The download retry currently always fails |
+| Don't mark the whole video failed when one rendition fails | Siblings flip the status back and forth |
+| Clean the working directory in `on_pipeline_failed` | Failed runs leave files on the worker |
+| Use server-side pagination, search and filters in the admin table | Videos past the first 20 are not visible |
+| Add the missing settings to the templates | A fresh clone needs manual fixes |
+
+## 2. Pipeline performance
+
+<Accordions>
+<Accordion title="Single-pass, multi-rendition encoding">
+
+Today the source is decoded once for the storyboard and once per rendition (up to 8 decodes), each rendition is written as an MP4 and then re-read to cut segments. One FFmpeg process can decode once, split the video with `-filter_complex split=N`, encode every rendition and write HLS segments and the master playlist directly (`-f hls -var_stream_map … -master_pl_name`). Fewer decodes, no MP4 intermediates, about half the temporary disk space.
+
+</Accordion>
+<Accordion title="Aligned keyframes and capped bitrate">
+
+Force a keyframe every segment (`-force_key_frames "expr:gte(t,n_forced*6)" -sc_threshold 0`) so every rendition's segments are exactly 6 seconds and aligned, which makes quality switches clean. Use capped CRF (`-maxrate`/`-bufsize`) so `BANDWIDTH` in the master playlist reflects the real peak, and add a `CODECS` attribute.
+
+</Accordion>
+<Accordion title="Compatibility flags">
+
+Add `-pix_fmt yuv420p -profile:v high` so 10-bit and HDR phone footage still produces H.264 that every browser decodes, and downmix audio to stereo.
+
+</Accordion>
+<Accordion title="Encode audio once">
+
+Audio is re-encoded identically for every rendition. A separate audio rendition (`EXT-X-MEDIA`) is encoded once and shared.
+
+</Accordion>
+<Accordion title="Parallel uploads to storage">
+
+Upload segments concurrently (or upload each rendition as soon as it is ready) instead of one file at a time, and set explicit content types (`application/vnd.apple.mpegurl`, `video/mp2t`).
+
+</Accordion>
+<Accordion title="Cheaper storyboard">
+
+Generate thumbnails from keyframes only, or as an extra output of the single-pass encode, instead of decoding every frame.
+
+</Accordion>
+<Accordion title="fMP4 / CMAF segments">
+
+`-hls_segment_type fmp4` reduces overhead versus MPEG-TS and prepares for HEVC/AV1 and DASH from the same files.
+
+</Accordion>
+<Accordion title="Per-title encoding">
+
+Choose renditions and bitrates from the content's complexity instead of one fixed ladder; skip renditions that would not look better than the one below.
+
+</Accordion>
+</Accordions>
+
+## 3. Reliability and operations
+
+| Change | Why |
+|---|---|
+| CI: build images off the server, push to a registry, deploy by pulling | No compilation on the production box; repeatable deploys |
+| Run migrations automatically on deploy | Schema changes cannot be forgotten |
+| Health checks on every service, `depends_on: service_healthy` | Start order based on readiness, not just process start |
+| Graceful worker shutdown period | Deploys wait for the current task instead of failing it |
+| Nightly PostgreSQL dumps and MinIO mirroring off the server | There is no backup today |
+| Uptime check, disk and memory alerts, alert on videos stuck in processing | Problems surface without a manual check |
+| Log rotation and structured (JSON) logs with request IDs | Bounded disk use, searchable logs |
+| Pinned image versions | No surprise upgrades on rebuild |
+| Automated tests: auth flows, admin authorisation, tus hook contract, pipeline happy path | Changes are verified before reaching production |
+
+## 4. Scale
+
+| Bottleneck today | Next step |
+|---|---|
+| Every segment is served from one server | A CDN in front of `/storage` (segments are already immutable and cacheable) |
+| One worker, one video at a time | Workers on separate machines; replace startup recovery with per-video heartbeats; shared storage between stages |
+| One long video occupies the worker | Split the source into chunks at keyframes and encode chunks in parallel |
+| One Uvicorn process | Multiple workers behind Caddy; move blocking calls out of `async` handlers |
+| One MinIO on local disk | Managed S3-compatible storage (S3, R2) or distributed MinIO |
+
+## 5. Product
+
+Server-rendered browse and watch pages with per-video metadata, search, pagination and infinite scroll, real admin dashboards, user management, comments, watch history and recommendations.
+
+## Security
+
+Security hardening is tracked separately and documented here once each item ships.

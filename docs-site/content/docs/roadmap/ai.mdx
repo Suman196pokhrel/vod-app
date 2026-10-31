@@ -1,0 +1,28 @@
+---
+title: AI roadmap
+description: Planned AI and ML features and where they plug into the pipeline.
+---
+
+AI features are planned, not built. This page records the intent and the integration points, so the existing architecture can absorb them without rework.
+
+<Placeholder kind="architecture" title="Where AI stages plug in: extra Celery steps before on_pipeline_success, GPU workers on a dedicated queue">
+  Show the current chain with optional AI branches and a separate GPU worker pool.
+</Placeholder>
+
+## Planned capabilities
+
+| Capability | What it does | Where it fits |
+|---|---|---|
+| **Frame generation / frame interpolation** | Synthesise intermediate frames (for example 24 → 60 fps) for smoother motion | A processing stage before transcoding, producing a higher-frame-rate mezzanine file |
+| **FPS boosting on playback** | Offer higher-frame-rate renditions alongside standard ones | Extra renditions in the ladder, chosen in the player |
+| **Upscaling** | Super-resolution for low-resolution sources | A stage before transcoding, enabling higher renditions than the source |
+| **Transcription and subtitles** | Speech-to-text into WebVTT subtitle tracks | A stage after `prepare_video`; subtitles referenced from the master playlist |
+| **Chapters and summaries** | Generate chapters and descriptions from the transcript | After transcription; stored as video metadata |
+| **Recommendations** | Related titles beyond the current "everything else" list | API and data model, starting from tags and watch history |
+
+## Integration points
+
+- **New pipeline stages** are new Celery tasks inserted into the chain in `workflows.py`. The processing queue appends `on_pipeline_success` after the last step, so new stages need no queue changes.
+- **GPU work** belongs on a separate Celery queue served by GPU workers, so CPU transcoding and AI inference do not compete. This requires the scale-out changes in [Improvements](/docs/roadmap/improvements#4-scale) (per-video ownership instead of single-worker recovery, shared storage between stages).
+- **Status reporting** extends naturally: each new stage writes its own `processing_status` value with its own progress percentage.
+- **Outputs** are objects in MinIO next to the HLS output, referenced by path from the `videos` row.

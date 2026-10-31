@@ -1,0 +1,56 @@
+---
+title: Current status
+description: What is real today, what is UI-only, and what is missing.
+---
+
+VOD is at **MVP**: the core viewer journey and the admin video lifecycle work end to end in production. This page is the honest inventory.
+
+<Placeholder kind="chart" title="Feature map: real, partial and UI-only features by area">
+  Grid or matrix coloured by status.
+</Placeholder>
+
+## Real and in production
+
+| Area | Feature |
+|---|---|
+| Upload | Resumable tus uploads up to 50 GB with admission control; legacy multipart upload |
+| Processing | One-at-a-time queue; storyboard; up to 7 H.264 renditions; HLS packaging; failure handling and restart recovery |
+| Delivery | HLS through Caddy from MinIO with long-lived segment caching |
+| Playback | Adaptive video.js + hls.js player with a quality menu and timeline thumbnails |
+| Browse | Public feed, hero carousel, category filter, title detail page, related titles |
+| Auth | Sign-up, email verification, sign-in, token refresh, logout, password reset by emailed code |
+| Admin | Video table with edit, visibility, soft delete, download, preview; upload with progress |
+| Infra | Docker Compose on one VPS, automatic HTTPS, Vercel-hosted frontend and docs |
+
+## Partial
+
+| Feature | Gap |
+|---|---|
+| Admin videos table | Loads the first 20 videos and works on them in the browser instead of using the API's server-side search, filters and pagination |
+| Category filter on browse | Runs in the browser over the first 20 public videos |
+| View counts | Endpoint exists; the frontend never calls it |
+| Watchlist | Button and sign-in gate exist; no backend |
+
+## UI-only
+
+Admin dashboard statistics, users, analytics, categories, settings, "Save draft", bulk delete, navbar search and notifications.
+
+## Not started
+
+- Comments, ratings, watch history, "continue watching"
+- Admin user management API
+- Categories as a database entity
+- Automated tests (backend and frontend)
+- CI/CD for the backend, backups, monitoring and alerting
+
+## Known bugs
+
+| Area | Bug |
+|---|---|
+| Frontend auth | Returning users can be left without a Sign in button or avatar until storage is cleared (session-restore edge cases) |
+| Upload dialog | Status polling continues after completion or failure, repeating callbacks |
+| Pipeline | Retry handling in some tasks can double-count or swallow a retry; the download retry in `prepare_video` cannot succeed |
+| Pipeline | Failed runs leave their working directory on the worker |
+| Setup | The env and Caddy templates miss two settings a fresh clone needs (documented in [Getting started](/docs/overview/getting-started)) |
+
+The plan to address these is in [Improvements](/docs/roadmap/improvements).

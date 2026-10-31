@@ -1,0 +1,99 @@
+---
+title: Likely questions
+description: Questions an interviewer is likely to ask about VOD, with answers grounded in the code.
+---
+
+## Architecture
+
+<Accordions>
+<Accordion title="Why not upload directly to the API?">
+
+A Python process is a poor pipe for gigabytes: it ties up workers for the length of the upload and cannot resume. tusd streams chunks straight to MinIO; the API only answers small hook calls. ([ADR 0001](/docs/decisions/adr-0001-resumable-uploads))
+
+</Accordion>
+<Accordion title="How does a video get from upload to playable?">
+
+`post-finish` creates a `queued` row → `start_next_video_if_idle()` takes a Redis lock → a Celery chain probes, builds the storyboard, transcodes renditions in a chord, segments, writes the master playlist, uploads to MinIO and finalizes → the lock passes to the next video. ([Upload to playback](/docs/architecture/upload-to-playback))
+
+</Accordion>
+<Accordion title="Why HLS? What does ABR actually do?">
+
+HLS splits each rendition into short segments listed in playlists. The player measures throughput while downloading segments and picks the rendition for the next segment, so quality drops before the buffer runs out instead of stalling. Segments are plain HTTP files, so they cache well.
+
+</Accordion>
+<Accordion title="Why does processing run one video at a time?">
+
+On one small server, parallel FFmpeg pipelines compete for CPU and memory. Even with one worker process, uncoordinated chains interleave so every video finishes late. Serialising pipelines keeps resource use predictable and finishes videos in order. ([ADR 0002](/docs/decisions/adr-0002-processing-queue))
+
+</Accordion>
+<Accordion title="What is a Celery chord and why use one?">
+
+A group of tasks plus a callback that runs after all of them finish, with their results. The seven transcodes form the group; `on_transcode_complete` aggregates which renditions succeeded before segmenting.
+
+</Accordion>
+</Accordions>
+
+## Reliability
+
+<Accordions>
+<Accordion title="What happens if the worker crashes mid-transcode?">
+
+No callback runs, so on startup a `worker_init` handler purges leftover messages, clears the lock, marks in-progress videos failed and starts the next queued one. A failed video is retried by setting it back to `queued`.
+
+</Accordion>
+<Accordion title="How do you prevent two pipelines for the same video?">
+
+The lock is taken with `SET NX` (atomic), and `prepare_video` refuses any video not exactly `queued`. The lock is released with an owner-checked Lua script, so a late callback cannot release another video's slot.
+
+</Accordion>
+<Accordion title="Tell me about a hard bug.">
+
+The [stuck videos incident](/docs/decisions/incident-2026-10-stuck-videos): a `link=` callback on the chain landed on the chord and crashed every pipeline with a `TypeError` inside Celery. Found from the database state and worker logs, reproduced locally, mechanism confirmed by inspecting Celery's built messages, fixed by making completion a chain step and making failures visible.
+
+</Accordion>
+<Accordion title="How would you know if processing broke again?">
+
+Today: the failure handler records the error, and `[queue]` log lines show every start, finish and failure. Next: alert on any video in a processing state longer than a threshold, and an end-to-end pipeline test in CI.
+
+</Accordion>
+</Accordions>
+
+## Scale and performance
+
+<Accordions>
+<Accordion title="What breaks first under load?">
+
+Playback bandwidth: every segment is served from one server. A CDN in front of `/storage` is the first change, and it is easy because segments are already immutable and cache-friendly. ([Walkthrough](/docs/interview/system-design-walkthrough#6-scaling-to-10-and-100))
+
+</Accordion>
+<Accordion title="How would you make transcoding faster?">
+
+Decode once and encode all renditions in one FFmpeg process writing HLS directly; force aligned keyframes; encode audio once; upload segments in parallel; then hardware encoders or chunked parallel encoding across machines. ([Improvements](/docs/roadmap/improvements#2-pipeline-performance))
+
+</Accordion>
+<Accordion title="How would you scale processing to many workers?">
+
+Replace single-worker recovery with per-video ownership (a heartbeat the worker renews), move intermediate files to shared or object storage so stages can run on different machines, and allow N pipelines at once with a counting semaphore instead of a single lock.
+
+</Accordion>
+</Accordions>
+
+## Security
+
+<Accordions>
+<Accordion title="How are admin endpoints protected?">
+
+Each admin route depends on `get_current_admin_user`, which verifies the access token and loads the user from the database; the role comes from the row, not the token, so demotion is immediate. Frontend guards are only UX.
+
+</Accordion>
+<Accordion title="How are the tus hooks protected?">
+
+They are called by tusd over the private Docker network with a shared secret compared in constant time, and Caddy returns 404 for `/internal/*` from the internet. The only public internal route is the status bridge, which needs an admin token.
+
+</Accordion>
+<Accordion title="Why access and refresh tokens?">
+
+Short-lived access tokens need only a signature check per request; refresh tokens are stored as SHA-256 hashes so sessions can be revoked (logout, password reset) and a database leak does not expose usable tokens.
+
+</Accordion>
+</Accordions>

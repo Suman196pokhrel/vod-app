@@ -1,0 +1,22 @@
+---
+title: Trade-offs
+description: The main design choices, what each one costs, and when it would change.
+---
+
+| Decision | Benefit | Cost | Revisit when |
+|---|---|---|---|
+| **tus via tusd** instead of uploads through the API | Resumable; API stays free | One more stateful service; every byte hops twice | Ingest bandwidth becomes the bottleneck → presigned multipart direct to storage |
+| **HLS** instead of progressive MP4 | Adaptive quality, cacheable segments, seeking without range tricks | Many small files; packaging step | — (HLS is the standard choice) |
+| **MPEG-TS segments** | Maximum compatibility | More overhead than fMP4; TS-only | Adding HEVC/AV1 or DASH → CMAF/fMP4 |
+| **Seven fixed renditions** | Simple, predictable | Wastes bits on easy content, too few for hard content | Encoding cost matters → per-title ladders |
+| **Two-pass pipeline** (encode MP4, then segment) | Each stage is simple and debuggable | Decodes the source many times; extra disk | Throughput matters → single-pass multi-output encode |
+| **One video at a time** | Predictable CPU and memory; videos finish in order | Throughput capped at one video | More hardware → parallel workers with per-video ownership |
+| **Redis lock + DB queue** | Queue state visible and editable with SQL | Lock release must be correct on every path | — |
+| **Celery** | Rich workflow primitives, retries, ecosystem | Canvas semantics are subtle (see the incident) | Workflows get complex → a workflow engine such as Temporal |
+| **Synchronous SQLAlchemy** | Simple, mature | `async` handlers must not call it directly | High concurrency → async driver or more workers |
+| **Single VPS** | Cheap, simple to reason about | Single point of failure; no isolation between tiers | Real traffic or SLAs → split tiers, managed services |
+| **Media served through the proxy from object storage** | No Python in the hot path; CDN-ready | All egress from one server today | Any real audience → CDN |
+| **JWT access + DB-tracked refresh tokens** | Stateless request auth; revocable sessions | Access tokens cannot be revoked before expiry | Instant revocation needed → short TTL plus a denylist |
+| **Tokens in `localStorage`** | Simple; works across reloads | Readable by any script on the page | Hardening → `httpOnly` refresh cookie, in-memory access token |
+| **Client-rendered pages** | Simple data flow with TanStack Query | No per-video metadata in initial HTML (SEO, link previews) | Discoverability matters → server components |
+| **Frontend on Vercel, backend self-hosted** | Global frontend delivery, independent deploys | Two platforms to operate | — |
