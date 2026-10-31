@@ -12,6 +12,8 @@ How the queue works (full write-up: docs/06_VIDEO_PROCESSING_PIPELINE.md,
    - failure: on_pipeline_failed, attached as the chain's link_error, which
      also marks the video "failed" with the real exception
    Both release the lock and call start_next_video_if_idle() again.
+4. When the worker starts, recover_after_worker_restart() cleans up whatever
+   a crashed or redeployed worker left behind, then starts the queue again.
 
 Never pass `link=` to the pipeline's apply_async(). Celery attaches it to the
 transcode chord, the chord forwards it to its group of 7 transcode tasks, and
@@ -20,7 +22,9 @@ pipeline then dies silently right after generate_storyboard. That is exactly
 why success is a chain step here instead of a link callback.
 """
 
+from celery import signals
 from app.celery_app import celery_app
+from app.core.database import engine
 from app.models.videos import Video
 from app.tasks.celery_dependencies import get_db_session, get_redis_client
 from app.tasks.workflows import create_video_processing_workflow
@@ -37,6 +41,20 @@ logger = logging.getLogger(__name__)
 # normal operation.
 PROCESSING_LOCK_KEY = "video_processing:active_lock"
 PROCESSING_LOCK_TTL_SECONDS = 6 * 60 * 60
+
+# Every status a video passes through while its pipeline is actually running
+# (see ProcessingStatus in app/utils/video_helpers.py). A video still in one
+# of these when the worker starts was interrupted mid-pipeline.
+IN_PROGRESS_STATUSES = (
+    "preparing",
+    "generating_storyboard",
+    "transcoding",
+    "aggregating",
+    "segmenting",
+    "creating_manifest",
+    "uploading_to_storage",
+    "finalizing",
+)
 
 # Deletes the lock only if it still holds this video's id, so a late or
 # duplicate callback from one video can never free the slot of the video
@@ -142,3 +160,65 @@ def on_pipeline_failed(request, exc, traceback, video_id: str):
     finally:
         _release_lock(video_id)
         start_next_video_if_idle()
+
+
+@signals.worker_init.connect
+def recover_after_worker_restart(**kwargs):
+    """
+    Runs once when the Celery worker starts - after task modules are imported,
+    before it consumes a single message.
+
+    Assumes exactly ONE worker container (production and local both run one).
+    With a single worker, nothing can be processing at the moment it starts,
+    so anything that still looks in-flight was interrupted by a crash, an OOM
+    kill or a redeploy. Without this, an interrupted video stayed at its last
+    in-progress status forever, and the queue behind it didn't move again
+    until the lock's 6h TTL expired AND someone uploaded another video.
+
+    If the worker is ever scaled to more than one container, remove this:
+    a second worker starting up would fail and purge the first one's
+    in-flight pipeline.
+    """
+    try:
+        # 1. Drop leftover messages of the interrupted pipeline (e.g. transcode
+        #    tasks that were queued but never ran). Run on their own they can
+        #    never finish the chord, and would only flip the video's status
+        #    back to "transcoding" after step 3 marks it failed.
+        purged = celery_app.control.purge()
+
+        # 2. Nothing is processing, so any lock is a leftover.
+        get_redis_client().delete(PROCESSING_LOCK_KEY)
+
+        # 3. Mark interrupted videos failed, with a message saying so.
+        with get_db_session() as db:
+            interrupted = (
+                db.query(Video)
+                .filter(Video.processing_status.in_(IN_PROGRESS_STATUSES))
+                .all()
+            )
+            for video in interrupted:
+                video.processing_error = (
+                    f"Processing was interrupted during '{video.processing_status}' "
+                    f"by a worker restart. Set the video back to 'queued' to retry."
+                )
+                video.processing_status = "failed"
+            interrupted_ids = [video.id for video in interrupted]
+
+        logger.info(
+            f"[queue] Worker startup recovery: purged {purged} message(s), "
+            f"marked {len(interrupted_ids)} interrupted video(s) failed: {interrupted_ids}"
+        )
+
+        # 4. Start the oldest queued video, if any.
+        start_next_video_if_idle()
+
+    except Exception as e:
+        # Never stop the worker from starting - worst case we're back to
+        # the old behaviour, with the 6h lock TTL as the safety net.
+        logger.error(f"[queue] Worker startup recovery failed: {str(e)}")
+
+    finally:
+        # This runs in the parent process, before the pool forks its child
+        # processes. Close every pooled Postgres connection opened here, so
+        # forked children never share (and corrupt) the parent's sockets.
+        engine.dispose()
