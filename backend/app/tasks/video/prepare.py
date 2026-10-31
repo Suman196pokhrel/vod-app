@@ -7,6 +7,7 @@ from app.core.config import get_settings
 from app.services.ffmpeg_service import extract_metadata
 from app.utils.video_helpers import update_video_processing_status
 import os
+import shutil
 import time
 import logging
 
@@ -56,6 +57,11 @@ def prepare_video(self, video_id:str):
     
     # create a working dir for this video
     work_dir_path = os.path.join(settings.processing_temp_dir , video_id)
+    # A previous run of this video that failed or was interrupted (e.g. by a
+    # worker restart) leaves its working dir behind, and makedirs would then
+    # raise FileExistsError - which made re-queueing such a video impossible.
+    # Nothing else can be using it: only one pipeline runs at a time.
+    shutil.rmtree(work_dir_path, ignore_errors=True)
     os.makedirs(work_dir_path)
 
     # Create subdirectories 

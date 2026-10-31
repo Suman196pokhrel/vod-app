@@ -134,13 +134,13 @@ if video.processing_status != "queued":
 
 video.processing_status = "preparing"   # committed before the download
 ...
-os.makedirs(work_dir_path)              # no exist_ok
-...
 except Exception as e:                  # download failed
     raise self.retry(exc=e, countdown=60)
 ```
 
-The first attempt commits `processing_status = "preparing"` *before* downloading. When the download fails, the task schedules a retry 60 seconds later - but the retried attempt runs the same guard, sees `"preparing"` instead of `"queued"`, and raises `ValueError: Video not ready for processing. Current status : preparing`. Even past the guard, `os.makedirs(work_dir_path)` has no `exist_ok=True` and would raise `FileExistsError` on the directory the first attempt created. Found while testing the processing-queue fix: a video with a missing raw object sat at `preparing` for exactly 60 seconds and then failed with that misleading "not ready" message (the chain's `link_error` now at least marks it failed instead of leaving it stuck). The fix is to let the guard accept a retry of the same task (e.g. allow `"preparing"` when `self.request.retries > 0`) and make the `makedirs` call idempotent.
+The first attempt commits `processing_status = "preparing"` *before* downloading. When the download fails, the task schedules a retry 60 seconds later - but the retried attempt runs the same guard, sees `"preparing"` instead of `"queued"`, and raises `ValueError: Video not ready for processing. Current status : preparing`. Found while testing the processing-queue fix: a video with a missing raw object sat at `preparing` for exactly 60 seconds and then failed with that misleading "not ready" message (the chain's `link_error` now at least marks it failed instead of leaving it stuck). The fix is to let the guard accept a retry of the same task, e.g. allow `"preparing"` when `self.request.retries > 0`.
+
+**Partly fixed:** the same retry path used to crash one line later too - `os.makedirs(work_dir_path)` raised `FileExistsError` on the directory the first attempt created. More importantly, that also made it impossible to re-queue *any* video whose earlier run failed or was interrupted, because its working directory was still on disk (`Pipeline stopped during 'preparing' (app.tasks.video_tasks.prepare_video): FileExistsError(17, 'File exists')`). `prepare_video` now removes a leftover working directory before creating it. That's safe because only one pipeline runs at a time. The status guard above is still open.
 
 ### Bug 5: `transcode_quality`'s Outer `except Exception: pass` Swallows Retries and Validation Errors
 

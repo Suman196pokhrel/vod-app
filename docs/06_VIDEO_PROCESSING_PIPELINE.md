@@ -139,10 +139,11 @@ UPDATE videos SET processing_status = 'queued', processing_error = NULL WHERE id
 
 This task:
 1. Updates `processing_status` to `"preparing"`
-2. Downloads the raw video from MinIO to a local temp directory (`<backend-dir>/tmp/video_processing/{video_id}/` - not filesystem `/tmp`; the path comes from `settings.processing_temp_dir`, which resolves relative to the backend project directory)
-3. Runs `ffprobe` on the file to extract metadata: codec, duration (seconds), resolution (width × height), bitrate
-4. Saves this metadata to `video.processing_metadata` as a JSON object
-5. Determines which quality levels to transcode - skips any quality higher than the source resolution (no upscaling; transcoding 480p source to 1440p makes no sense)
+2. Creates the video's working directory, first removing any leftover one from an earlier failed or interrupted run of the same video (otherwise `os.makedirs` raises `FileExistsError` and the video can never be re-queued)
+3. Downloads the raw video from MinIO to a local temp directory (`<backend-dir>/tmp/video_processing/{video_id}/` - not filesystem `/tmp`; the path comes from `settings.processing_temp_dir`, which resolves relative to the backend project directory)
+4. Runs `ffprobe` on the file to extract metadata: codec, duration (seconds), resolution (width × height), bitrate
+5. Saves this metadata to `video.processing_metadata` as a JSON object
+6. Determines which quality levels to transcode - skips any quality higher than the source resolution (no upscaling; transcoding 480p source to 1440p makes no sense)
 
 The task decorator sets `max_requests=3`, which reads like a retry-count kwarg but isn't a recognized Celery option at all - Celery silently accepts and ignores it. The actual retry ceiling comes from Celery's own default `max_retries=3` (never explicitly set on this task), which only coincidentally matches the number in `max_requests=3`. Every retry across this whole pipeline uses a fixed `countdown=60` - there's no exponential backoff anywhere in the codebase, despite what you might expect from typical Celery setups.
 
