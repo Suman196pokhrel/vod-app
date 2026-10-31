@@ -1,0 +1,57 @@
+---
+title: Caddy
+description: "The reverse proxy: TLS, routing, caching and why it runs on the host network."
+---
+
+**Caddy** is the backend's only public entry point. It was chosen for **automatic HTTPS** (it obtains and renews Let's Encrypt certificates by itself), a short configuration file, and solid streaming reverse-proxy support.
+
+The routing rules are explained in [Request routing](/docs/architecture/request-routing). This page covers the configuration files and operational details.
+
+<Placeholder kind="flow" title="Caddy request pipeline: TLS termination → route match (first match wins) → headers → upstream">
+  Annotate each route with its upstream and cache policy.
+</Placeholder>
+
+## Config files
+
+| File | Used for | In git |
+|---|---|---|
+| `infra/caddy/Caddyfile.example` | Template for local development | Yes |
+| `infra/caddy/Caddyfile.prod.example` | Template for production | Yes |
+| `infra/caddy/Caddyfile.local` | Your local config, copied from the example | No |
+| `infra/caddy/Caddyfile.prod` | The production config on the server | No |
+
+The real files are git-ignored so environment-specific details stay out of the repository. The container mounts the file read-only.
+
+## Production config, in outline
+
+```text title="Caddyfile.prod (outline)"
+api.vod.spokhrel.dev {
+    handle /files/*                         → tusd   (flush_interval -1)
+    handle /internal/tus/hooks/uploads/*    → api
+    handle /internal/*                      → respond 404
+    handle_path /storage/*                  → minio  (prefix stripped)
+    reverse_proxy                           → api
+}
+```
+
+| Directive | Meaning |
+|---|---|
+| `handle` | Match a path and keep it unchanged |
+| `handle_path` | Match a path and **strip** the matched prefix before proxying |
+| `reverse_proxy` | Forward to an upstream |
+| `flush_interval -1` | Stream the response immediately instead of buffering (needed for upload progress) |
+| `respond 404` | Answer directly without contacting an upstream |
+
+`/files` uses `handle`, not `handle_path`: tusd serves under `/files/` and does not honour a forwarded prefix, so stripping it would break the protocol.
+
+## Caching
+
+The production config sets `Cache-Control` per media type: one year and `immutable` for `.ts` segments, 60 seconds for `.m3u8` playlists. See [Request routing](/docs/architecture/request-routing#caching).
+
+## Why host networking in production
+
+Caddy runs with `network_mode: host` and reaches the API, MinIO and tusd on loopback ports. Those services publish their ports only on `127.0.0.1`, so they are reachable from Caddy on the same machine but not from the internet. Locally, Caddy instead joins the Compose bridge network and uses service names.
+
+## Certificates
+
+Certificates and ACME account data are stored in the `caddy_data` volume, so they survive container recreation and Caddy does not re-request certificates on every deploy.

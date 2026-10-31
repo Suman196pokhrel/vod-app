@@ -1,0 +1,66 @@
+---
+title: Infrastructure overview
+description: Where each part of VOD runs and how the pieces are wired together.
+---
+
+VOD runs in three places:
+
+| Part | Hosting | Domain |
+|---|---|---|
+| Frontend (Next.js) | **Vercel** | `vod.spokhrel.dev` |
+| Docs site (this site) | **Vercel** | `docs.vod.spokhrel.dev` |
+| Backend (API, worker, databases, storage, proxy) | One **Hetzner** VPS running **Docker Compose** | `api.vod.spokhrel.dev` |
+
+<Placeholder kind="architecture" title="Deployment topology: Vercel (frontend, docs) and one Hetzner VPS running seven containers behind Caddy">
+  Show public ports (80/443 only) vs loopback-only and private-network-only services.
+</Placeholder>
+
+## The backend server
+
+Seven containers on one host, defined in `infra/docker-compose.yml`:
+
+| Service | Image | Network exposure |
+|---|---|---|
+| `caddy` | `caddy:2-alpine` | **Host network**: the only public entry point (ports 80 and 443) |
+| `api` | built from `backend/` | Loopback only (`127.0.0.1:8000`) |
+| `worker` | built from `backend/` (same image) | None |
+| `postgres` | `postgres:16-alpine` | None (private Docker network) |
+| `redis` | `redis:7-alpine` | None (private Docker network) |
+| `minio` | `minio/minio` | Loopback only (`127.0.0.1:9000`); the admin console is not published |
+| `tusd` | `tusproject/tusd:v2.9.2` | Loopback only (`127.0.0.1:1080`) |
+
+All services except Caddy share a private bridge network (`backend_net`) and reach each other by service name (`postgres:5432`, `redis:6379`, `minio:9000`, `api:8000`). Caddy runs on the host network and reaches the three services it proxies through their loopback ports.
+
+## Why one server
+
+The project is built to show that a complete VOD platform can run on a small, inexpensive server. That choice drives several decisions documented elsewhere:
+
+- The worker processes one video at a time ([ADR 0002](/docs/decisions/adr-0002-processing-queue)).
+- Each container has a **memory limit**, so a heavy transcode cannot starve the database or the API.
+- Video bytes bypass Python on the way in (tusd) and on the way out (Caddy → MinIO).
+
+## Resource budget
+
+Memory limits from the production compose file:
+
+| Service | `mem_limit` | Notes |
+|---|---|---|
+| worker | 1800 MB | FFmpeg needs the most headroom; CPU weight lowered (`cpu_shares: 256`) so the API wins under contention |
+| api | 768 MB | `cpu_shares: 1024` |
+| postgres | 512 MB | |
+| minio | 512 MB | |
+| redis | 256 MB | |
+| tusd | 192 MB | |
+| caddy | 64 MB | |
+
+`cpu_shares` are relative weights, not hard caps: they only matter when processes compete for CPU.
+
+## Environments
+
+| Environment | Compose file | Status |
+|---|---|---|
+| Local | `infra/docker-compose.local.yml` | In daily use; adds pgAdmin, Flower and RedisInsight |
+| Production | `infra/docker-compose.yml` | Live |
+| Staging | `infra/docker-compose.staging.yml` | Incomplete: no Caddy or tusd service and no committed env file, so it is not used |
+
+Details: [Docker Compose](/docs/infrastructure/docker-compose), [Caddy](/docs/infrastructure/caddy), [Local development](/docs/infrastructure/local-development), [Deployment](/docs/infrastructure/deployment).

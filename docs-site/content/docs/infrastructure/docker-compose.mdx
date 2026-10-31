@@ -1,0 +1,62 @@
+---
+title: Docker Compose
+description: The services, networks, volumes and per-environment differences of the Compose setup.
+---
+
+Every backend service runs as a container defined in `infra/`. The API and worker share one image built from `backend/Dockerfile`.
+
+<Placeholder kind="architecture" title="Compose topology: services, the backend_net bridge network, named volumes and published ports">
+  Side-by-side local vs production view.
+</Placeholder>
+
+## The backend image
+
+`backend/Dockerfile` starts from `python:3.12-slim`, installs system packages including **FFmpeg** and the PostgreSQL client libraries, installs `requirements.txt`, copies the code and starts Uvicorn by default. The worker service overrides the command:
+
+```yaml
+worker:
+  command: ["celery", "-A", "app.celery_app:celery_app", "worker", "--loglevel=INFO", "--concurrency=1"]
+```
+
+One image for both roles means the API and worker always run the same code version and share models, settings and services.
+
+## Persistent data
+
+| Volume | Holds |
+|---|---|
+| `postgres_data` | The database |
+| `minio_data` | All objects: originals, thumbnails, HLS output |
+| `caddy_data`, `caddy_config` | TLS certificates and Caddy state |
+| `tusd_data` | tusd's local working data |
+
+The worker's processing directory is inside the container, not on a volume: it is scratch space that is deleted after each successful pipeline.
+
+## Local vs production
+
+| | Local (`docker-compose.local.yml`) | Production (`docker-compose.yml`) |
+|---|---|---|
+| Caddy | Bridge network, plain HTTP on port 80 | Host network, HTTPS on 80/443 |
+| API | Mounts `backend/` and runs `uvicorn --reload` | Code baked into the image |
+| Worker | Code baked in, **concurrency 3** | Code baked in, **concurrency 1** |
+| Database and Redis ports | Published for local tools | Not published |
+| Memory limits | None | Per service (see [overview](/docs/infrastructure#resource-budget)) |
+| Extra tools | pgAdmin (5050), Flower (5555), RedisInsight (5540), MinIO console (9001) | None |
+| Restart policy | `unless-stopped` on most services | `unless-stopped` on every service |
+
+The local API's bind mount plus `--reload` makes API changes live. The worker has no mount, so task changes need `make build`.
+
+## Configuration
+
+`api` and `worker` load the environment file with `env_file`. PostgreSQL, Redis, MinIO and tusd take their settings through Compose **variable substitution** (`${REDIS_PASSWORD}` and so on), which is why Compose is always run with `--env-file`:
+
+```bash
+docker compose -f docker-compose.yml --env-file prod.env up -d
+```
+
+## Health checks
+
+Redis has a Compose `healthcheck`. The other services rely on `restart: unless-stopped` and plain `depends_on` (start order, not readiness). Adding health checks with `condition: service_healthy` is on the [roadmap](/docs/roadmap/improvements).
+
+## tusd's configuration
+
+tusd is configured entirely through command-line flags in the Compose file: it stores uploads in the raw-videos bucket under the `tus-uploads/` prefix using the S3 API, uses `tus_part_size_mb` as the S3 part size, and sends `pre-create`, `post-finish` and `post-terminate` hooks to the API over the private network.

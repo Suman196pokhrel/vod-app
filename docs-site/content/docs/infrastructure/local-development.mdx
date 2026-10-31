@@ -1,0 +1,87 @@
+---
+title: Local development
+description: How the local stack is put together and the day-to-day development loop.
+---
+
+Setup steps are in [Getting started](/docs/overview/getting-started). This page explains how the local environment works.
+
+<Placeholder kind="architecture" title="Local dev topology: pnpm dev (frontend :3000) + Docker stack behind Caddy (:80) + dev tools">
+  Show which ports you open in the browser and which are container-internal.
+</Placeholder>
+
+## What runs where
+
+| Process | How | Port |
+|---|---|---|
+| Frontend | `pnpm dev` in `app/` (on your machine, not in Docker) | 3000 |
+| Docs site | `make docs` (on your machine) | 3001 |
+| Caddy | Docker | 80 |
+| API | Docker, source mounted, auto-reload | 8000 (use Caddy on 80 instead) |
+| Worker | Docker, concurrency 3 | — |
+| PostgreSQL | Docker | 5432 |
+| Redis | Docker | 6379 |
+| MinIO | Docker | 9000 (API), 9001 (console) |
+| tusd | Docker | via Caddy `/files` |
+| pgAdmin | Docker | 5050 |
+| Flower | Docker | 5555 |
+| RedisInsight | Docker | 5540 |
+
+## The edit loop
+
+| You change | To see it |
+|---|---|
+| Frontend code | Nothing: Next.js hot-reloads |
+| API code (`backend/app/apis`, `services`, …) | Nothing: the API container mounts `backend/` with `uvicorn --reload` |
+| Celery task code (`backend/app/tasks`) | `make build`: the worker runs the code baked into its image |
+| `requirements.txt` | `make build` |
+| A model | Write an Alembic migration, then `alembic upgrade head` in `make shell` |
+| `infra/local.env` | `make restart` |
+
+## Debugging tools
+
+| Tool | Use it for |
+|---|---|
+| **Swagger** at http://localhost/docs | Calling API endpoints by hand |
+| **Flower** at http://localhost:5555 | Watching Celery tasks: state, arguments, retries, errors |
+| **pgAdmin** at http://localhost:5050 | Inspecting tables (for example `processing_status` of recent videos) |
+| **RedisInsight** at http://localhost:5540 | Inspecting the processing lock and admission keys |
+| **MinIO console** at http://localhost:9001 | Browsing buckets and HLS output |
+| `make logs s=worker` | Following the pipeline, including `[queue]` lines |
+
+## Useful queries
+
+```sql
+-- Recent videos and where they are in the pipeline
+SELECT id, title, processing_status, processing_error, created_at
+FROM videos ORDER BY created_at DESC LIMIT 10;
+```
+
+## Common problems
+
+<Accordions>
+<Accordion title="Thumbnails and video don't load">
+
+`NEXT_PUBLIC_API_URL` must be `http://localhost` (Caddy), not `http://localhost:8000`, and your `Caddyfile.local` must contain the `/storage/*` route to MinIO.
+
+</Accordion>
+<Accordion title="API or worker exits on startup with a validation error">
+
+A required setting is missing from `infra/local.env`. The error names the field; compare with `backend/app/core/config.py`. `MAX_VIDEO_SIZE` and `MAX_THUMBNAIL_SIZE` are the usual culprits.
+
+</Accordion>
+<Accordion title="make dev fails with 'port is already allocated'">
+
+Another process uses one of the stack's ports (often a standalone pgAdmin on 5050). Stop it, or start the other services explicitly and leave out the one that clashes.
+
+</Accordion>
+<Accordion title="A pipeline change has no effect">
+
+The worker does not mount the source code. Run `make build`.
+
+</Accordion>
+<Accordion title="Caddy fails to start with a mount error">
+
+`Caddyfile.local` must be a **file**. If it does not exist when Docker starts, Docker creates a directory with that name instead; delete it and copy the example again.
+
+</Accordion>
+</Accordions>
