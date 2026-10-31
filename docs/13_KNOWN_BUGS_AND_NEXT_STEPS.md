@@ -59,7 +59,38 @@ There used to be two different functions named `get_current_user` in this codeba
 
 **File:** `backend/app/tasks/workflows.py`
 
-Every upload dispatched its own Celery chain independently the moment it finished, with nothing coordinating between videos. On production, where the worker runs `--concurrency=1`, that meant every task from every video's chain competed for the same single execution slot in the same shared broker queue. Uploading two or three videos close together made each one's transcode chord (7 tasks) land in that queue around the same time, so a short video that finished transcoding first still had its later stages (`segment_videos`, `create_manifest`, `upload_to_minio`, `finalize_processing`) queued behind other videos' still-pending transcode tasks. In the admin table it looked frozen on whatever stage it last reached, sometimes for as long as every other queued video took to finish transcoding. This is fixed: a Redis lock now ensures only one video's pipeline is dispatched at a time, and every chain's success/error callback (`advance_processing_queue`) hands the lock to the next oldest `"queued"` video the moment the current one ends, whether it succeeded or failed. Uploading is unaffected, videos still get created immediately; they just wait their turn to actually process. See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md#multiple-videos-one-pipeline-at-a-time).
+Every upload dispatched its own Celery chain independently the moment it finished, with nothing coordinating between videos. On production, where the worker runs `--concurrency=1`, that meant every task from every video's chain competed for the same single execution slot in the same shared broker queue. Uploading two or three videos close together made each one's transcode chord (7 tasks) land in that queue around the same time, so a short video that finished transcoding first still had its later stages (`segment_videos`, `create_manifest`, `upload_to_minio`, `finalize_processing`) queued behind other videos' still-pending transcode tasks. In the admin table it looked frozen on whatever stage it last reached, sometimes for as long as every other queued video took to finish transcoding. This is fixed: a Redis lock now ensures only one video's pipeline is dispatched at a time, and every pipeline hands the lock to the next oldest `"queued"` video the moment it ends, whether it succeeded or failed. Uploading is unaffected, videos still get created immediately; they just wait their turn to actually process. The first version of this fix wired the hand-off as a `link=` callback and broke every pipeline - see the next entry. The queue now lives in `backend/app/tasks/processing_queue.py`. See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md#multiple-videos-one-pipeline-at-a-time).
+
+### Resolved: Every Pipeline Crashed Right After `generate_storyboard`
+
+**Files:** `backend/app/tasks/workflows.py` (before), `backend/app/tasks/processing_queue.py` (now)
+
+From the deploy of the processing lock (commit `46dd5eb`, 31 July 2026) until this fix, **no uploaded video could finish processing**. The thumbnail showed up on the browse page (it's stored at upload time, not by the pipeline), but opening the video showed "This video is still processing. Check back shortly." forever. In the database, the video sat at `processing_status = "generating_storyboard"` with `storyboard_url` filled in (the storyboard stage itself had succeeded), `manifest_url` null and an empty `processing_error`. The worker log showed:
+
+```
+[storyboard] ✓ Complete for <video_id>: 1 sheet(s), 9 cues
+RuntimeWarning: Exception raised outside body: TypeError('Cannot add link to group: use a chord')
+Task app.tasks.video_tasks.generate_storyboard[...] raised unexpected: TypeError('Cannot add link to group: use a chord')
+Task app.tasks.video_tasks.advance_processing_queue[...] received
+```
+
+**Root cause:** `start_video_processing()` dispatched the chain with `apply_async(link=advance_processing_queue.si(), link_error=advance_processing_queue.si())`. Celery folds every step after the transcode chord into the chord's body, so a chain-level `link` gets attached to the chord itself. When the chord was launched after `generate_storyboard`, it passed that option on to its `group` of 7 transcode tasks, and `group.apply_async()` raises `TypeError` for any `link` (Celery 5.6.3, `celery/canvas.py`). The error happened while Celery was handing off between steps, outside any task body, so no transcode task was ever created and no task's own `try/except` could mark the video failed. The `link_error` callback did run, but it only released the lock. It reproduced on every upload, locally and in production, and inspecting the dispatched message showed `link` set on the chord.
+
+**Fix:** releasing the lock is now `on_pipeline_success`, appended as the **last step of the chain** instead of a `link` callback, so nothing is attached to the chord any more. Rule of thumb for this codebase: never pass `link=` to the pipeline's `apply_async()`. See [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md#multiple-videos-one-pipeline-at-a-time).
+
+**Recovering a video that hit this:** it stays at `generating_storyboard` until the worker restarts with the fix, at which point [worker startup recovery](./06_VIDEO_PROCESSING_PIPELINE.md#worker-startup-recovery) marks it failed as "interrupted". Set it back to `queued` to reprocess it (see "Debugging the Queue" in the same doc).
+
+### Resolved: Pipeline Crashes Left Videos "Still Processing" Forever
+
+**File:** `backend/app/tasks/processing_queue.py` (`on_pipeline_failed`)
+
+Each task marks its own failures, but anything a task didn't catch - the `TypeError` above being the worst case - left the video at its last in-progress status with an empty `processing_error`, because the chain's `link_error` only released the lock. The watch page and the admin progress dialog then waited forever. Fixed: the chain's `link_error` is now `on_pipeline_failed`, which marks the video `"failed"` (never overwriting `"completed"`), writes the stage, failing task and exception into `processing_error` unless a task already wrote a more specific message, and then advances the queue.
+
+### Resolved: A Worker Restart Mid-Pipeline Stalled the Whole Queue
+
+**File:** `backend/app/tasks/processing_queue.py` (`recover_after_worker_restart`)
+
+If the worker died or was redeployed while a pipeline was running, nothing ever ran that pipeline's callbacks: the video stayed in progress forever, and the queue behind it only moved again once the lock's 6-hour TTL expired *and* someone uploaded another video. Fixed: a `worker_init` handler now purges leftover broker messages, clears the lock, marks every in-progress video `"failed"` ("interrupted by a worker restart") and starts the oldest queued video. It assumes a single worker container - see [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md#worker-startup-recovery) before scaling workers out.
 
 ### Resolved: Delete Video Crash (was Bug 1 in an earlier revision)
 
@@ -91,6 +122,46 @@ export const saveDraft = async (data: Partial<VideoFormData>) => {
 ```
 
 There is no `POST /videos/draft` route anywhere in `video.py`. This is currently harmless because neither upload form's "Save Draft" button calls `saveDraft()` - both still run a fake `setTimeout` (see [11_FRONTEND_VIDEO_UPLOAD.md](./11_FRONTEND_VIDEO_UPLOAD.md)). But it's a trap waiting for whoever wires the button up expecting the function to just work: it won't, until the backend route is built (or `saveDraft()` is repointed at a route that already exists).
+
+### Bug 4: `prepare_video`'s Download Retry Can Never Succeed
+
+**File:** `backend/app/tasks/video/prepare.py` (`prepare_video`)
+**Severity:** Medium - a transient MinIO hiccup fails the video instead of being retried
+
+```python
+if video.processing_status != "queued":
+    raise ValueError(f"Video not ready for processing. Current status : {video.processing_status}")
+
+video.processing_status = "preparing"   # committed before the download
+...
+os.makedirs(work_dir_path)              # no exist_ok
+...
+except Exception as e:                  # download failed
+    raise self.retry(exc=e, countdown=60)
+```
+
+The first attempt commits `processing_status = "preparing"` *before* downloading. When the download fails, the task schedules a retry 60 seconds later - but the retried attempt runs the same guard, sees `"preparing"` instead of `"queued"`, and raises `ValueError: Video not ready for processing. Current status : preparing`. Even past the guard, `os.makedirs(work_dir_path)` has no `exist_ok=True` and would raise `FileExistsError` on the directory the first attempt created. Found while testing the processing-queue fix: a video with a missing raw object sat at `preparing` for exactly 60 seconds and then failed with that misleading "not ready" message (the chain's `link_error` now at least marks it failed instead of leaving it stuck). The fix is to let the guard accept a retry of the same task (e.g. allow `"preparing"` when `self.request.retries > 0`) and make the `makedirs` call idempotent.
+
+### Bug 5: `transcode_quality`'s Outer `except Exception: pass` Swallows Retries and Validation Errors
+
+**File:** `backend/app/tasks/video/transcode.py` (`transcode_quality`)
+**Severity:** Medium - found by reading the code, not reproduced yet
+
+```python
+try:
+    ...                                   # input validation raises ValueError / FileNotFoundError / ...
+    try:
+        ...                               # FFmpeg
+    except subprocess.CalledProcessError as e:
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e, countdown=60)
+        ...
+except Exception as exc:
+    # Retry logic
+    pass                                  # → task returns None
+```
+
+`self.retry()` works by publishing a new copy of the task and then raising a `Retry` exception, which Celery needs to see to record the attempt as "retrying". Here that `Retry` is raised inside the inner `except`, so it lands in the outer `except Exception` and is silently dropped: the current attempt reports *success* with a `None` result while the retry copy also runs, so the chord can see the same quality complete twice. The input-validation errors above the inner `try` (missing input file, empty file, invalid quality, missing height) end up in the same `pass`: the quality is silently treated as a failed transcode (`on_transcode_complete` filters out `None`) without any log line or status update. The fix is to re-raise `Retry` (`except Retry: raise`) and to log or return an identity-carrying `{"failed": True}` dict for everything else, like the inner handlers already do.
 
 ---
 
@@ -139,33 +210,36 @@ The "make videos watchable" phase is done. What's left is genuinely secondary - 
 3. **Resolve the `saveDraft()` dead end** (Bug 3) - either build `POST /videos/draft` or repoint the function; then wire both upload forms' buttons to it
 4. **Wire `incrementVideoView`** from the play page - the backend half of this already works
 5. **Add a cancel button for in-progress resumable uploads**
+6. **Fix `prepare_video`'s download retry** (Bug 4) - let the status guard accept a retry of the same task and make `os.makedirs` idempotent
+7. **Fix `transcode_quality`'s swallowed retries** (Bug 5) - re-raise `Retry` and log or report everything else
+8. **Clean up the temp directory on failure** - from `on_pipeline_failed`, which now runs for every failed pipeline
 
 ### Admin completeness
 
-6. **Admin user-management API** - `GET /admin/users` with filtering and pagination; role/active-status updates
-7. **Real analytics** - start with simple DB aggregations on the videos table; graduate to event streaming for real-time dashboards later
-8. **Categories as a proper entity** - database table, CRUD endpoints, and update the video create/edit schemas to reference category IDs
-9. **Settings save** - wire the settings page to an actual persistence layer
-10. **Is Public at creation time** - add the toggle to the upload form itself
+9. **Admin user-management API** - `GET /admin/users` with filtering and pagination; role/active-status updates
+10. **Real analytics** - start with simple DB aggregations on the videos table; graduate to event streaming for real-time dashboards later
+11. **Categories as a proper entity** - database table, CRUD endpoints, and update the video create/edit schemas to reference category IDs
+12. **Settings save** - wire the settings page to an actual persistence layer
+13. **Is Public at creation time** - add the toggle to the upload form itself
 
 ### Content completeness
 
-11. **Comments** - new component, new table, new endpoints (there's no old UI to reconnect to)
-12. **Watch history table** - prerequisite for personalization and "continue watching"
+14. **Comments** - new component, new table, new endpoints (there's no old UI to reconnect to)
+15. **Watch history table** - prerequisite for personalization and "continue watching"
 
 ### Infrastructure hardening
 
-13. **Docker health checks** on PostgreSQL, MinIO, API, and worker, wired into `depends_on: condition: service_healthy`
-14. **Enable 4K transcoding** if/when the processing time tradeoff is acceptable
-15. **Backfill storyboards** for videos processed before the scrubbing-preview feature shipped
-16. **Add `tusd` and Caddy routes to the staging compose file** once Bug 2 is fixed, so staging matches local/prod capability
+16. **Docker health checks** on PostgreSQL, MinIO, API, and worker, wired into `depends_on: condition: service_healthy`
+17. **Enable 4K transcoding** if/when the processing time tradeoff is acceptable
+18. **Backfill storyboards** for videos processed before the scrubbing-preview feature shipped
+19. **Add `tusd` and Caddy routes to the staging compose file** once Bug 2 is fixed, so staging matches local/prod capability
 
 ### Future sprint: AI foundation
 
-17. **Tag-based related videos** - simple SQL, no ML required
-18. **Whisper transcription task** - runs in Celery after transcoding
-19. **Chapter generation** using an LLM on the transcript
-20. Reintroducing any orphaned AI component means re-adding its import/JSX to a page *and* giving it a real data source - not just fixing the data source in place.
+20. **Tag-based related videos** - simple SQL, no ML required
+21. **Whisper transcription task** - runs in Celery after transcoding
+22. **Chapter generation** using an LLM on the transcript
+23. Reintroducing any orphaned AI component means re-adding its import/JSX to a page *and* giving it a real data source - not just fixing the data source in place.
 
 ---
 
@@ -176,7 +250,7 @@ When you come back to this codebase after time away, run these to confirm the sy
 ```bash
 make dev                    # Start the stack
 make logs s=api             # Check API started without errors
-make logs s=worker           # Check worker connected to Redis
+make logs s=worker           # Check worker connected to Redis, and its "[queue] Worker startup recovery" line
 curl http://localhost/health # Should return {"status": "Ok!"}
 
 # In pgAdmin (localhost:5050) or via make db:

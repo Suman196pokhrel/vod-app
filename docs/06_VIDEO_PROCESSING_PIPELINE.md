@@ -48,6 +48,8 @@ workflow = chain(
 
 This is sequential at the top level - each stage runs after the previous one completes - except for the transcoding step, which runs all seven quality levels in parallel simultaneously (via `chord` + `group`). Note that transcoding is now a single **parameterized** task, `transcode_quality`, invoked once per quality level with a string argument (`"1440p"`, `"1080p"`, ...) - earlier revisions of this pipeline had seven separate task functions (`transcode_1440p`, `transcode_1080p`, etc.); they were consolidated into one task. 4K (2160p) transcoding is commented out to speed up local development.
 
+`create_video_processing_workflow()` only *builds* this chain - nothing dispatches it directly. The processing queue (`backend/app/tasks/processing_queue.py`, see [Multiple Videos: One Pipeline at a Time](#multiple-videos-one-pipeline-at-a-time) below) appends one more step, `on_pipeline_success`, after `finalize_processing`, attaches `on_pipeline_failed` as the chain's `link_error`, and only then calls `apply_async()`.
+
 ```mermaid
 flowchart TD
     A["prepare_video<br/>download + ffprobe"] --> B["generate_storyboard<br/>sprite sheets + WebVTT<br/>(best-effort, never fails the chain)"]
@@ -57,6 +59,8 @@ flowchart TD
     E --> F["create_manifest<br/>master.m3u8"]
     F --> G["upload_to_minio"]
     G --> H["finalize_processing<br/>status → completed"]
+    H --> I["on_pipeline_success<br/>release lock → start next queued video<br/>(appended by processing_queue.py)"]
+    A & B & D & E & F & G & H -. "any step raises" .-> X["on_pipeline_failed (link_error)<br/>status → failed, release lock → start next"]
 ```
 
 Let's walk through each stage.
@@ -69,14 +73,63 @@ Production runs the Celery worker with `--concurrency=1` (`infra/docker-compose.
 
 Left alone, that causes a specific problem: each video's transcode chord fires all 7 `transcode_quality` tasks into that shared queue as soon as its (fast) `prepare_video`/`generate_storyboard` steps finish. Upload several videos close together and all of their 7-task batches land in the queue around the same time. A short video's remaining stages (`segment_videos`, `create_manifest`, `upload_to_minio`, `finalize_processing`) only get enqueued once its own transcodes finish, so they land at the back of the queue, behind other videos' still-pending transcode tasks. In the admin table that video looks stuck on whatever stage it last reached, even though nothing is actually broken, it's just waiting its turn behind other videos' heavier work.
 
-To prevent this, only one video's pipeline is dispatched at a time. The mechanism lives in `backend/app/tasks/workflows.py`:
+To prevent this, only one video's pipeline is dispatched at a time. The mechanism lives in its own module, `backend/app/tasks/processing_queue.py` (`workflows.py` only builds the chain):
 
-- A Redis lock (`video_processing:active_lock`) marks "something is currently processing." Whoever holds it is the only video whose chain is allowed to run.
-- When a video is created, `try_advance_queue()` tries to acquire the lock. If it succeeds, the oldest video still sitting at `processing_status = "queued"` gets dispatched immediately. If it fails, because something else already holds the lock, the new video just stays `"queued"` in the database. Uploading is never blocked by this, the video row is always created right away, it just doesn't start processing until its turn comes.
-- Every dispatched chain has `advance_processing_queue` attached as both its success callback (`link`) and its error callback (`link_error`), so the moment a pipeline ends, whether it completed or failed, the lock releases and the next oldest queued video, if any, is dispatched.
-- The lock carries a 6-hour TTL as a dead-man's switch, not the normal release path. It only matters if a worker dies mid-task (OOM, or a redeploy killing the container mid-pipeline) and nothing runs to release the lock. Without the TTL, that would wedge every future upload behind a lock nobody's holding anymore.
+- A Redis lock (`video_processing:active_lock`) marks "something is currently processing." Its value is the **id of the video currently processing**, so `redis-cli GET video_processing:active_lock` tells you exactly which video holds the slot.
+- When a video is created (both upload paths, see [05_VIDEO_UPLOAD.md](./05_VIDEO_UPLOAD.md) and [15_RESUMABLE_UPLOADS.md](./15_RESUMABLE_UPLOADS.md)), `start_next_video_if_idle()` looks up the oldest video still at `processing_status = "queued"` and tries to take the lock for it with `SET NX`. If it wins, that video's chain is dispatched immediately and its `celery_task_id` is stamped. If the lock already exists, the call is a no-op and the new video just stays `"queued"` in the database. Uploading is never blocked by this, the video row is always created right away, it just doesn't start processing until its turn comes. Two callers racing for the same video can't both start it: only one of them gets the lock.
+- The pipeline hands the lock back itself, however it ends:
+  - **Success:** `on_pipeline_success(video_id)` is appended as the **last step of the chain**, after `finalize_processing`. It releases the lock and calls `start_next_video_if_idle()`.
+  - **Failure:** `on_pipeline_failed(video_id)` is attached as the chain's `link_error`, so it runs when any step raises. It marks the video `"failed"` (unless it already `"completed"`), fills `processing_error` with the stage, the failing task and the real exception - keeping any more specific message a task already wrote - then releases the lock and calls `start_next_video_if_idle()`. Its signature starts with `(request, exc, traceback)`, which makes Celery call it inline in the failing worker process with the actual exception instead of as a separate task that only receives a task id. This also covers errors Celery raises *between* two steps, which no task's own `try/except` can catch.
+- The lock is released with an atomic compare-and-delete (a small Lua script): it is only deleted if it still holds that video's id, so a late or duplicate callback from one video can never free the slot of the video that started after it. If `apply_async()` itself throws, the lock is released on the spot instead of wedging the queue.
+- The lock carries a 6-hour TTL as a dead-man's switch, not the normal release path. With worker startup recovery (below) it is now only a last resort.
+
+**Never pass `link=` to the pipeline's `apply_async()`.** This is how the queue was first wired (`apply_async(link=advance_processing_queue.si(), link_error=...)`), and it broke every pipeline. Celery doesn't keep a chain's steps in one flat list: everything after the transcode chord is folded into the chord's body, so a chain-level `link` gets attached to the last signature Celery can see - the chord itself. When the chord is launched after `generate_storyboard`, it forwards its options to its `group` of 7 transcode tasks, and `group.apply_async()` refuses a `link` outright:
+
+```
+TypeError: Cannot add link to group: use a chord
+```
+
+No transcode task was ever created, the video stayed at `generating_storyboard` forever with an empty `processing_error` (the old `link_error` only released the lock), and the watch page showed "This video is still processing" indefinitely. That's why success is a chain step now. `link_error` is safe to use: a chord applies it to its body, never to the header group (unless `task_allow_error_cb_on_chord_header` is enabled, which it isn't). See [13_KNOWN_BUGS_AND_NEXT_STEPS.md](./13_KNOWN_BUGS_AND_NEXT_STEPS.md#resolved-every-pipeline-crashed-right-after-generate_storyboard).
 
 One consequence worth knowing: a video that fails outright (every quality transcode fails, see `on_transcode_complete` below) still releases the lock and advances the queue. One bad upload doesn't jam everything queued behind it.
+
+### Worker Startup Recovery
+
+If the worker dies or is redeployed mid-pipeline (OOM kill, `docker compose up -d` recreating the container, a reboot), none of the pipeline's callbacks ever run. Before this recovery existed, the interrupted video stayed at its last in-progress status forever, and the queue behind it only moved again once the lock's 6-hour TTL expired *and* someone uploaded another video.
+
+`recover_after_worker_restart()`, connected to Celery's `worker_init` signal, runs once when the worker starts - after task modules are imported, before it consumes a single message:
+
+1. **Purges the broker queue** (`celery_app.control.purge()`). Leftover messages of the interrupted pipeline, e.g. transcode tasks that were queued but never ran, can never complete the chord on their own and would only flip the video's status back to `"transcoding"` after step 3 marks it failed.
+2. **Deletes the processing lock** - nothing can be processing yet, so any lock is a leftover.
+3. **Marks interrupted videos failed.** Every video in an in-progress status (`preparing`, `generating_storyboard`, `transcoding`, `aggregating`, `segmenting`, `creating_manifest`, `uploading_to_storage`, `finalizing`) becomes `"failed"` with `processing_error = "Processing was interrupted during '<stage>' by a worker restart. Set the video back to 'queued' to retry."`
+4. **Starts the oldest queued video**, if any.
+
+The worker logs one summary line, e.g. `[queue] Worker startup recovery: purged 0 message(s), marked 1 interrupted video(s) failed: ['3d1aba52-...']`. Any error is logged and never stops the worker from starting, and the SQLAlchemy engine is disposed afterwards: the handler runs in the worker's parent process before the pool forks, and forked children must not share the parent's Postgres sockets.
+
+**This assumes exactly one worker container**, which is how both production (`--concurrency=1`) and local (`--concurrency=3`) run today. With a single worker nothing can be processing at the moment it starts, so anything that looks in-flight was interrupted. If workers are ever scaled out, remove this handler: a second worker starting up would purge and fail the first one's live pipeline.
+
+One edge it doesn't cover: if the worker is hard-killed while it holds prefetched-but-unstarted messages, Redis only re-delivers those after its visibility timeout (1 hour by default), i.e. after the purge already ran. Such a stray task can briefly set the failed video's status back to an in-progress value; the next worker restart cleans it up again.
+
+### Debugging the Queue
+
+```bash
+# Which video holds the processing slot right now? (empty = idle)
+docker compose exec redis sh -c 'redis-cli -a "$REDIS_PASSWORD" --no-auth-warning GET video_processing:active_lock'
+
+# Every queue event: started, finished, failed, startup recovery
+docker compose logs worker | grep "\[queue\]"
+```
+
+```sql
+-- What is waiting, running, or stuck?
+SELECT id, title, processing_status, processing_error, created_at
+FROM videos WHERE processing_status NOT IN ('completed') ORDER BY created_at;
+
+-- Retry a failed video: put it back in the queue...
+UPDATE videos SET processing_status = 'queued', processing_error = NULL WHERE id = '<video_id>';
+```
+
+...then kick the queue once, from the worker container (`docker compose exec worker python -c "from app.tasks.processing_queue import start_next_video_if_idle; print(start_next_video_if_idle())"`), or restart the worker - startup recovery calls `start_next_video_if_idle()` too, but only do that while nothing is processing, since a restart fails whatever is in flight. `prepare_video` refuses any video whose status isn't exactly `"queued"`, so a video can't be processed twice by accident.
 
 ---
 
@@ -92,6 +145,8 @@ This task:
 5. Determines which quality levels to transcode - skips any quality higher than the source resolution (no upscaling; transcoding 480p source to 1440p makes no sense)
 
 The task decorator sets `max_requests=3`, which reads like a retry-count kwarg but isn't a recognized Celery option at all - Celery silently accepts and ignores it. The actual retry ceiling comes from Celery's own default `max_retries=3` (never explicitly set on this task), which only coincidentally matches the number in `max_requests=3`. Every retry across this whole pipeline uses a fixed `countdown=60` - there's no exponential backoff anywhere in the codebase, despite what you might expect from typical Celery setups.
+
+**Known bug:** the download retry can never succeed. The first attempt has already set the status to `"preparing"`, and the retried attempt hits this task's own `processing_status != "queued"` guard and raises `Video not ready for processing`. The chain's `link_error` then marks the video failed with that (misleading) message. See [13_KNOWN_BUGS_AND_NEXT_STEPS.md](./13_KNOWN_BUGS_AND_NEXT_STEPS.md#bug-4-prepare_videos-download-retry-can-never-succeed).
 
 ---
 
@@ -258,13 +313,17 @@ The final cleanup step:
 4. Clears `video.celery_task_id`
 5. Deletes the entire temp directory
 
-This only runs when every earlier stage succeeds. The pipeline is a plain Celery `chain(...)` with no `link_error` handler configured, so when `segment_videos`, `create_manifest`, or `upload_to_minio` marks the video `"failed"` and raises (which each of them does), the chain stops right there - `finalize_processing` does **not** run, and the temp directory is **not** cleaned up on that failure path. The one exception is `transcode_quality`: a failed transcode there returns a value instead of raising, so a chord where every branch fails is the one failure mode that still reaches the rest of the chain (subject to the `on_transcode_complete` bug documented above). If you're chasing disk usage from abandoned temp directories, this is the first place to look.
+This only runs when every earlier stage succeeds. When `segment_videos`, `create_manifest`, or `upload_to_minio` marks the video `"failed"` and raises (which each of them does), the chain stops right there - `finalize_processing` does **not** run, and the temp directory is **not** cleaned up on that failure path. The chain's `link_error`, `on_pipeline_failed`, runs instead, but it only makes sure the video is `"failed"` and hands the processing slot to the next queued video; it doesn't touch the temp directory either. The one exception is `transcode_quality`: a failed transcode there returns a value instead of raising, so a chord where every branch fails is the one failure mode that still reaches the rest of the chain (`on_transcode_complete` then marks the video failed and raises). If you're chasing disk usage from abandoned temp directories, this is the first place to look.
+
+After `finalize_processing` succeeds, the chain has one more step, `on_pipeline_success`, appended by the processing queue - it releases the processing lock and starts the next queued video. See [Multiple Videos: One Pipeline at a Time](#multiple-videos-one-pipeline-at-a-time).
 
 ---
 
 ## Error Handling and Failures
 
 Every task catches exceptions and updates `video.processing_status` to `"failed"` with the error message in `video.processing_error`. The frontend's polling hook treats `"failed"` as a terminal state and shows an error to the user.
+
+Anything a task does *not* catch itself is caught by the chain's `link_error`, `on_pipeline_failed` (see [Multiple Videos: One Pipeline at a Time](#multiple-videos-one-pipeline-at-a-time)): an uncaught exception, a retry that finally gives up, or an error Celery raises while handing off between two steps. It sets `"failed"` and, when no task wrote a message, a `processing_error` like `Pipeline stopped during 'generating_storyboard' (app.tasks.video_tasks.generate_storyboard): TypeError('...')`. Before this existed, such failures left the video at its last in-progress status with an empty `processing_error`, and the watch page showed "This video is still processing" forever. A worker that dies mid-pipeline is handled by [worker startup recovery](#worker-startup-recovery) instead, since no callback can run in that case.
 
 Retries use a fixed 60-second delay (`countdown=60`), not exponential backoff, across every task in this pipeline. After exhausting retries (3 attempts, Celery's default), the exception propagates and the task is marked as failed in Celery.
 
@@ -275,7 +334,7 @@ Monitor processing in real time via Flower at http://localhost:5555. You can see
 ## Checking Logs During Processing
 
 ```bash
-make logs s=worker     # Celery worker logs (shows FFmpeg output, stage transitions)
+make logs s=worker     # Celery worker logs (shows FFmpeg output, stage transitions, [queue] events)
 make logs s=api        # API logs (shows task enqueueing, status updates)
 ```
 
@@ -288,9 +347,9 @@ You can also check MinIO directly at http://localhost:9001 - if processing compl
 - **Enable 4K transcoding** - uncomment the 2160p step in `workflows.py` (adds significant processing time)
 - **Backfill storyboards** - a standalone task/admin action to generate scrubbing thumbnails for videos processed before the storyboard stage existed
 - **Configurable storyboard interval/grid** - currently fixed constants (5s interval, 10×10 grid, 160px tiles); could become per-video or per-quality settings
-- **Temp-directory cleanup on failure** - the chain now has a `link_error` (see "Multiple Videos: One Pipeline at a Time" above), but it's used to advance the processing queue, not to clean up `/tmp`. A failed video's working directory under `processing_temp_dir` is still only removed by `finalize_processing`, which never runs if an earlier stage fails and raises - a dedicated cleanup step is still open
+- **Temp-directory cleanup on failure** - the chain's `link_error`, `on_pipeline_failed` (see "Multiple Videos: One Pipeline at a Time" above), marks the video failed and advances the processing queue, but doesn't clean up the working directory. A failed video's directory under `processing_temp_dir` is still only removed by `finalize_processing`, which never runs if an earlier stage fails and raises - `on_pipeline_failed` is the natural place to add that cleanup
 - **Webhook notifications** - push a webhook when processing completes instead of requiring the client to poll
-- **Multiple workers** - scale horizontally by running more Celery worker containers
+- **Multiple workers** - scale horizontally by running more Celery worker containers. Worker startup recovery assumes a single worker and must be removed (or reworked, e.g. to only fail videos whose lock-holding worker is gone) before doing this
 - **Progress percentage** - expose per-stage progress within each task (e.g., FFmpeg progress parsing)
 - **Cancel task** - use `celery_task_id` to revoke an in-progress task when a video is deleted
 - **Priority queues** - give higher-priority content faster processing

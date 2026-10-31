@@ -65,14 +65,15 @@ A new `Video` record is created in PostgreSQL with:
 
 **6. Try to enqueue the Celery processing workflow**
 
-The API calls `try_advance_queue()` (`app/tasks/workflows.py`), not `start_video_processing()` directly:
+The API calls `start_next_video_if_idle()` (`app/tasks/processing_queue.py`), never the Celery chain directly:
 
 ```python
 # services/video/service.py
-try_advance_queue()
+from app.tasks.processing_queue import start_next_video_if_idle
+start_next_video_if_idle()
 ```
 
-Only one video's pipeline processes at a time (see [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md#multiple-videos-one-pipeline-at-a-time)), so `try_advance_queue()` first checks whether anything else is already running. If nothing is, it dispatches the oldest `"queued"` video's chain via `start_video_processing()` (which builds the chain with `create_video_processing_workflow()`, submits it with `.apply_async()`, and stamps `video.celery_task_id` on whichever row actually got dispatched). If something else is already processing, this call is a no-op and the video simply stays at `processing_status = "queued"` until its turn. Either way, this is synchronous and returns immediately, it never blocks the upload response. This is the exact same entry point the resumable-upload flow's post-finish hook calls, so from this point on a video's journey through the pipeline is identical regardless of which upload path created it.
+Only one video's pipeline processes at a time (see [06_VIDEO_PROCESSING_PIPELINE.md](./06_VIDEO_PROCESSING_PIPELINE.md#multiple-videos-one-pipeline-at-a-time)), so `start_next_video_if_idle()` first checks whether anything else is already running. If nothing is, it takes the processing lock for the oldest `"queued"` video and dispatches its chain (built by `create_video_processing_workflow()`, with `on_pipeline_success` appended as the last step and `on_pipeline_failed` attached as `link_error`), then stamps `video.celery_task_id` on that row. That is usually the video just uploaded, but not necessarily: an older queued video always goes first. If something else is already processing, this call is a no-op and the video simply stays at `processing_status = "queued"` until its turn - the running pipeline starts the next video itself when it ends. Either way, this is synchronous and returns immediately, it never blocks the upload response. This is the exact same entry point the resumable-upload flow's post-finish hook calls, so from this point on a video's journey through the pipeline is identical regardless of which upload path created it.
 
 **7. Return the video record**
 
