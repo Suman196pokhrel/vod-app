@@ -1,0 +1,125 @@
+---
+title: Data model
+description: Every PostgreSQL table, its key columns and how the tables relate.
+---
+
+Six tables, defined as SQLAlchemy models in `backend/app/models/`. Primary keys are UUID strings generated in Python.
+
+<Placeholder kind="architecture" title="Entity-relationship diagram: users, videos, refresh_tokens, email_verification_tokens, password_reset_tokens, tus_uploads">
+  Crow's-foot ERD with foreign keys and ON DELETE behaviour.
+</Placeholder>
+
+## users
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | string (UUID) | Primary key |
+| `email` | string | Unique, indexed |
+| `username` | string | Unique, indexed |
+| `hashed_password` | string | bcrypt |
+| `role` | enum `USER` / `ADMIN` | Database default `USER`, indexed |
+| `is_active` | boolean | Default true; inactive users cannot sign in or refresh |
+| `is_verified` | boolean | Default false; set by email verification |
+| `created_at`, `updated_at` | timestamps | |
+
+## videos
+
+The central table. It holds editorial metadata, the processing state machine and storage paths.
+
+<TypeTable
+  type={{
+    id: { type: 'string (UUID)', description: 'Primary key.' },
+    user_id: { type: 'string → users.id', description: 'The uploader.' },
+    title: { type: 'string(200)', description: 'Required.' },
+    description: { type: 'string(5000)', description: 'Optional.' },
+    category: { type: 'string(50)', description: 'Required, indexed. A free-text string, not a separate table.' },
+    tags: { type: 'JSON', description: 'List of strings.' },
+    cast: { type: 'string(500)', description: 'Stored comma-separated, returned as a list.' },
+    age_rating: { type: 'string', description: 'For example G or PG-13.' },
+    release_date: { type: 'date', description: 'Optional.' },
+    director: { type: 'string', description: 'Optional.' },
+    status: { type: 'string(20)', description: 'Editorial state: draft, published or scheduled. Default draft.' },
+    is_public: { type: 'boolean', description: 'Visibility. The public feed requires is_public = true and status = published.' },
+    processing_status: { type: 'string(30)', description: 'Pipeline state, see below. Indexed.' },
+    processing_error: { type: 'string(1000)', description: 'Why processing failed, when it did.' },
+    processing_metadata: { type: 'JSON', description: 'ffprobe output: duration, width, height, codecs, bitrates, frame rate, file size.' },
+    raw_video_path: { type: 'string(500)', description: 'Bucket-prefixed object path of the original upload.' },
+    thumbnail_url: { type: 'string', description: 'Object path of the poster image.' },
+    manifest_url: { type: 'string', description: 'Object path of master.m3u8. Empty until processing completes.' },
+    storyboard_url: { type: 'string', description: 'Object path of the scrubbing-preview WebVTT.' },
+    available_qualities: { type: 'JSON', description: 'Renditions actually produced, for example ["1080p", "720p", …].' },
+    celery_task_id: { type: 'string', description: 'Set when the pipeline is dispatched, cleared on completion.' },
+    views_count: { type: 'integer', description: 'View counter.' },
+    likes_count: { type: 'integer', description: 'Reserved; nothing writes it yet.' },
+    created_at: { type: 'timestamp', description: 'Indexed. Also defines queue order.' },
+    updated_at: { type: 'timestamp', description: '' },
+    deleted_at: { type: 'timestamp', description: 'Soft delete. Non-null means deleted.' },
+  }}
+/>
+
+Two columns describe two different things and are easy to confuse:
+
+- **`status`** is editorial: has an admin published it?
+- **`processing_status`** is technical: how far has the pipeline got?
+
+A video can be `published` while still `transcoding`; the player shows "still processing" until `manifest_url` is set.
+
+### processing_status values
+
+<Placeholder kind="state" title="processing_status state machine: uploading → queued → preparing → … → completed, with failed reachable from every active state">
+  Include the re-queue edge (failed → queued) used for manual retries.
+</Placeholder>
+
+| Value | Progress shown | Set by |
+|---|---|---|
+| `uploading` | 5% | Model default |
+| `queued` | 15% | Upload handlers |
+| `preparing` | 25% | `prepare_video` |
+| `generating_storyboard` | 35% | `generate_storyboard` |
+| `transcoding` | 50% | `transcode_quality` |
+| `aggregating` | 60% | `on_transcode_complete` |
+| `segmenting` | 70% | `segment_videos` |
+| `creating_manifest` | 80% | `create_manifest` |
+| `uploading_to_storage` | 90% | `upload_to_minio` |
+| `finalizing` | 95% | `finalize_processing` |
+| `completed` | 100% | `finalize_processing` |
+| `failed` | 0% | Any stage, or the pipeline's failure handler |
+
+The progress numbers are fixed per stage (`utils/video_helpers.py`), not measured.
+
+## refresh_tokens
+
+| Column | Notes |
+|---|---|
+| `user_id` | → `users.id`, `ON DELETE CASCADE` |
+| `token_hash` | SHA-256 of the refresh JWT, indexed |
+| `expires_at` | |
+| `is_revoked` | Set by logout and password reset |
+
+## email_verification_tokens and password_reset_tokens
+
+Both have the same shape: `user_id` (cascade delete), `token`, `expires_at`, `used`, `created_at`. Verification tokens are UUIDs valid for 24 hours; reset tokens are 6-digit codes valid for 1 hour.
+
+## tus_uploads
+
+One row per resumable upload session.
+
+| Column | Notes |
+|---|---|
+| `upload_id` | Primary key; the tus upload ID assigned in the `pre-create` hook |
+| `user_id` | → `users.id` |
+| `video_id` | → `videos.id`, set when the upload finishes |
+| `object_key` | Where the file landed in MinIO |
+| `declared_size` | Bytes, from the client |
+| `status` | `created`, `completed` or `terminated` |
+| `created_at`, `completed_at` | |
+
+## Migrations
+
+Alembic migrations live in `backend/alembic/versions/` as a single linear chain. They are run manually (`alembic upgrade head`). At startup the API also calls `create_all()`, which creates any table that does not exist yet but never alters existing ones.
+
+## Design notes
+
+- **Status columns are strings, not database enums.** Adding a pipeline stage needs no migration; the allowed values are enforced in Python (`ProcessingStatus`).
+- **Soft delete** keeps rows (and their files) when an admin deletes a video; queries filter on `deleted_at IS NULL`.
+- **Paths, not URLs**, are stored for every file, so the public host can change without touching data.

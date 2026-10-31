@@ -1,0 +1,127 @@
+---
+title: Backend overview
+description: How the FastAPI service is structured and how a request flows through it.
+---
+
+The backend is one Python codebase (`backend/app/`) that runs in two roles from the same Docker image:
+
+- **API**: `uvicorn app.main:app` serves HTTP requests.
+- **Worker**: `celery -A app.celery_app:celery_app worker` runs the processing pipeline (covered in [Pipeline](/docs/pipeline)).
+
+## Layered structure
+
+The API follows a **routes → services → models** layering: route handlers stay thin, business logic lives in services, persistence in SQLAlchemy models.
+
+<Files>
+  <Folder name="backend/app" defaultOpen>
+    <File name="main.py" />
+    <File name="celery_app.py" />
+    <Folder name="apis/routes" defaultOpen>
+      <File name="auth.py" />
+      <File name="user.py" />
+      <File name="video.py" />
+      <File name="tus_hooks.py" />
+      <File name="health.py" />
+    </Folder>
+    <Folder name="core" defaultOpen>
+      <File name="config.py" />
+      <File name="database.py" />
+      <File name="dependencies.py" />
+      <File name="jwt.py" />
+      <File name="security.py" />
+      <File name="logging_config.py" />
+    </Folder>
+    <Folder name="services">
+      <File name="auth_service.py" />
+      <File name="user_service.py" />
+      <File name="verification_service.py" />
+      <File name="password_reset_service.py" />
+      <File name="email_service.py" />
+      <File name="minio_service.py" />
+      <File name="tus_service.py" />
+      <File name="ffmpeg_service.py" />
+      <Folder name="video">
+        <File name="service.py" />
+        <File name="queries.py" />
+        <File name="mutations.py" />
+        <File name="status.py" />
+        <File name="download.py" />
+        <File name="validation.py" />
+      </Folder>
+    </Folder>
+    <Folder name="models" />
+    <Folder name="schemas" />
+    <Folder name="tasks" />
+    <Folder name="utils" />
+  </Folder>
+</Files>
+
+| Layer | Responsibility |
+|---|---|
+| `apis/routes/` | HTTP surface: path, method, request/response schemas, which auth dependency applies |
+| `core/` | Settings, database engine and sessions, JWT helpers, password hashing, auth dependencies, logging |
+| `services/` | Business logic. `services/video/` is a package: a `VideoService` facade over focused modules for queries, mutations, status, downloads and validation |
+| `models/` | SQLAlchemy ORM tables |
+| `schemas/` | Pydantic request and response models |
+| `tasks/` | Celery tasks and the processing queue (the worker side) |
+| `utils/` | Processing-status enum and progress map, CORS origin parsing |
+
+## Request lifecycle
+
+<Placeholder kind="sequence" title="Lifecycle of an authenticated request: Caddy → Uvicorn → router → auth dependency → service → SQLAlchemy session → response">
+  Include where Pydantic validation happens and where a 401/403/404 can be returned.
+</Placeholder>
+
+<Steps>
+<Step>
+
+### Routing and validation
+
+Caddy forwards the request to Uvicorn. FastAPI matches the route and validates the body and query parameters against the Pydantic schema; invalid input returns **422** before any handler code runs.
+
+</Step>
+<Step>
+
+### Dependencies
+
+FastAPI's **dependency injection** resolves the handler's parameters: a database session from `get_db()` (a generator that always closes the session), and an auth dependency such as `get_current_user` or `get_current_admin_user` (see [Authentication](/docs/backend/auth)).
+
+</Step>
+<Step>
+
+### Service call
+
+The handler calls a service function, which runs SQLAlchemy queries through the **synchronous** session (`psycopg2` driver, `pool_pre_ping=True` so dead connections are replaced), and may call MinIO, Redis or the email provider.
+
+</Step>
+<Step>
+
+### Response
+
+The return value is serialised through the route's `response_model`, which also strips any fields not in the schema.
+
+</Step>
+</Steps>
+
+<Callout title="Sync database, mixed handlers">
+  The database layer is synchronous. FastAPI runs plain `def` handlers in a thread pool, so blocking
+  database calls there do not block the event loop. `async def` handlers run on the event loop
+  itself, so any blocking call inside them does. Most routes are `def`.
+</Callout>
+
+## Application startup
+
+`main.py` configures logging first, then builds the app:
+
+- **CORS**: allowed origins come from the `CORS_ALLOW_ORIGINS` environment variable (comma-separated), defaulting to `http://localhost:3000` and `http://127.0.0.1:3000`. Credentials are allowed; methods and headers are `*`.
+- **Routers**: auth (`/auth`), user (`/user`), video (`/videos`), health (`/health`), and tus hooks (`/internal/tus/hooks`).
+- **Lifespan**: on startup it calls `Base.metadata.create_all()`, which creates missing tables. Schema *changes* are managed by **Alembic** migrations, run manually with `alembic upgrade head`.
+- **OpenAPI**: FastAPI's interactive docs are at `/docs` and the schema at `/openapi.json`.
+
+## Logging
+
+Logs go to stdout through `colorlog` at INFO level, so `docker compose logs` shows them. The processing queue prefixes its lines with `[queue]`, which makes `docker compose logs worker | grep "\[queue\]"` a quick way to follow it.
+
+## Testing
+
+There is currently no automated test suite in the backend. The plan is in [Improvements](/docs/roadmap/improvements).

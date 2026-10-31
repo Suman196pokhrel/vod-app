@@ -1,0 +1,89 @@
+---
+title: Configuration
+description: Every backend setting, its default, and how configuration reaches the containers.
+---
+
+Settings are a Pydantic `BaseSettings` class (`backend/app/core/config.py`), read from environment variables and cached with `lru_cache`, so every module shares one instance via `get_settings()`. Matching is **case-insensitive**: `JWT_SECRET_KEY` and `jwt_secret_key` both set the same field.
+
+## How values reach the code
+
+<Placeholder kind="flow" title="Configuration flow: infra/*.env → Docker Compose env_file → container environment → pydantic Settings">
+  Show that the API and worker read the same env file, and that some services (Postgres, Redis, MinIO) take values through compose variable substitution instead.
+</Placeholder>
+
+1. Each environment has an env file in `infra/` (`local.env`, `prod.env`), created from `infra/.env.example`. Env files are git-ignored.
+2. Docker Compose passes it to the `api` and `worker` containers with `env_file`.
+3. Infrastructure containers (PostgreSQL, Redis, MinIO, tusd) get their values through compose variable substitution, so compose must be run with `--env-file`.
+
+Fields marked **required** have no default: the API and worker refuse to start if they are missing.
+
+## Database and Redis
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `database_url_sync` | required | SQLAlchemy URL (`postgresql://…`, psycopg2), also used by Alembic |
+| `database_url` | required | Async URL; currently unused |
+| `redis_host` | required | Redis host |
+| `redis_password` | required | Redis password |
+| `redis_port` | `6379` | |
+| `redis_db` | `0` | Celery broker and result backend share this database |
+
+## Auth and email
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `jwt_secret_key` | required | HMAC signing key |
+| `jwt_algorithm` | required | For example `HS256` |
+| `access_token_expire_minutes` | `30` | Access-token lifetime |
+| `refresh_token_expire_days` | `7` | Refresh-token lifetime |
+| `RESEND_API_KEY` | required | Email provider key |
+| `from_email` | required | Sender address |
+| `FRONTEND_URL` | required | Base for links in emails (verification) |
+| `CORS_ALLOW_ORIGINS` | `http://localhost:3000`, `http://127.0.0.1:3000` | Comma-separated allowed origins (read directly from the environment in `main.py`) |
+
+## Storage
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `minio_endpoint` | required | `host:port` of MinIO |
+| `minio_access_key`, `minio_secret_key` | required | Credentials |
+| `minio_bucket_videos` | required | Raw uploads |
+| `minio_bucket_thumbnails` | required | Posters and storyboards |
+| `minio_bucket_processed_videos` | required | HLS output |
+| `minio_secure` | `false` | TLS between the backend and MinIO (internal traffic) |
+
+Buckets are created automatically if they do not exist when the backend starts.
+
+## Processing
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `FFMPEG_THREADS` | `2` | `-threads` passed to each FFmpeg encode |
+| `QUALITY_SETTINGS` | 2160p…144p table | The bitrate ladder ([HLS output](/docs/pipeline/hls-output)) |
+| `processing_temp_dir` | `<backend>/tmp/video_processing` | Worker scratch space |
+
+Celery itself is configured in `backend/app/celery_app.py`: JSON serialisation, `task_track_started`, results kept 24 hours, a **50-minute soft** and **60-minute hard** time limit per task.
+
+## Uploads
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `max_video_size`, `max_thumbnail_size` | required | Declared size limits (must be present in the env file) |
+| `uploads_tus_enabled` | `true` | Resumable-upload hooks on or off |
+| `tus_part_size_mb` | `50` | S3 part size for tusd |
+| `tus_max_concurrent_uploads` | `8` | Admission cap |
+| `tus_max_file_size_gb` | `50` | Maximum declared size |
+| `tus_allowed_mime_types` | mp4, quicktime, webm | Accepted video types |
+| `tus_admission_ttl_hours` | `2` | Expiry of an admission slot |
+| `tus_hook_shared_secret` | empty | Authenticates tusd hook calls |
+
+## Frontend
+
+The frontend reads two build-time variables:
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Base URL of Caddy (API and `/storage`) |
+| `NEXT_PUBLIC_UPLOADS_TUS_ENABLED` | `false` switches the upload page to the legacy form |
+
+`NEXT_PUBLIC_*` values are inlined into the JavaScript bundle at build time, so changing them requires a rebuild.

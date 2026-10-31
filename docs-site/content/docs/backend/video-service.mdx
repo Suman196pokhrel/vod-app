@@ -1,0 +1,106 @@
+---
+title: Video service
+description: Listing, reading, editing and deleting videos, the legacy upload, processing status and downloads.
+---
+
+All video endpoints live in `apis/routes/video.py` and delegate to `VideoService` (`services/video/service.py`), a facade over smaller modules:
+
+| Module | Handles |
+|---|---|
+| `queries.py` | Reads: by ID, the public feed, "my videos", the admin list with filters |
+| `mutations.py` | Writes: metadata updates, visibility, soft delete, thumbnail attach |
+| `status.py` | Processing status and view counting |
+| `download.py` | Presigned download URLs for originals |
+| `validation.py` | Content-type checks for uploaded files |
+
+## Reading videos
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `GET /videos/` | Anyone | Public feed: `is_public = true`, `status = "published"`, not deleted, newest first; `skip`/`limit` pagination |
+| `GET /videos/by-id/{id}` | Anyone; private videos only to the owner or an admin | One video, or 404 |
+| `GET /videos/user/me` | Signed-in user | The caller's own uploads |
+| `GET /videos/list-all` | Admin | Every non-deleted video with search, filters, sorting and pagination (`limit` capped at 100) |
+
+`list-all` accepts `search` (case-insensitive `ILIKE` match on title or description), filters on editorial `status`, `processing_status` and `user_id`, plus `sort_by` (any video column, default `created_at`) and `sort_order`. It returns the page together with a `total` count, and loads each video's uploader in the same query (`joinedload`) to avoid one extra query per row (the N+1 problem).
+
+## Editing
+
+| Endpoint | Does |
+|---|---|
+| `PATCH /videos/by-id/{id}` | Partial update of metadata (only fields present in the request change) |
+| `PATCH /videos/by-id/{id}/visibility` | Sets `is_public` |
+| `POST /videos/{id}/thumbnail` | Uploads and attaches a poster image (used right after a resumable upload) |
+| `DELETE /videos/by-id/{id}` | **Soft delete**: sets `deleted_at`; the row and files remain |
+
+All four require an admin.
+
+## Legacy multipart upload
+
+`POST /videos/create` is the original upload path, still used when the frontend's tus feature flag is off. It takes `multipart/form-data` with three parts: `video` (file), optional `thumbnail` (file) and `data` (a **JSON string** of metadata, because multipart forms cannot carry nested JSON natively).
+
+<Steps>
+<Step>
+
+### Parse and validate
+
+`data` is parsed into the `VideoMetadata` schema (title 5–200 characters, description 10–5000). The declared content types are checked: `video/mp4`, `video/quicktime`, `video/webm` for video; JPEG, PNG or WebP for the thumbnail. Invalid metadata returns **400**.
+
+</Step>
+<Step>
+
+### Stream to MinIO
+
+The file is sent to the raw bucket with `put_object` in 10 MB parts, as `user-<user_id>/<uuid>.<ext>`.
+
+</Step>
+<Step>
+
+### Create the row
+
+`is_public` is derived from the submitted status (`published` → public), and `processing_status` starts as `queued`.
+
+</Step>
+<Step>
+
+### Roll back on failure
+
+If the database commit does not happen, a `finally` block deletes the objects already written to MinIO, so a failed request leaves no orphaned files.
+
+</Step>
+<Step>
+
+### Queue it
+
+`start_next_video_if_idle()` is called; if nothing else is processing, this video starts immediately. See [Processing queue](/docs/pipeline/processing-queue).
+
+</Step>
+</Steps>
+
+The resumable path is the default and is preferred for anything large: [Resumable uploads](/docs/backend/resumable-uploads).
+
+## Processing status
+
+`GET /videos/{id}/status` (owner only) maps the stored `processing_status` to:
+
+```json
+{
+  "video_id": "…",
+  "status": "transcoding",
+  "progress": 50,
+  "message": "…",
+  "is_completed": false,
+  "is_failed": false,
+  "error": null
+}
+```
+
+`error` is filled only when the status is `failed`. The percentages are fixed per stage, not measured. An unknown stored value is reported as `queued`.
+
+## Downloading originals
+
+`GET /videos/by-id/{id}/download-url` (admin) returns a **presigned URL** for the original upload, valid for 15 minutes, with `Content-Disposition: attachment` so the browser downloads it instead of playing it. The URL is signed for the public host the request came through and rewritten onto Caddy's `/storage` path.
+
+## View counting
+
+`POST /videos/{id}/view` increments `views_count`. It accepts anonymous calls. The frontend does not call it yet, so counts stay at zero.

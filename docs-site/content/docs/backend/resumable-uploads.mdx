@@ -1,0 +1,96 @@
+---
+title: Resumable uploads
+description: How tusd, Uppy and the API cooperate so large uploads survive network drops.
+---
+
+Uploading a multi-gigabyte file in a single HTTP request fails the moment the connection blips. VOD uses the **tus protocol** instead: the file is sent in chunks, the server remembers how much it has, and the client resumes from that offset after any interruption.
+
+Three parties are involved, each doing one job:
+
+| Party | Job |
+|---|---|
+| **Uppy** (browser) | Chunks the file, retries, pauses and resumes, reports progress |
+| **tusd** (server) | Implements tus, writes chunks into MinIO with S3 multipart upload |
+| **FastAPI** (server) | Decides who may upload what, and turns a finished upload into a video |
+
+The API **never sees the file bytes**. It only handles small hook calls from tusd. This control-plane / data-plane split is the core of the design ([ADR 0001](/docs/decisions/adr-0001-resumable-uploads)).
+
+<Placeholder kind="sequence" title="tus upload sequence: Uppy POST → tusd pre-create hook → API → PATCH chunks → MinIO multipart → post-finish hook → video row → queue">
+  Mark which calls go through Caddy and which stay on the private Docker network.
+</Placeholder>
+
+## The hooks
+
+tusd is configured to call the API on three events. The calls go directly over the private Docker network, are authenticated with a shared secret, and the route is unreachable from the internet (Caddy returns 404 for `/internal/*`).
+
+<Tabs items={['pre-create', 'post-finish', 'post-terminate']}>
+<Tab value="pre-create">
+
+Runs **before** tusd accepts any bytes. Returning a rejection stops the upload before it starts.
+
+1. Reads the admin's access token from the upload metadata and verifies it; the user must be an admin.
+2. Requires non-empty `title` and `category`.
+3. Checks the declared size is above 0 and within `tus_max_file_size_gb` (default **50 GB**), and the MIME type is allowed (`video/mp4`, `video/quicktime`, `video/webm`).
+4. **Admission control**: counts active upload keys in Redis; at `tus_max_concurrent_uploads` (default **8**) it rejects with **503 Service Unavailable** and `Retry-After: 30`.
+5. Generates the upload ID, inserts a `tus_uploads` row (`created`) and sets the Redis key `tus:active:<id>` with a TTL of `tus_admission_ttl_hours` (default **2**), so a slot is freed even if an upload is abandoned.
+6. Returns the ID to tusd together with the metadata **minus the token**, so the token is never persisted next to the file.
+
+</Tab>
+<Tab value="post-finish">
+
+Runs once the last byte is written.
+
+1. Normalises the upload ID (tusd's S3 store reports it as `<id>+<multipart-upload-id>`).
+2. If the upload is already `completed`, returns immediately: tusd may retry a hook, and the handler is **idempotent**.
+3. Creates the `videos` row: `processing_status = "queued"`, `status = "draft"`, `is_public = false`, and `raw_video_path` = bucket + key from tusd.
+4. Marks the upload `completed`, links it to the video, releases the admission slot.
+5. Calls `start_next_video_if_idle()`.
+
+</Tab>
+<Tab value="post-terminate">
+
+Runs when the client cancels an upload. Marks the row `terminated` and releases the admission slot.
+
+</Tab>
+</Tabs>
+
+## Finding the video after upload
+
+The browser only knows the tus upload ID. To attach a thumbnail and details, it needs the video ID, which is created asynchronously in `post-finish`. The **status bridge** solves this:
+
+```http
+GET /internal/tus/hooks/uploads/{upload_id}
+Authorization: Bearer <admin access token>
+```
+
+returns `{ "status": "...", "video_id": "..." }`. It is the only `/internal` route Caddy lets through, and it requires an admin token. The frontend polls it every 1.5 seconds until `video_id` appears.
+
+## Why admission control
+
+Each active upload holds a multipart upload open in MinIO and keeps tusd busy. Capping concurrency protects a small server from a burst of uploads, and the `Retry-After` header tells well-behaved clients when to try again rather than failing outright.
+
+## Configuration
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `uploads_tus_enabled` | `true` | Enables the hook routes. If false they return 404. |
+| `tus_part_size_mb` | 50 | S3 part size tusd uses (Uppy's chunk size is set separately to 50 MB in the frontend) |
+| `tus_max_concurrent_uploads` | 8 | Admission cap |
+| `tus_max_file_size_gb` | 50 | Largest accepted declared size |
+| `tus_allowed_mime_types` | mp4, quicktime, webm | Accepted video types |
+| `tus_admission_ttl_hours` | 2 | Safety expiry on each admission slot |
+| `tus_hook_shared_secret` | empty | Authenticates tusd's hook calls; if empty, every hook is rejected |
+
+On the frontend, `NEXT_PUBLIC_UPLOADS_TUS_ENABLED` chooses between the tus form (default) and the legacy single-request form.
+
+## Failure behaviour
+
+| Situation | What happens |
+|---|---|
+| Network drops mid-upload | Uppy asks tusd for the current offset and resumes |
+| Tab closed mid-upload | A `beforeunload` warning is shown while uploading; an abandoned upload's admission slot expires after 2 hours |
+| Too many uploads at once | 503 with `Retry-After: 30` |
+| Non-admin or expired token | Rejected in `pre-create`, before any bytes are sent |
+| tusd retries `post-finish` | Ignored: the upload is already `completed` |
+
+The frontend half of this flow is described in [Upload flow](/docs/frontend/upload-flow).

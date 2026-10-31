@@ -1,0 +1,115 @@
+---
+title: Authentication
+description: Sign-up, email verification, JWT access and refresh tokens, roles and password reset.
+---
+
+VOD uses **stateless JWT access tokens** for requests and **database-tracked refresh tokens** for staying signed in. Passwords are hashed with **bcrypt**. Roles (`USER`, `ADMIN`) are read from the database on every request, never trusted from the token.
+
+<Placeholder kind="sequence" title="Auth lifecycle: sign-up → verify email → sign in → authenticated requests → refresh → logout">
+  Show which steps touch the database (users, email_verification_tokens, refresh_tokens) and which are pure JWT checks.
+</Placeholder>
+
+## The two tokens
+
+| | Access token | Refresh token |
+|---|---|---|
+| Purpose | Sent with every API request | Exchanged for a new access token |
+| Claims | `user_id`, `email`, `role`, `type: "access"`, `exp` | `user_id`, `type: "refresh"`, `exp` |
+| Lifetime | `ACCESS_TOKEN_EXPIRE_MINUTES` (code default 30) | `REFRESH_TOKEN_EXPIRE_DAYS` (default 7) |
+| Stored server-side | No: verified by signature and expiry only | Yes: a **SHA-256 hash** in the `refresh_tokens` table |
+| Revocable | No, it expires on its own | Yes: `is_revoked` flag |
+| Sent as | `Authorization: Bearer <token>` | JSON body to `/auth/refresh` and `/auth/logout` |
+
+**Why two tokens:** the access token is short-lived and needs no database lookup to validate its signature, while the refresh token gives a revocable, longer session. Storing only a hash of the refresh token means a database leak does not expose usable tokens.
+
+Signing uses `JWT_SECRET_KEY` with `JWT_ALGORITHM` (`core/jwt.py`, python-jose). Every token carries a `type` claim, and verification checks it, so a refresh token cannot be used as an access token.
+
+## Flows
+
+<Tabs items={['Sign up', 'Verify email', 'Sign in', 'Refresh', 'Logout', 'Reset password']}>
+<Tab value="Sign up">
+
+`POST /auth/signup` (`services/user_service.py`)
+
+1. Validates input: username 3–50 characters, password 8–100 characters, email format.
+2. Rejects a duplicate email or username with **400**.
+3. Hashes the password with bcrypt and inserts the user with role `USER`, `is_verified = false`.
+4. Creates an email-verification token (UUID, valid **24 hours**) and emails a link to `{FRONTEND_URL}/verify-email?token=…` through **Resend**.
+
+Email sending failures are logged and do not fail the sign-up; the user can request a new link.
+
+</Tab>
+<Tab value="Verify email">
+
+`GET /auth/verify-email?token=…` (`services/verification_service.py`)
+
+Checks the token exists, is unused and unexpired, then sets `users.is_verified = true` and marks the token used.
+
+`POST /auth/resend-verification` issues a fresh token, limited to **3 per hour** per user (counted from the tokens table).
+
+</Tab>
+<Tab value="Sign in">
+
+`POST /auth/signin` (`services/auth_service.py`)
+
+1. Looks up the user by email and verifies the bcrypt hash.
+2. Requires `is_verified` and `is_active` (403 otherwise).
+3. Issues an access token and a refresh token, stores the refresh token's SHA-256 hash with its expiry.
+4. Returns both tokens and the user.
+
+</Tab>
+<Tab value="Refresh">
+
+`POST /auth/refresh` with `{ "refresh_token": "…" }`
+
+1. Verifies signature, expiry and `type: "refresh"`.
+2. Finds the stored hash; rejects it if revoked or expired in the database, or if the user is inactive.
+3. Returns a **new access token**. The refresh token itself is reused until it expires (it is not rotated).
+
+</Tab>
+<Tab value="Logout">
+
+`POST /auth/logout` with `{ "refresh_token": "…" }`
+
+Marks that refresh token revoked. The current access token stays valid until it expires, since access tokens are not tracked server-side. The call succeeds even for an unknown token, so logout is idempotent.
+
+</Tab>
+<Tab value="Reset password">
+
+`POST /auth/forgot-password` with an email
+
+Emails a **6-digit one-time code** (generated with Python's `secrets` module), valid for **1 hour**, limited to 3 requests per hour per user. The response is the same whether or not the email exists.
+
+`POST /auth/reset-password` with `{ email, code, new_password }`
+
+Checks the code for that user (unused, unexpired), sets the new bcrypt hash, marks the code used and **revokes all of the user's refresh tokens**, signing them out everywhere.
+
+</Tab>
+</Tabs>
+
+## Protecting routes
+
+Auth is applied per route with FastAPI dependencies (`core/dependencies.py`):
+
+| Dependency | Allows | Used by |
+|---|---|---|
+| `get_current_user` | Any valid access token | `GET /videos/user/me`, `GET /videos/{id}/status` |
+| `get_current_verified_user` | Valid token **and** verified email | `GET /user/profile` |
+| `get_current_admin_user` | Valid token **and** `role = ADMIN` (403 otherwise) | All admin video routes, uploads, the tus status bridge |
+| `get_current_user_optional` | Anyone; returns the user if a valid token is present, `None` otherwise | Public video reads, view counting |
+
+Each dependency decodes the token, then **loads the user from the database**. The role check uses that database row (`User.is_admin()`), not the `role` claim inside the token, so demoting an admin takes effect on their next request instead of when their token expires.
+
+There is no `/admin` path prefix; admin protection is explicit on each route.
+
+### Private videos
+
+`GET /videos/by-id/{id}` returns a private video only to its owner or an admin. For anyone else it returns **404**, not 403, so the response does not reveal that the video exists.
+
+## Roles
+
+`UserRole` has two values, `USER` and `ADMIN` (`models/enums.py`); the database stores the enum names. New accounts are always `USER`. There is no promotion endpoint: an admin is created by updating the row directly in the database.
+
+## On the frontend
+
+The frontend stores both tokens in `localStorage`, attaches the access token in an Axios interceptor, and refreshes automatically on a 401. See [Data and auth](/docs/frontend/data-and-auth).
