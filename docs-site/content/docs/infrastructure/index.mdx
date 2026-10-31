@@ -61,6 +61,6 @@ Memory limits from the production compose file:
 |---|---|---|
 | Local | `infra/docker-compose.local.yml` | In daily use; adds pgAdmin, Flower and RedisInsight |
 | Production | `infra/docker-compose.yml` | Live |
-| Staging | `infra/docker-compose.staging.yml` | Incomplete: no Caddy or tusd service and no committed env file, so it is not used |
+| Staging | `infra/docker-compose.staging.yml` | Incomplete: no Caddy or tusd service, and the `staging.env` file it expects does not exist, so it is not used |
 
 Details: [Docker Compose](/docs/infrastructure/docker-compose), [Caddy](/docs/infrastructure/caddy), [Local development](/docs/infrastructure/local-development), [Deployment](/docs/infrastructure/deployment).

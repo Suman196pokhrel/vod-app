@@ -25,7 +25,7 @@ ffprobe -v quiet -print_format json -show_format -show_streams <raw file>
 It records duration, width, height, video codec, bitrate, frame rate, file size, audio codec and audio bitrate from the first video and audio streams.
 
 **Returns:** `video_id`, `local_path`, `work_dir`, `transcoded_dir`, `segments_dir`, `metadata`.
-**Failure:** a download error is retried after 60 seconds; a probe error (for example a corrupt file) marks the video `failed` immediately, since retrying would not help.
+**Failure:** a download error schedules a retry after 60 seconds, but the retry currently cannot succeed: the first attempt already set `preparing`, and the retried task's own `queued` check rejects it, so the video ends `failed` (tracked in [Improvements](/docs/roadmap/improvements)). A probe error (for example a corrupt file) marks the video `failed` immediately, since retrying would not help.
 
 ## 2. generate_storyboard
 

@@ -85,7 +85,7 @@ No extra service, hooks become function calls. But Python tus servers are far le
 |---|---|
 | Part size well under S3's 10,000-part limit | 50 MB parts (`tus_part_size_mb`), enough for 50 GB in about 1,000 parts |
 | Admission control in `pre-create`, fail fast with 503 + `Retry-After` | Implemented: Redis key per active upload, cap 8, `Retry-After: 30` |
-| Stream request bodies at the proxy | Implemented: `flush_interval -1` on `/files/*` |
+| Streaming-friendly proxy settings | `flush_interval -1` on `/files/*`, so tusd's responses (upload offsets, progress) are passed back immediately instead of buffered |
 | Serve finished files from storage, not tusd | Implemented: playback goes through `/storage` to MinIO |
 | Keep the upload token out of stored metadata | Implemented: `pre-create` strips it |
 | Idempotent `post-finish` | Implemented |

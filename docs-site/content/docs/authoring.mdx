@@ -1,0 +1,132 @@
+---
+title: Authoring reference
+description: Every content type this site supports, with the MDX that produces it. Not listed in the sidebar.
+---
+
+This page is deliberately left out of the navigation. It shows each supported content type, so new pages (and replacements for placeholders) can copy from it.
+
+## Mermaid diagram
+
+Rendered in the browser, follows light/dark mode.
+
+<Mermaid
+  chart="
+flowchart LR
+  U[Upload] --> Q[Queue] --> T[Transcode] --> S[Segment] --> P[Publish] --> W[Watch]
+"
+/>
+
+```mdx
+<Mermaid chart="
+flowchart LR
+  U[Upload] --> Q[Queue] --> T[Transcode]
+" />
+```
+
+## Image
+
+Images in `public/` are served from the site root. Images are zoomable on click.
+
+![VOD deployment topology](/images/architecture-01.png)
+
+```mdx
+![VOD deployment topology](/images/architecture-01.png)
+```
+
+## Video
+
+<video controls preload="metadata" width="100%" src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" />
+
+```mdx
+<video controls preload="metadata" width="100%" src="/videos/demo.mp4" />
+```
+
+## Placeholder
+
+<Placeholder kind="sequence" title="What the diagram should show">
+  Optional notes for whoever draws it.
+</Placeholder>
+
+```mdx
+<Placeholder kind="sequence" title="What the diagram should show">
+  Optional notes.
+</Placeholder>
+```
+
+Kinds: `architecture`, `flow`, `sequence`, `state`, `chart`, `screenshot`, `video`, `animation`.
+
+## Callouts
+
+<Callout title="Note">Default (info) callout.</Callout>
+
+<Callout type="warn" title="Warning">Something to be careful about.</Callout>
+
+<Callout type="error" title="Danger">Something that breaks things.</Callout>
+
+## Tabs
+
+<Tabs items={['Python', 'TypeScript']}>
+<Tab value="Python">
+
+```python
+start_next_video_if_idle()
+```
+
+</Tab>
+<Tab value="TypeScript">
+
+```ts
+storageUrl(video.manifest_url)
+```
+
+</Tab>
+</Tabs>
+
+## Steps
+
+<Steps>
+<Step>
+
+### First
+
+Text.
+
+</Step>
+<Step>
+
+### Second
+
+Text.
+
+</Step>
+</Steps>
+
+## Accordions
+
+<Accordions>
+<Accordion title="Question">Answer.</Accordion>
+</Accordions>
+
+## File tree
+
+<Files>
+  <Folder name="segments" defaultOpen>
+    <File name="master.m3u8" />
+  </Folder>
+</Files>
+
+## Type table
+
+<TypeTable type={{ video_id: { type: 'string', description: 'The video.' } }} />
+
+## Code block with title
+
+```python title="backend/app/tasks/workflows.py"
+workflow = chain(prepare_video.s(video_id), generate_storyboard.s())
+```
+
+## Cards
+
+<Cards>
+  <Card href="/docs/pipeline" title="Pipeline" description="Linked card." />
+</Cards>

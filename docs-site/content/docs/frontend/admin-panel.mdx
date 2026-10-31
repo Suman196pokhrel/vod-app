@@ -13,7 +13,7 @@ Everything under `/admin` requires an admin account. The layouts redirect signed
 
 ### Videos table (`/admin/videos`)
 
-Built with **TanStack Table** on top of `GET /videos/list-all`. Each row shows the thumbnail, title, uploader, visibility, editorial status, processing status and date. Row actions:
+Built with **TanStack Table** on top of `GET /videos/list-all`. Columns: the video (thumbnail and title), status (processing status plus a published/visibility badge), technical details from ffprobe (such as resolution), available qualities, engagement, views, and created and updated dates. Row actions:
 
 | Action | Does |
 |---|---|
