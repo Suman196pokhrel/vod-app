@@ -1,0 +1,84 @@
+---
+title: Data and auth
+description: The Axios client, token refresh, the auth store and TanStack Query caching.
+---
+
+## The API client
+
+`lib/apis/client.ts` creates one Axios instance with `baseURL = NEXT_PUBLIC_API_URL` and two interceptors.
+
+<Placeholder kind="sequence" title="Token refresh on 401: request → 401 → refresh → retry with the new token, or redirect to sign-in">
+  Include the skipAuthRedirect branch for public requests.
+</Placeholder>
+
+<Steps>
+<Step>
+
+### Request interceptor
+
+Reads the access token from `localStorage` and sets `Authorization: Bearer <token>`.
+
+</Step>
+<Step>
+
+### Response interceptor
+
+On a **401**:
+
+1. If the request was made with `skipAuthRedirect` (public video reads, profile and refresh calls), the error is passed straight to the caller. A 401 on a public read means "not available", not "your session expired".
+2. Otherwise, if this request has not already been retried, it calls the auth store's `refreshToken()`, sets the new token on the original request and **retries it once** (the `_retry` flag prevents loops on the same request).
+3. If refreshing fails, it sends the browser to `/auth/sign-in`.
+
+</Step>
+</Steps>
+
+## Token storage
+
+Both tokens are kept in `localStorage` (`lib/utils/tokenManager.ts`) under `access_token` and `refresh_token`. This is simple and survives reloads; the trade-off is that any script running on the page can read them. The usual hardening is to keep the refresh token in an `httpOnly` cookie and the access token only in memory ([Improvements](/docs/roadmap/improvements)).
+
+## The auth store
+
+`lib/store/authStore.ts` is a **Zustand** store holding `user`, `isAuthenticated` and `isLoading`, with these actions:
+
+| Action | Does |
+|---|---|
+| `initialize()` | Runs on layout mount. No tokens → signed out. Otherwise fetches `/user/profile`; on 401 tries one refresh |
+| `signin(email, password)` | Calls `/auth/signin`, stores both tokens, sets the user |
+| `signup(...)` | Calls `/auth/signup` (does not sign in; the email must be verified first) |
+| `refreshToken()` | Calls `/auth/refresh`, stores the new access token, re-fetches the profile |
+| `logout()` | Calls `/auth/logout` with the refresh token, then clears tokens and state |
+
+The navbar shows **Sign in** or the user's avatar once `isLoading` is false.
+
+<Placeholder kind="state" title="Auth store states: loading → signed out | signed in, with refresh as a transition">
+  Small state diagram for initialize(), signin, refresh failure and logout.
+</Placeholder>
+
+## Redirects after sign-in
+
+Guards send users to `/auth/sign-in?next=<path>`. After signing in, `getSafeNextPath()` (`lib/utils/safeNextPath.ts`) validates the value before navigating: it must start with `/`, and values starting with `//` or `/\` are rejected, falling back to a default page.
+
+`useRequireAuth()` applies the same idea to single actions on public pages: clicking the hero's watchlist button while signed out sends you to sign-in and back.
+
+## Server state: TanStack Query
+
+| Hook | Query key | Notes |
+|---|---|---|
+| `usePublicVideos(skip, limit)` | `["publicVideos", skip, limit]` | `staleTime` 60 s; shared by the hero, grid and related videos, so one request feeds all three |
+| `useVideo(id)` | `["video", id]` | No retries, so a missing video shows "not found" immediately |
+| Admin list | `["getAllVideosAdmin", filters]` | Keeps the previous page visible while the next loads; edit, visibility and delete mutations invalidate it |
+
+The processing-status poller is a separate `setInterval`-based hook (`useVideoProcessing`), described in [Upload flow](/docs/frontend/upload-flow).
+
+## Building media URLs
+
+```ts title="lib/utils/storage.ts"
+export const storageUrl = (path: string) =>
+  `${process.env.NEXT_PUBLIC_API_URL}/storage/${path.replace(/^\/+/, "")}`
+```
+
+Every thumbnail, manifest and storyboard path from the API goes through this helper. `next.config.ts` allow-lists the storage host for `next/image`.
+
+## Known issues
+
+The session-restore logic has two known bugs that can leave the navbar without a Sign in button or avatar for returning users until the page is reloaded or storage is cleared. They are tracked in [Improvements](/docs/roadmap/improvements).

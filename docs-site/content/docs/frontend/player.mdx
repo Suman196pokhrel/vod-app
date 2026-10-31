@@ -1,0 +1,66 @@
+---
+title: Player
+description: The video.js and hls.js player, quality switching and timeline thumbnails.
+---
+
+`/play/[video_id]` renders one full-viewport player with no site chrome. The player is built on **video.js 10** (`@videojs/react`, currently a beta release) with a customised skin.
+
+<Placeholder kind="video" title="Player walkthrough: start-up, automatic quality change, manual quality menu, scrubbing with thumbnails">
+  Screen recording, about 30 seconds.
+</Placeholder>
+
+## Structure
+
+| File | Role |
+|---|---|
+| `app/play/[video_id]/page.tsx` | Loads the video with `useVideo` and renders the player full-screen |
+| `app/play/[video_id]/loading.tsx` | A branded loading screen while the route loads |
+| `player/VideoPlayer.tsx` | If there is no `manifest_url`, shows "This video is still processing". Otherwise builds the manifest and poster URLs and renders the skin |
+| `player/videojs-skin/Skin.tsx` | An ejected copy of video.js's default skin, modified to use HLS and a quality menu |
+| `player/useStoryboardThumbnails.ts` | Loads and parses the storyboard VTT for timeline previews |
+
+## Adaptive streaming
+
+The skin renders video.js's `HlsJsVideo` element, which uses **hls.js** (Media Source Extensions) where needed and native HLS on Safari. hls.js reads the master playlist and switches renditions as bandwidth changes. It is tuned with:
+
+```ts title="Skin.tsx"
+const HLS_CONFIG = {
+  maxBufferLength: 60,              // seconds of forward buffer to aim for
+  maxMaxBufferLength: 120,          // ceiling when bandwidth allows
+  maxBufferSize: 120 * 1000 * 1000, // bytes
+  backBufferLength: 30,             // drop played data older than this
+  capLevelToPlayerSize: true,       // don't fetch 1080p into a small player
+  abrEwmaDefaultEstimate: 1_000_000,// assume 1 Mbps until measured
+  lowLatencyMode: false,            // VOD, not live
+  nudgeMaxRetry: 5,                 // try harder to recover a stall
+} as const;
+```
+
+| Setting | Why |
+|---|---|
+| Deep forward buffer | Media comes from a single origin server; buffering further ahead hides latency spikes |
+| `capLevelToPlayerSize` | Saves bandwidth: a small player never downloads more pixels than it can show |
+| Conservative starting estimate | Playback starts quickly on a lower rendition, then climbs |
+
+Because the rendition list comes from the playlist, the skin can offer a **Quality** menu (automatic, or a fixed rendition) through `useQualityOptions()`.
+
+## Timeline thumbnails
+
+<Placeholder kind="flow" title="Storyboard: VTT cue lookup → sprite sheet → crop rectangle → thumbnail above the scrubber">
+  Show one sprite sheet with the highlighted tile for the hovered time.
+</Placeholder>
+
+1. The pipeline wrote `storyboard.vtt` and sprite sheets (see [Stages](/docs/pipeline/stages#2-generate_storyboard)).
+2. `useStoryboardThumbnails` fetches the VTT with `fetch`, parses each cue's start/end time and its `sprite_NNN.jpg#xywh=x,y,w,h` target, and resolves sprite URLs relative to the VTT.
+3. The parsed cues are passed to the scrubber's thumbnail component, which shows the right crop of the right sprite sheet for the hovered time.
+
+The VTT is parsed by hand instead of attaching it as a `<track kind="metadata">`, because the track approach proved unreliable with cross-origin storage. Loading is cancelled when the component unmounts, and missing storyboards (older videos) simply mean no thumbnails.
+
+## Edge cases
+
+| Case | Behaviour |
+|---|---|
+| Video still processing | Message instead of a player |
+| Video not found or private | "Not found" from `useVideo` |
+| Older video without storyboard | Plays normally without hover thumbnails |
+| Slow network | Starts on a low rendition; hls.js steps up as throughput is measured |

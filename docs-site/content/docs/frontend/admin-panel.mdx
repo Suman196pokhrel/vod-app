@@ -1,0 +1,49 @@
+---
+title: Admin panel
+description: What the admin area can do today and which pages are still UI-only.
+---
+
+Everything under `/admin` requires an admin account. The layouts redirect signed-out users to sign-in and non-admins to `/`; the backend enforces the role on every admin endpoint regardless.
+
+<Placeholder kind="screenshot" title="Admin videos table with the row actions menu open">
+  Label the visibility toggle, edit, download, preview and delete actions.
+</Placeholder>
+
+## Real today
+
+### Videos table (`/admin/videos`)
+
+Built with **TanStack Table** on top of `GET /videos/list-all`. Each row shows the thumbnail, title, uploader, visibility, editorial status, processing status and date. Row actions:
+
+| Action | Does |
+|---|---|
+| Preview Video | Opens `/watch/{id}`; disabled until the video has a `manifest_url` |
+| Edit Details | Dialog that saves through `PATCH /videos/by-id/{id}` |
+| Make Public / Make Private | `PATCH /videos/by-id/{id}/visibility` |
+| View Details | Read-only dialog with the video's full record |
+| Download | `GET /videos/by-id/{id}/download-url`, then opens the presigned URL |
+| Copy Link / Copy ID | Copies the public watch URL or the video ID |
+| Delete Video | `DELETE /videos/by-id/{id}` (soft delete) |
+
+Each mutation invalidates the table's query so it refetches.
+
+### Upload (`/admin/videos/upload`)
+
+See [Upload flow](/docs/frontend/upload-flow).
+
+## UI-only today
+
+| Page or element | State |
+|---|---|
+| Dashboard (`/admin`) | Stat cards, charts, popular videos and activity feed use hard-coded data |
+| Users (`/admin/users`) | Mock data; no user-management API exists |
+| Analytics (`/admin/analytics`) | Mock charts |
+| Categories (`/admin/categories`) | Local state only; categories are a free-text field on videos, not a table |
+| Settings (`/admin/settings`) | Save does nothing yet |
+| Videos table stat cards and status tabs | Placeholder values and empty tabs |
+| "Save draft" on the upload form | Not connected to an endpoint |
+| Bulk delete | Not connected |
+
+## Known limitations
+
+The videos table currently requests the first 20 videos only and paginates, searches and sorts them in the browser, even though `list-all` supports server-side search, filters, sorting and pagination. Wiring the table's controls to the API is in [Improvements](/docs/roadmap/improvements).

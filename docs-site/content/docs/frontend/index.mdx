@@ -1,0 +1,79 @@
+---
+title: Frontend overview
+description: Structure of the Next.js app, its routes and which parts are real or UI-only.
+---
+
+The frontend (`app/`) is a **Next.js 16 App Router** application written in TypeScript, styled with Tailwind CSS 4 and shadcn/ui, and deployed on **Vercel**. It talks to the backend only over HTTPS, using `NEXT_PUBLIC_API_URL` as the base for both the API and media (`/storage`).
+
+<Placeholder kind="architecture" title="Frontend module map: routes → hooks → API modules → Axios client → backend; Zustand auth store alongside">
+  Group routes by route group and show which hooks and API modules each one uses.
+</Placeholder>
+
+## Project structure
+
+<Files>
+  <Folder name="app" defaultOpen>
+    <Folder name="app" defaultOpen>
+      <Folder name="(public)" defaultOpen>
+        <Folder name="(browse)" />
+        <Folder name="auth" />
+        <Folder name="verify-email" />
+      </Folder>
+      <Folder name="(protected)">
+        <Folder name="admin" />
+      </Folder>
+      <Folder name="play/[video_id]" />
+      <File name="layout.tsx" />
+    </Folder>
+    <Folder name="components" />
+    <Folder name="hooks" />
+    <Folder name="lib">
+      <Folder name="apis" />
+      <Folder name="store" />
+      <Folder name="utils" />
+      <Folder name="motion" />
+    </Folder>
+    <Folder name="providers" />
+    <Folder name="constants" />
+  </Folder>
+</Files>
+
+| Folder | Holds |
+|---|---|
+| `app/` | Routes. Folders in parentheses are **route groups**: they organise layouts without appearing in the URL |
+| `components/` | shadcn/ui primitives (`ui/`), navbar, loaders, sign-in and sign-up forms |
+| `hooks/` | Data hooks: `use-public-videos`, `use-video`, `use-video-processing`, `use-require-auth` |
+| `lib/apis/` | The Axios client and typed API functions per domain (`auth.api.ts`, `video.ts`, `tusUpload.ts`) |
+| `lib/store/` | Zustand stores (`authStore.ts` is the one in use) |
+| `lib/utils/` | Token storage, `storageUrl`, feature flags, safe redirect paths |
+| `lib/motion/` | Animation hooks (GSAP and CSS) |
+| `providers/` | TanStack Query provider |
+
+## Routes
+
+| URL | Group | Auth | Real or UI-only |
+|---|---|---|---|
+| `/` | `(public)/(browse)` | Public | Real: hero carousel, category pills, video grid from `GET /videos/` |
+| `/watch/[video_id]` | `(public)/(browse)` | Public | Real: title detail page and related videos |
+| `/play/[video_id]` | top level | Public | Real: full-screen player |
+| `/auth/sign-in`, `/auth/sign-up` | `(public)` | Public | Real |
+| `/auth/forgot-pw`, `/auth/reset-password` | `(public)` | Public | Real (6-digit code flow) |
+| `/verify-email` | `(public)` | Public | Real (target of the email link) |
+| `/admin/videos` | `(protected)` | Admin | Real: list, edit, visibility, delete, download, preview |
+| `/admin/videos/upload` | `(protected)` | Admin | Real: resumable or legacy upload with progress |
+| `/admin` | `(protected)` | Admin | UI-only dashboard |
+| `/admin/users`, `/admin/analytics`, `/admin/categories`, `/admin/settings` | `(protected)` | Admin | UI-only (no backend yet) |
+
+### Why `/watch` and `/play` are separate
+
+`/watch/[id]` is a browsable title page (backdrop, metadata, related titles) inside the normal site chrome. `/play/[id]` sits outside every route group, so it has no navbar: it is a distraction-free, full-viewport player. Separating them keeps the heavy player off the detail page and makes the player a clean, linkable destination.
+
+## Rendering model
+
+The pages are **client components** (`"use client"`) that fetch through TanStack Query after load. There is no server-side data fetching yet, which keeps the pages simple but means no per-video metadata in the initial HTML. Moving the browse and watch shells to server components is on the [roadmap](/docs/roadmap/improvements).
+
+## Guards
+
+- `(protected)/layout.tsx` runs the auth store's `initialize()`, shows a loader while it resolves, and redirects signed-out users to sign-in with a `?next=` return path.
+- `(protected)/admin/layout.tsx` additionally sends non-admins to `/`.
+- These are **UX guards**. Real enforcement is on the backend: every admin endpoint checks the role from the database.

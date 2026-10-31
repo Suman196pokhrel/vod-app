@@ -1,0 +1,40 @@
+---
+title: Browse and watch
+description: The public feed, the title detail page and how they share data.
+---
+
+Both pages live in the `(public)/(browse)` route group, so they share a layout with the navbar and run the auth store's `initialize()` once.
+
+<Placeholder kind="screenshot" title="Browse page: hero carousel, category pills and poster grid">
+  Annotated screenshot labelling HeroSection, CategoryPills and VideoGrid.
+</Placeholder>
+
+## Browse (`/`)
+
+| Component | Does |
+|---|---|
+| `HeroSection` | Rotates through the **5** newest public videos every **8 seconds**, with a full-bleed backdrop, metadata and Play / More info buttons |
+| `CategoryPills` | Filters by category: All, Action, Drama, Comedy, Sci-Fi, Thriller, Documentary, Fantasy, Horror |
+| `VideoGrid` + `VideoCard` | Poster tiles (2:3 aspect) linking to the detail page |
+
+All three read the same `usePublicVideos(0, 20)` query, so the page makes **one** request for its list. The category filter runs in the browser over those 20 videos; there is no server-side category filtering or infinite scroll yet.
+
+## Title detail (`/watch/[video_id]`)
+
+<Placeholder kind="screenshot" title="Watch page: ambient-tinted backdrop, title, metadata row, synopsis, cast and tags, related titles">
+  Show the ambient glow sampled from the artwork.
+</Placeholder>
+
+1. `useVideo(id)` loads the video (`GET /videos/by-id/{id}`). While loading, skeletons shaped like the page are shown; on error, a "Video not found" message.
+2. The hero shows the thumbnail as a backdrop with a gradient over the text column only, so the artwork stays visible.
+3. `VideoInfo` shows the title, an all-caps metadata row, synopsis, cast and tags.
+4. **Watch now** goes to `/play/[video_id]`.
+5. `RelatedVideos` reuses the cached public list, minus the current video.
+
+### Ambient colour
+
+`useAmbientColor(thumbnailUrl)` draws the thumbnail onto a 16 × 16 canvas, averages the pixels and exposes the colour as a CSS variable (`--ambient`). The page uses it for a soft, heavily blurred glow behind the content. If the image cannot be read (for example a cross-origin restriction), the colour stays `null` and the page renders without the glow; it is an enhancement, never a dependency.
+
+## Watchlist button
+
+The hero's **+** button is gated by `useRequireAuth()`: signed-out users are sent to sign-in and returned afterwards. The watchlist itself is local state only; there is no backend for it yet.

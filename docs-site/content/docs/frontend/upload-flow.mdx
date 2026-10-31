@@ -1,0 +1,80 @@
+---
+title: Upload flow
+description: The admin upload form, resumable vs legacy uploads, and the processing progress dialog.
+---
+
+`/admin/videos/upload` renders one of two forms, chosen at build time by `NEXT_PUBLIC_UPLOADS_TUS_ENABLED` (anything except `"false"` means the resumable form).
+
+<Placeholder kind="screenshot" title="Upload page: drop zones, metadata form, live progress with speed and pause/resume">
+  Show the form mid-upload.
+</Placeholder>
+
+## The form
+
+Built with **React Hook Form** and a **Zod** schema (`uploadForm/formSchema.ts`): title (5–200 characters), description (10–5000), category (required), age rating, director (up to 200), cast (up to 500), release date, status (`draft`, `published` or `scheduled`) and tags, plus drop zones for the video and the thumbnail (JPEG, PNG or WebP).
+
+## Resumable upload (default)
+
+<Steps>
+<Step>
+
+### Prepare Uppy
+
+One Uppy instance per page with the tus plugin: endpoint `${NEXT_PUBLIC_API_URL}/files/`, **50 MB chunks**, one file at a time.
+
+</Step>
+<Step>
+
+### Submit
+
+The form requires both a video and a thumbnail. The video is added to Uppy with tus metadata: title, category, MIME type and the admin's access token (the backend checks it in its `pre-create` hook).
+
+</Step>
+<Step>
+
+### Upload
+
+Progress and speed are shown live; the upload can be paused and resumed. A `beforeunload` warning protects against closing the tab mid-upload.
+
+</Step>
+<Step>
+
+### Resolve the video ID
+
+When Uppy reports completion, the form extracts the upload ID from the upload URL and polls `GET /internal/tus/hooks/uploads/{id}` every 1.5 seconds, up to 21 attempts, until the backend returns the new `video_id`.
+
+</Step>
+<Step>
+
+### Save thumbnail and details
+
+`POST /videos/{id}/thumbnail` and `PATCH /videos/by-id/{id}` run in parallel with `Promise.allSettled`, so one failing does not cancel the other; each failure gets its own message telling the admin to fix it later from Edit Details.
+
+</Step>
+<Step>
+
+### Show processing progress
+
+The form resets and the processing dialog opens for the new video.
+
+</Step>
+</Steps>
+
+## Legacy upload
+
+The legacy form sends everything in one `multipart/form-data` request to `POST /videos/create` (video, thumbnail and a JSON `data` field). It is simpler, but a dropped connection means starting over, and the API process has to stream the whole file.
+
+## Processing progress dialog
+
+`useVideoProcessing` polls `GET /videos/{id}/status` on an interval (the upload forms use 3 seconds) while the dialog is open. `VideoProcessingDialog` shows the stage name, a progress bar and a step indicator (upload → queue → analyse → transcode → segment → package → deploy). The percentage is the fixed value per stage from the backend, not measured progress.
+
+<Placeholder kind="screenshot" title="Processing dialog: step indicator and progress bar during transcoding">
+  Use a real in-progress video.
+</Placeholder>
+
+## Known issues
+
+- The status poll keeps running after a terminal state (`completed` or `failed`), so completion and failure callbacks can fire repeatedly.
+- The access token embedded in the tus metadata is not refreshed before the upload starts; an expired token is rejected by the backend.
+
+Both are tracked in [Improvements](/docs/roadmap/improvements).

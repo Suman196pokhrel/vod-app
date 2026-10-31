@@ -1,0 +1,54 @@
+---
+title: Design system
+description: Visual identity, design tokens, typography, motion and the ambient glow.
+---
+
+**Direction:** a quiet, near-black gallery where content glows and the interface only speaks when touched, and when it speaks, it is fast and cyan.
+
+Tokens are CSS variables in `app/app/globals.css`, exposed to Tailwind 4 through `@theme inline`. Components come from **shadcn/ui** ("new-york" style) on Radix primitives, with Lucide icons. The full rule book is `docs/DESIGN_SYSTEM.md` in the repository.
+
+<Placeholder kind="screenshot" title="Token sheet: surfaces, text steps, cyan accent, radius, type scale">
+  One reference image of the tokens rendered as swatches.
+</Placeholder>
+
+## Colour
+
+| Token | Value | Use |
+|---|---|---|
+| `--background` | `oklch(0.15 0.004 285)` ≈ `#0A0A0B` | App background |
+| `--foreground` | `oklch(0.985 0 0)` ≈ `#FAFAFA` | Primary text |
+| `--muted-foreground` | ≈ `#A1A1AA` | Secondary text |
+| `--primary` | `oklch(0.789 0.154 211)` ≈ `#22D3EE` (cyan-400) | The single accent |
+| `--accent` | Subtle cyan-tinted surface | Hover backgrounds |
+
+Colours are defined in **OKLCH**, a perceptually uniform colour space, so lightness steps look even. The accent works by **contrast, not coverage**: it appears rarely, so it stands out when it does.
+
+## Typography
+
+| Role | Font |
+|---|---|
+| Display (page and video titles, hero) | Space Grotesk |
+| UI and body | Geist |
+| Code | Geist Mono |
+
+Metadata rows and section labels use an **eyebrow** style: 11 px, all caps, wide letter-spacing, muted colour. Weights stay at 400 / 500 / 600.
+
+## Motion
+
+| Token | Value | Use |
+|---|---|---|
+| `--duration-fast` | 150 ms | Hover, focus, small state changes |
+| `--duration-base` | 200 ms | Menus, overlays, card hover |
+| `--duration-slow` | 300 ms | Page transitions |
+| `--duration-cinematic` | 600 ms | Hero backdrop crossfade and ambient fades only |
+| `--ease-out-quart` | `cubic-bezier(0.2, 0, 0, 1)` | The only easing curve |
+
+Every interactive element responds to hover and focus within 150 ms. `prefers-reduced-motion` is respected globally.
+
+## Loading
+
+Content areas use **skeletons** shaped like the content they replace (`.skeleton`), never spinners. Spinners are reserved for buttons and the video player.
+
+## Ambient glow (the signature element)
+
+The watch page and the browse hero are tinted by the video's own artwork. `useAmbientColor` averages a 16 × 16 downsample of the thumbnail and sets `--ambient`, which feeds a blurred background layer at low opacity. It fails silently: no colour means no glow, never a broken page.
