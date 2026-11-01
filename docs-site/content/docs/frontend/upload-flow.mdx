@@ -5,9 +5,7 @@ description: The admin upload form, resumable vs legacy uploads, and the process
 
 `/admin/videos/upload` renders one of two forms, chosen at build time by `NEXT_PUBLIC_UPLOADS_TUS_ENABLED` (anything except `"false"` means the resumable form).
 
-<Placeholder kind="screenshot" title="Upload page: drop zones, metadata form, live progress with speed and pause/resume">
-  Show the form mid-upload.
-</Placeholder>
+![Upload page: video and thumbnail drop zones above the metadata form](/images/screens/upload.jpg)
 
 ## The form
 
@@ -68,9 +66,17 @@ The legacy form sends everything in one `multipart/form-data` request to `POST /
 
 `useVideoProcessing` polls `GET /videos/{id}/status` on an interval (the upload forms use 3 seconds) while the dialog is open. `VideoProcessingDialog` shows the stage name, a progress bar and a step indicator (upload → queue → analyse → transcode → segment → package → deploy). The percentage is the fixed value per stage from the backend, not measured progress.
 
-<Placeholder kind="screenshot" title="Processing dialog: step indicator and progress bar during transcoding">
-  Use a real in-progress video.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  q["queued<br/>15%"] --> p["preparing<br/>25%"] --> sb["generating_storyboard<br/>35%"] --> t["transcoding<br/>50%"]
+  t --> a["aggregating<br/>60%"] --> s["segmenting<br/>70%"] --> m["creating_manifest<br/>80%"]
+  m --> u["uploading_to_storage<br/>90%"] --> f["finalizing<br/>95%"] --> c["completed<br/>100%"]
+  class c accent
+`}
+/>
+
+The dialog polls `GET /videos/{id}/status`; each stage maps to a fixed percentage from `STATUS_META` (`backend/app/utils/video_helpers.py`). `failed` reports 0%.
 
 ## Known issues
 
