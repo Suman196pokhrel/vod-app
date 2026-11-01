@@ -2,6 +2,74 @@
 @import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 
+/*
+ * One palette: zinc neutrals plus a single cyan accent, the same identity as
+ * the VOD app (docs/DESIGN_SYSTEM.md). Hierarchy comes from neutral shades and
+ * type weight; cyan marks only links, active nav and focus. Light mode uses
+ * cyan-700 because cyan-400 fails contrast on white.
+ */
+@theme {
+  --color-fd-background: #ffffff;
+  --color-fd-foreground: #09090b;
+  --color-fd-muted: #f4f4f5;
+  --color-fd-muted-foreground: #52525b;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #09090b;
+  --color-fd-card: #fafafa;
+  --color-fd-card-foreground: #09090b;
+  --color-fd-border: #e4e4e7;
+  --color-fd-primary: #0e7490;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #f4f4f5;
+  --color-fd-secondary-foreground: #18181b;
+  --color-fd-accent: #f4f4f5;
+  --color-fd-accent-foreground: #09090b;
+  --color-fd-ring: #0e7490;
+  --color-fd-overlay: rgb(9 9 11 / 0.2);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+.dark {
+  --color-fd-background: #0a0a0b;
+  --color-fd-foreground: #fafafa;
+  --color-fd-muted: #18181b;
+  --color-fd-muted-foreground: #a1a1aa;
+  --color-fd-popover: #141416;
+  --color-fd-popover-foreground: #fafafa;
+  --color-fd-card: #111113;
+  --color-fd-card-foreground: #fafafa;
+  --color-fd-border: #27272a;
+  --color-fd-primary: #22d3ee;
+  --color-fd-primary-foreground: #083344;
+  --color-fd-secondary: #18181b;
+  --color-fd-secondary-foreground: #e4e4e7;
+  --color-fd-accent: #1c1c1f;
+  --color-fd-accent-foreground: #fafafa;
+  --color-fd-ring: #22d3ee;
+  --color-fd-overlay: rgb(0 0 0 / 0.5);
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #18181b;
+  --color-fd-secondary: #1c1c1f;
+  --color-fd-muted-foreground: #a1a1aa;
+}
+
+/* Callouts: neutral by default, cyan only where the reader must act. */
+@theme static {
+  --color-fd-info: #71717a;
+  --color-fd-success: #71717a;
+  --color-fd-idea: #71717a;
+  --color-fd-warning: #06b6d4;
+  --color-fd-error: #0891b2;
+  --color-fd-diff-remove: rgb(113 113 122 / 0.14);
+  --color-fd-diff-remove-symbol: #71717a;
+  --color-fd-diff-add: rgb(6 182 212 / 0.12);
+  --color-fd-diff-add-symbol: #06b6d4;
+}
+
 html {
   scrollbar-gutter: stable;
 }
@@ -9,4 +77,20 @@ html {
 html > body[data-scroll-locked] {
   margin-right: 0px !important;
   --removed-body-scroll-bar-size: 0px !important;
+}
+
+/* Diagrams sit on a quiet card so they read as figures, not page decoration. */
+.mermaid-figure {
+  margin: 1.75rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: 0.75rem;
+  background: var(--color-fd-card);
+  overflow-x: auto;
+}
+
+.mermaid-figure svg {
+  margin: 0 auto;
+  max-width: 100%;
+  height: auto;
 }
