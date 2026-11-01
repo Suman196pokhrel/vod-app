@@ -5,9 +5,24 @@ description: Planned AI and ML features and where they plug into the pipeline.
 
 AI features are planned, not built. This page records the intent and the integration points, so the existing architecture can absorb them without rework.
 
-<Placeholder kind="architecture" title="Where AI stages plug in: extra Celery steps before on_pipeline_success, GPU workers on a dedicated queue">
-  Show the current chain with optional AI branches and a separate GPU worker pool.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  prep["prepare_video"] --> tr["Transcription<br/>speech → WebVTT"]
+  tr --> ch["Chapters +<br/>summaries"]
+  prep --> up["Upscaling /<br/>frame interpolation"]
+  up --> tc["transcode chord<br/>+ extra renditions"]
+  tc --> rest["segment → manifest →<br/>upload → finalize"]
+  ch --> rest
+  rest --> ok["on_pipeline_success<br/>appended by the queue"]
+  subgraph gpu["gpu queue · GPU workers"]
+    tr
+    ch
+    up
+  end
+  class gpu accent
+`}
+/>
 
 ## Planned capabilities
 

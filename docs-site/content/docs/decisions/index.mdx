@@ -22,6 +22,15 @@ Incident write-ups follow a blameless format: impact, timeline, root cause, fix 
 |---|---|---|
 | [2026-10](/docs/decisions/incident-2026-10-stuck-videos) | Every new upload stuck at "still processing" | High: no new video could be published |
 
-<Placeholder kind="chart" title="Timeline of decisions and incidents">
-  Horizontal timeline from the first upload pipeline to today, marking ADRs and incidents.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  m["2026-07-23 · MVP reached"]
+  a1["2026-07-26 · ADR 0001: resumable uploads with tusd + Uppy"]
+  a2["2026-07-31 · ADR 0002: one pipeline at a time, Redis lock"]
+  i1["2026-10-24 · Incident: first upload after the lock deploy crashes"]
+  f1["2026-11-01 · Fix confirmed in production, ADR 0002 revised"]
+  m --> a1 --> a2 --> i1 --> f1
+  class i1 accent
+`}
+/>

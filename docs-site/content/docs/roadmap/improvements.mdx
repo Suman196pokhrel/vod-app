@@ -5,9 +5,29 @@ description: The prioritised plan for correctness, pipeline performance, reliabi
 
 Ordered by impact. Each item names the current behaviour it changes.
 
-<Placeholder kind="chart" title="Improvement roadmap: impact vs effort for each item below">
-  2×2 matrix (quick wins, big bets, fill-ins, deprioritised).
-</Placeholder>
+<Mermaid
+  chart={`
+quadrantChart
+  title Impact vs effort (rough estimates)
+  x-axis Low effort --> High effort
+  y-axis Low impact --> High impact
+  quadrant-1 Plan
+  quadrant-2 Do first
+  quadrant-3 Quick wins
+  quadrant-4 Reconsider
+  Fix retry handling: [0.25, 0.7]
+  Stop polling at completion: [0.12, 0.45]
+  Server-side admin table: [0.35, 0.6]
+  Backups: [0.3, 0.9]
+  Alerts on stuck videos: [0.3, 0.8]
+  Health checks: [0.2, 0.55]
+  CI image builds: [0.6, 0.65]
+  Automated tests: [0.7, 0.85]
+  CDN for storage: [0.45, 0.75]
+  Chunked parallel encoding: [0.85, 0.6]
+  Multiple workers: [0.82, 0.4]
+`}
+/>
 
 ## 1. Correctness (small, high value)
 

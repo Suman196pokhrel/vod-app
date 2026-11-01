@@ -9,9 +9,18 @@ Run from `~/vod-app/infra` on the server with the `dc` alias:
 alias dc='docker compose -f docker-compose.yml --env-file prod.env'
 ```
 
-<Placeholder kind="flow" title="Where to look first: symptom → layer (frontend, API, queue, worker, storage) → command">
-  Decision chart pointing to the sections below.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  s{"Symptom"}
+  s -- "page broken, no<br/>Sign in button" --> fe["Frontend<br/>browser console, localStorage"]
+  s -- "5xx or 401 on<br/>API calls" --> api["API<br/>dc logs api"]
+  s -- "stuck at queued /<br/>still processing" --> q["Queue<br/>lock key + queued rows"]
+  s -- "failed status" --> w["Worker<br/>dc logs worker | grep id"]
+  s -- "player or<br/>thumbnail 404" --> st["Storage<br/>mc ls, Caddy /storage"]
+  s -- "out of space" --> disk["Disk<br/>df -h, docker system df"]
+`}
+/>
 
 ## Logs
 

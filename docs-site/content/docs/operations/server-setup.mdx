@@ -3,9 +3,15 @@ title: Server setup
 description: Building a production backend server from an empty VPS.
 ---
 
-<Placeholder kind="flow" title="From empty VPS to serving traffic: OS → Docker → repo → config → DNS → stack → buckets → admin">
-  Checklist-style flow matching the steps below.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  os["Base system<br/>OS, firewall, SSH"] --> docker["Docker +<br/>Compose"] --> code["Clone<br/>the repo"]
+  code --> cfg["Configuration<br/>prod.env, Caddyfile.prod"] --> dns["DNS<br/>api.vod.spokhrel.dev"]
+  dns --> stack["Start<br/>the stack"] --> buckets["Create<br/>MinIO buckets"] --> admin["First<br/>admin user"]
+  admin --> fe["Point the frontend<br/>at the API"]
+`}
+/>
 
 <Steps>
 <Step>

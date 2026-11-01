@@ -196,7 +196,8 @@ function MermaidContent({ chart }: { chart: string }) {
     state: { useMaxWidth: false },
     er: { useMaxWidth: false },
     timeline: { useMaxWidth: false },
-    quadrantChart: { useMaxWidth: false },
+    quadrantChart: { useMaxWidth: false, chartWidth: 620, chartHeight: 480, pointLabelFontSize: 13 },
+    gantt: { useMaxWidth: false, useWidth: 860, barHeight: 26, barGap: 8, fontSize: 13, sectionFontSize: 13, leftPadding: 120 },
     xyChart: { useMaxWidth: false },
   });
 

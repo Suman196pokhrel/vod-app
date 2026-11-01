@@ -31,9 +31,28 @@ Run **one video's pipeline at a time, oldest first**:
 
 Mechanics: [Processing queue](/docs/pipeline/processing-queue).
 
-<Placeholder kind="chart" title="Before vs after: three uploads processed interleaved vs one at a time (finish times per video)">
-  Gantt-style comparison showing every video finishing earlier except the last.
-</Placeholder>
+<Mermaid
+  chart={`
+gantt
+  title Three uploads (illustrative), A long, B and C short
+  dateFormat HH:mm
+  axisFormat %H:%M
+  section Interleaved
+  A transcode :a1, 00:00, 20m
+  B transcode :b1, after a1, 10m
+  C transcode :c1, after b1, 10m
+  A finish → 45 min :a2, after c1, 5m
+  B finish → 50 min :b2, after a2, 5m
+  C finish → 55 min :c2, after b2, 5m
+  section One at a time
+  A transcode :x1, 00:00, 20m
+  A finish → 25 min :x2, after x1, 5m
+  B transcode :x3, after x2, 10m
+  B finish → 40 min :x4, after x3, 5m
+  C transcode :x5, after x4, 10m
+  C finish → 55 min :x6, after x5, 5m
+`}
+/>
 
 ## Alternatives
 

@@ -89,9 +89,25 @@ Two weaknesses turned one bug into a silent outage:
 - The error callback only released the lock; it did not mark the video failed.
 - Nothing alerted on videos sitting in a processing state for too long.
 
-<Placeholder kind="flow" title="Where Celery put the callback: chain → chord(link) → group(link) → TypeError">
-  Before/after diagram of the canvas options.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  subgraph before["Before: link= on apply_async"]
+    direction TB
+    b1["chain.apply_async(link=on_success)"] --> b2["link lands on the last<br/>signature Celery sees: the chord"]
+    b2 --> b3["chord passes its options<br/>to its header group"]
+    b3 --> b4["group.apply_async(link=...)"]
+    b4 --> b5["TypeError: Cannot add link<br/>to group: use a chord"]
+  end
+  subgraph after["After: success is a chain step"]
+    direction TB
+    a1["chain | on_pipeline_success.si(id)"] --> a2["apply_async(link_error=on_pipeline_failed)"]
+    a2 --> a3["chord applies link_error<br/>to its callback only"]
+    a3 --> a4["pipeline runs"]
+  end
+  class b5 accent
+`}
+/>
 
 ## Fix
 

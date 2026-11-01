@@ -5,9 +5,16 @@ description: How production is run day to day, and where to look when something 
 
 This section is the runbook for the production backend: deploying, setting up a server, managing secrets, debugging and recovering from incidents. It describes procedures and commands; it never contains secret values.
 
-<Placeholder kind="flow" title="Operations map: deploy → verify → monitor → debug → recover">
-  One loop diagram linking each page in this section.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  deploy["Deploy<br/>pull, build, migrate"] --> verify["Verify<br/>health, logs, a test upload"]
+  verify --> monitor["Monitor<br/>daily health check"]
+  monitor --> debug["Debug<br/>logs, queue, database"]
+  debug --> recover["Recover<br/>playbooks, re-queue, roll back"]
+  recover -. next release .-> deploy
+`}
+/>
 
 ## At a glance
 

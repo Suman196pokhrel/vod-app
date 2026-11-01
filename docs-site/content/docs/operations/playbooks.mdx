@@ -5,9 +5,21 @@ description: Step-by-step responses to the incidents seen in production, from sy
 
 Each playbook goes **symptom → checks → likely causes → fix**. Commands assume the `dc` alias from [Debugging](/docs/operations/debugging).
 
-<Placeholder kind="flow" title="Triage tree for the playbooks below">
-  Entry point: "what does the user see?" branching to each playbook.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  start{"What is wrong?"}
+  start --> a["Video still processing<br/>long after upload"]
+  start --> b["Processing failed"]
+  start --> c["Uploads fail<br/>or never start"]
+  start --> d["API or whole<br/>site down"]
+  start --> e["Videos won't play"]
+  start --> f["Disk filling up"]
+  start --> g["No Sign in<br/>button or avatar"]
+  start --> h["Video failed<br/>after a deploy"]
+  h -. "same fix:<br/>re-queue" .-> b
+`}
+/>
 
 <Accordions>
 <Accordion title="A video says 'still processing' long after upload">

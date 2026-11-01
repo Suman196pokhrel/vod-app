@@ -5,9 +5,18 @@ description: Release, verify and roll back the production backend.
 
 Frontend and docs deploy automatically on Vercel when `main` changes. This page covers the **backend**, which is deployed by hand.
 
-<Placeholder kind="flow" title="Backend release: pre-checks → pull → build → migrate → verify → (rollback)">
-  Include the decision point "is a video processing right now?".
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  pre{"Pre-checks<br/>video processing?"} -- "yes: wait" --> pre
+  pre -- idle --> pull["git pull"] --> build["compose up -d --build<br/>api worker"]
+  build --> mig["alembic upgrade head<br/>if the release has a migration"]
+  mig --> verify{"Verify<br/>health + logs"}
+  verify -- ok --> done(["Released"])
+  verify -- broken --> rb["Roll back<br/>previous commit, rebuild"]
+  class done accent
+`}
+/>
 
 ## 1. Pre-checks
 

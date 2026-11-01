@@ -19,9 +19,18 @@ Walk the life of one video, naming one design decision per step:
 
 Close with one real incident: the [chord callback bug](/docs/decisions/incident-2026-10-stuck-videos), how it was found and what changed.
 
-<Placeholder kind="architecture" title="Whiteboard version: the five boxes you draw in an interview">
-  Deliberately minimal: Browser, Caddy, API, Worker, Storage, with the two async boundaries marked.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  client["Client<br/>Next.js"] --> edge["Edge<br/>Caddy"]
+  edge --> api["API<br/>FastAPI + PostgreSQL"]
+  edge -- uploads --> ingest["Ingest<br/>tusd"]
+  api -- "queue" --> proc["Processing<br/>Celery + FFmpeg"]
+  ingest --> store[("Storage<br/>MinIO")]
+  proc --> store
+  edge -- playback --> store
+`}
+/>
 
 ## The 10-minute version
 

@@ -5,9 +5,24 @@ description: What is real today, what is UI-only, and what is missing.
 
 VOD is at **MVP**: the core viewer journey and the admin video lifecycle work end to end in production. This page is the honest inventory.
 
-<Placeholder kind="chart" title="Feature map: real, partial and UI-only features by area">
-  Grid or matrix coloured by status.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  subgraph real["Real and in production"]
+    direction TB
+    r1["Resumable upload"] ~~~ r2["Processing queue + HLS"] ~~~ r3["Adaptive player"] ~~~ r4["Public browse + watch"] ~~~ r5["Auth flows"] ~~~ r6["Admin video table"]
+  end
+  subgraph partial["Partial"]
+    direction TB
+    p1["Admin table: first 20 only"] ~~~ p2["Category filter: client-side"] ~~~ p3["View counts: never called"] ~~~ p4["Watchlist: no backend"]
+  end
+  subgraph ui["UI-only or not started"]
+    direction TB
+    u1["Admin users, analytics, settings"] ~~~ u2["Categories table"] ~~~ u3["Comments, watch history"]
+  end
+  real ~~~ partial ~~~ ui
+`}
+/>
 
 ## Real and in production
 

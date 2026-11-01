@@ -24,9 +24,34 @@ This page follows the structure of a system design interview. Numbers marked *il
 
 ## 2. High-level design
 
-<Placeholder kind="architecture" title="High-level design: client, edge (Caddy), control plane (FastAPI + PostgreSQL), processing (Redis + Celery + FFmpeg), storage (MinIO), ingest (tusd)">
-  The diagram you would draw first, before any deep dive.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  client["Client<br/>Next.js on Vercel, hls.js player, Uppy"]
+  edge["Edge<br/>Caddy: TLS, routing, cache headers"]
+  subgraph control["Control plane"]
+    api["FastAPI"] --> pg[("PostgreSQL")]
+  end
+  subgraph ingest["Ingest"]
+    tusd["tusd"]
+  end
+  subgraph processing["Processing"]
+    redis[("Redis<br/>broker + lock")] --> worker["Celery worker<br/>FFmpeg"]
+  end
+  subgraph storage["Storage"]
+    minio[("MinIO<br/>originals, HLS")]
+  end
+  client --> edge
+  edge -- "/*" --> api
+  edge -- "/files/*" --> tusd
+  edge -- "/storage/*" --> minio
+  tusd --> minio
+  tusd -. hooks .-> api
+  api --> redis
+  worker --> minio
+  worker --> pg
+`}
+/>
 
 | Concern | Component | Reason |
 |---|---|---|

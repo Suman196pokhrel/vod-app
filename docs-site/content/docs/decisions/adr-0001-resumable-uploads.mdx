@@ -26,9 +26,20 @@ Adopt the **tus** protocol: **tusd** as a dedicated ingest service writing to Mi
 - **Data plane:** browser → tusd → MinIO. Bytes never reach FastAPI.
 - **Control plane:** FastAPI takes part only through tusd hooks: it authorises uploads (`pre-create`) and turns finished uploads into videos (`post-finish`).
 
-<Placeholder kind="architecture" title="Control plane vs data plane for uploads">
-  Two lanes: bytes (Uppy → tusd → MinIO) and decisions (tusd ↔ FastAPI hooks).
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  subgraph dataplane["Data plane: bytes"]
+    direction LR
+    uppy["Uppy<br/>browser"] -- "50 MB chunks" --> tusd["tusd"] -- "S3 multipart" --> minio[("MinIO")]
+  end
+  subgraph controlplane["Control plane: decisions"]
+    api["FastAPI"] --> pg[("PostgreSQL")]
+  end
+  tusd -. "pre-create: may this upload start?" .-> api
+  tusd -. "post-finish: turn it into a video" .-> api
+`}
+/>
 
 ## Alternatives considered
 
