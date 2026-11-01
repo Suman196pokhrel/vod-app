@@ -3,6 +3,7 @@
 // Renders a Mermaid diagram client-side, following the Fumadocs recipe:
 // https://fumadocs.dev/docs/markdown/mermaid
 import { use, useId, useSyncExternalStore } from 'react';
+import { DiagramFigure } from './diagram-figure';
 
 export function Mermaid({ chart }: { chart: string }) {
   // `false` on the server and during hydration
@@ -189,8 +190,8 @@ function MermaidContent({ chart }: { chart: string }) {
     theme: 'base',
     themeVariables: themeVariables(theme),
     themeCSS: accentCSS(theme),
-    // Natural size, never shrunk to fit: wide diagrams scroll instead of
-    // turning their labels unreadable.
+    // Rendered at natural size; the figure scales it to the column and
+    // DiagramFigure enlarges it on click.
     flowchart: { curve: 'basis', padding: 12, htmlLabels: true, useMaxWidth: false },
     sequence: { mirrorActors: false, messageAlign: 'center', useMaxWidth: false },
     state: { useMaxWidth: false },
@@ -207,13 +208,5 @@ function MermaidContent({ chart }: { chart: string }) {
     }),
   );
 
-  return (
-    <div
-      className="mermaid-figure not-prose"
-      ref={(container) => {
-        if (container) bindFunctions?.(container);
-      }}
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  );
+  return <DiagramFigure svg={svg} onMount={(el) => bindFunctions?.(el)} />;
 }
