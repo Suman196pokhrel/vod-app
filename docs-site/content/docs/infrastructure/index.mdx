@@ -11,9 +11,33 @@ VOD runs in three places:
 | Docs site (this site) | **Vercel** | `docs.vod.spokhrel.dev` |
 | Backend (API, worker, databases, storage, proxy) | One **Hetzner** VPS running **Docker Compose** | `api.vod.spokhrel.dev` |
 
-<Placeholder kind="architecture" title="Deployment topology: Vercel (frontend, docs) and one Hetzner VPS running seven containers behind Caddy">
-  Show public ports (80/443 only) vs loopback-only and private-network-only services.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  user([Viewers and admins])
+  subgraph vercel["Vercel"]
+    direction LR
+    fe["vod.spokhrel.dev<br/>Next.js frontend"]
+    docs["docs.vod.spokhrel.dev<br/>this site"]
+  end
+  subgraph vps["Hetzner VPS · api.vod.spokhrel.dev"]
+    caddy["caddy<br/>host network, :80 / :443"]
+    subgraph net["backend_net (private bridge)"]
+      direction LR
+      api["api<br/>127.0.0.1:8000"]
+      tusd["tusd<br/>127.0.0.1:1080"]
+      minio[("minio<br/>127.0.0.1:9000")]
+      worker["worker"]
+      pg[("postgres")]
+      redis[("redis")]
+    end
+  end
+  user --> fe & docs
+  user -- HTTPS --> caddy
+  caddy --> api & tusd & minio
+  class caddy accent
+`}
+/>
 
 ## The backend server
 

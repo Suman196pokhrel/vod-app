@@ -5,9 +5,35 @@ description: How the local stack is put together and the day-to-day development 
 
 Setup steps are in [Getting started](/docs/overview/getting-started). This page explains how the local environment works.
 
-<Placeholder kind="architecture" title="Local dev topology: pnpm dev (frontend :3000) + Docker stack behind Caddy (:80) + dev tools">
-  Show which ports you open in the browser and which are container-internal.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  subgraph host["Your machine"]
+    fe["pnpm dev<br/>frontend :3000"]
+    docs["make docs<br/>docs :3001"]
+  end
+  subgraph docker["Docker (docker-compose.local.yml)"]
+    caddy["Caddy :80"]
+    api["API :8000<br/>--reload"]
+    tusd["tusd"]
+    worker["worker<br/>concurrency 3"]
+    pg[("PostgreSQL :5432")]
+    redis[("Redis :6379")]
+    minio[("MinIO :9000 / :9001")]
+    subgraph tools["Dev tools"]
+      direction TB
+      pgadmin["pgAdmin :5050"]
+      flower["Flower :5555"]
+      ri["RedisInsight :5540"]
+    end
+  end
+  fe -- "NEXT_PUBLIC_API_URL=http://localhost" --> caddy
+  caddy --> api & tusd & minio
+  api --> pg & redis
+  redis --> worker
+  class caddy accent
+`}
+/>
 
 ## What runs where
 

@@ -3,9 +3,15 @@ title: Deployment
 description: How the frontend, docs and backend reach production today, and what a deploy affects.
 ---
 
-<Placeholder kind="flow" title="Deploy paths: git push → Vercel builds frontend and docs automatically; backend updated manually on the VPS">
-  Two lanes, with the manual backend steps listed.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  push(["git push main"]) --> v1["Vercel build<br/>app/"] --> p1["vod.spokhrel.dev"]
+  push --> v2["Vercel build<br/>docs-site/"] --> p2["docs.vod.spokhrel.dev"]
+  push -. manual .-> ssh["SSH to the VPS<br/>git pull"]
+  ssh --> build["compose up -d --build<br/>api worker"] --> mig["alembic upgrade head<br/>if needed"] --> p3["api.vod.spokhrel.dev"]
+`}
+/>
 
 ## Frontend and docs: automatic
 

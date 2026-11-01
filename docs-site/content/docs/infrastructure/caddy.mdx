@@ -7,9 +7,16 @@ description: "The reverse proxy: TLS, routing, caching and why it runs on the ho
 
 The routing rules are explained in [Request routing](/docs/architecture/request-routing). This page covers the configuration files and operational details.
 
-<Placeholder kind="flow" title="Caddy request pipeline: TLS termination → route match (first match wins) → headers → upstream">
-  Annotate each route with its upstream and cache policy.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  req(["Request :443"]) --> tls["TLS termination<br/>Let's Encrypt, auto-renewed"]
+  tls --> match{"Route match<br/>first match wins"}
+  match --> hdr["Headers<br/>Cache-Control per file type"]
+  hdr --> up["Upstream<br/>api · tusd · minio"]
+  match -- "/internal/*" --> deny["respond 404"]
+`}
+/>
 
 ## Config files
 

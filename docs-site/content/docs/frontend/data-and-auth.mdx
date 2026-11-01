@@ -7,9 +7,33 @@ description: The Axios client, token refresh, the auth store and TanStack Query 
 
 `lib/apis/client.ts` creates one Axios instance with `baseURL = NEXT_PUBLIC_API_URL` and two interceptors.
 
-<Placeholder kind="sequence" title="Token refresh on 401: request → 401 → refresh → retry with the new token, or redirect to sign-in">
-  Include the skipAuthRedirect branch for public requests.
-</Placeholder>
+<Mermaid
+  chart={`
+sequenceDiagram
+  autonumber
+  participant P as Page
+  participant AX as Axios client
+  participant S as authStore
+  participant API as FastAPI
+  P->>AX: request
+  AX->>AX: add Bearer access token
+  AX->>API: request
+  API-->>AX: 401
+  alt skipAuthRedirect (public read)
+    AX-->>P: error, handled by the caller
+  else first retry
+    AX->>S: refreshToken()
+    S->>API: POST /auth/refresh
+    alt refresh ok
+      API-->>S: new access token
+      AX->>API: retry once (_retry = true)
+      API-->>P: 200
+    else refresh fails
+      AX->>P: redirect to /auth/sign-in
+    end
+  end
+`}
+/>
 
 <Steps>
 <Step>
@@ -50,9 +74,21 @@ Both tokens are kept in `localStorage` (`lib/utils/tokenManager.ts`) under `acce
 
 The navbar shows **Sign in** or the user's avatar once `isLoading` is false.
 
-<Placeholder kind="state" title="Auth store states: loading → signed out | signed in, with refresh as a transition">
-  Small state diagram for initialize(), signin, refresh failure and logout.
-</Placeholder>
+<Mermaid
+  chart={`
+stateDiagram-v2
+  direction LR
+  [*] --> Loading: initialize()
+  Loading --> SignedOut: no tokens
+  Loading --> SignedIn: profile ok
+  Loading --> Refreshing: profile 401
+  Refreshing --> SignedIn: refresh ok
+  Refreshing --> SignedOut: refresh fails
+  SignedOut --> SignedIn: signin()
+  SignedIn --> Refreshing: API 401
+  SignedIn --> SignedOut: logout()
+`}
+/>
 
 ## Redirects after sign-in
 

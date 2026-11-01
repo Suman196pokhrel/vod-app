@@ -5,9 +5,27 @@ description: The services, networks, volumes and per-environment differences of 
 
 Every backend service runs as a container defined in `infra/`. The API and worker share one image built from `backend/Dockerfile`.
 
-<Placeholder kind="architecture" title="Compose topology: services, the backend_net bridge network, named volumes and published ports">
-  Side-by-side local vs production view.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  internet([Internet :80 / :443]) --> caddy["caddy<br/>network_mode: host"]
+  caddy -- "127.0.0.1:8000" --> api
+  caddy -- "127.0.0.1:1080" --> tusd
+  caddy -- "127.0.0.1:9000" --> minio
+  subgraph net["backend_net bridge"]
+    api["api"]
+    worker["worker"]
+    tusd["tusd"]
+    minio["minio"]
+    pg["postgres<br/>no published port"]
+    redis["redis<br/>no published port"]
+  end
+  pg --- v1[("postgres_data")]
+  minio --- v2[("minio_data")]
+  tusd --- v3[("tusd_data")]
+  caddy --- v4[("caddy_data<br/>caddy_config")]
+`}
+/>
 
 ## The backend image
 

@@ -46,9 +46,17 @@ Because the rendition list comes from the playlist, the skin can offer a **Quali
 
 ## Timeline thumbnails
 
-<Placeholder kind="flow" title="Storyboard: VTT cue lookup → sprite sheet → crop rectangle → thumbnail above the scrubber">
-  Show one sprite sheet with the highlighted tile for the hovered time.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  hover(["Pointer at 02:14<br/>on the scrubber"]) --> cue["Find VTT cue<br/>02:10 → 02:15"]
+  cue --> target["sprite_001.jpg<br/>#xywh=960,180,160,90<br/>(tile 26: row 2, col 6)"]
+  target --> crop["Crop that tile<br/>from the sprite sheet"]
+  crop --> thumb["Thumbnail shown<br/>above the scrubber"]
+  vtt[("storyboard.vtt")] -. "fetched once,<br/>parsed by hand" .-> cue
+  class thumb accent
+`}
+/>
 
 1. The pipeline wrote `storyboard.vtt` and sprite sheets (see [Stages](/docs/pipeline/stages#2-generate_storyboard)).
 2. `useStoryboardThumbnails` fetches the VTT with `fetch`, parses each cue's start/end time and its `sprite_NNN.jpg#xywh=x,y,w,h` target, and resolves sprite URLs relative to the VTT.

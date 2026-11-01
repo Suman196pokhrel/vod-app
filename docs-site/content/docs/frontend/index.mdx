@@ -5,9 +5,27 @@ description: Structure of the Next.js app, its routes and which parts are real o
 
 The frontend (`app/`) is a **Next.js 16 App Router** application written in TypeScript, styled with Tailwind CSS 4 and shadcn/ui, and deployed on **Vercel**. It talks to the backend only over HTTPS, using `NEXT_PUBLIC_API_URL` as the base for both the API and media (`/storage`).
 
-<Placeholder kind="architecture" title="Frontend module map: routes → hooks → API modules → Axios client → backend; Zustand auth store alongside">
-  Group routes by route group and show which hooks and API modules each one uses.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  subgraph routes["Routes (app/app)"]
+    direction TB
+    browse["(public)/(browse)<br/>home + /watch"]
+    play["/play/[video_id]"]
+    admin["(protected)/admin"]
+  end
+  hooks["hooks/<br/>useVideo, useRequireAuth,<br/>use-video-processing"]
+  apis["lib/apis/<br/>auth.api.ts, video.ts,<br/>tusUpload.ts"]
+  client["Axios client<br/>interceptors"]
+  store["Zustand authStore"]
+  backend(["FastAPI via Caddy"])
+  routes --> hooks --> apis --> client --> backend
+  routes --> store
+  store --> apis
+  client -. "401 → refresh" .-> store
+  class client accent
+`}
+/>
 
 ## Project structure
 
