@@ -68,3 +68,16 @@ The [Interview Guide](/docs/interview) collects the trade-offs across the whole 
   `backend/app/tasks/processing_queue.py` point at that repository. If a page and the code
   disagree, the code wins, and the page should be fixed.
 </Callout>
+
+## For LLMs and RAG systems
+
+The same content is published in machine-readable form, generated from these pages at build time:
+
+| URL | Contents |
+|---|---|
+| [`/llms.txt`](/llms.txt) | Index of every page: title, link and one-line description, grouped by section |
+| [`/llms-full.txt`](/llms-full.txt) | Every page as one markdown file |
+| `/docs/<page>.md` | One page as markdown; any `/docs/...` URL also returns markdown when requested with `Accept: text/markdown` |
+| [`/llms.json`](/llms.json) | Page list for indexers: URL, markdown URL, title, section and a SHA-256 `hash` of the markdown, so only changed pages need re-embedding |
+
+Diagrams are included as ```` ```mermaid ```` blocks, and every heading carries its anchor (`## Heading [#anchor]`) so chunks can link back to the exact section.
