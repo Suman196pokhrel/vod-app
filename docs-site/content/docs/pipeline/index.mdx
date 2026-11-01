@@ -5,9 +5,15 @@ description: How an uploaded file becomes an adaptive HLS stream, using a Celery
 
 Processing a video means downloading the original, inspecting it, generating scrubbing previews, transcoding several renditions, packaging them as HLS and publishing the result to object storage. That takes minutes of CPU per video, so it runs in a **Celery worker**, never inside an API request.
 
-<Placeholder kind="animation" title="Animated pipeline: one source file fanning out into seven renditions, then into segments and a master playlist">
-  Short looping animation for the top of the Pipeline section.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  src["original"] --> t1440["1440p"] & t1080["1080p"] & t720["720p"] & t480["480p"] & t360["360p"] & t240["240p"] & t144["144p"]
+  t1440 & t1080 & t720 & t480 & t360 & t240 & t144 --> seg["6 s segments<br/>+ playlists"]
+  seg --> master["master.m3u8"]
+  class master accent
+`}
+/>
 
 ## The workflow
 
@@ -39,9 +45,22 @@ workflow = chain(
 
 When the [processing queue](/docs/pipeline/processing-queue) dispatches it, it appends one more step, `on_pipeline_success`, and attaches `on_pipeline_failed` as the error handler.
 
-<Placeholder kind="flow" title="Workflow graph: prepare → storyboard → chord(7× transcode) → aggregate → segment → manifest → upload → finalize → on_pipeline_success, with on_pipeline_failed as the error branch">
-  Mark which steps are sequential and which run as the chord's parallel group.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  start(["start_next_video_if_idle()"]) --> prepare
+  subgraph chain["Celery chain"]
+    prepare["prepare_video<br/>download + ffprobe"] --> story["generate_storyboard<br/>best effort"]
+    story --> tq["transcode_quality × 7<br/>chord, parallel group"]
+    tq --> agg["on_transcode_complete<br/>chord callback"]
+    agg --> seg["segment_videos"] --> man["create_manifest"]
+    man --> up["upload_to_minio"] --> fin["finalize_processing"]
+  end
+  fin --> ok["on_pipeline_success<br/>release lock, start next"]
+  chain -. "any step raises<br/>(link_error)" .-> fail["on_pipeline_failed<br/>mark failed, release lock, start next"]
+  class ok accent
+`}
+/>
 
 ## Celery primitives used
 

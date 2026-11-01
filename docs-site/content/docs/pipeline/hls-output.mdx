@@ -5,9 +5,24 @@ description: The bitrate ladder, segment layout and playlists the pipeline produ
 
 **HLS (HTTP Live Streaming)** delivers video as many small segment files listed in text playlists (`.m3u8`). A player downloads the **master playlist**, picks a rendition based on measured bandwidth and screen size, and fetches that rendition's segments one by one, switching up or down between segments as conditions change. That is **adaptive bitrate (ABR) streaming**.
 
-<Placeholder kind="animation" title="ABR in action: bandwidth drops, the player steps down from 1080p to 480p at the next segment boundary, then climbs back">
-  Timeline animation with a bandwidth graph above and the chosen rendition below.
-</Placeholder>
+<Mermaid
+  chart={`
+sequenceDiagram
+  participant P as hls.js player
+  participant S as /storage (Caddy → MinIO)
+  P->>S: GET master.m3u8
+  S-->>P: 7 renditions with BANDWIDTH
+  P->>S: 1080p/segment_0010.ts
+  Note over P: bandwidth drops
+  P->>P: estimate falls below 5 Mbps
+  P->>S: 480p/segment_0011.ts
+  Note over P: switches at the next segment boundary
+  P->>S: 480p/segment_0012.ts
+  Note over P: bandwidth recovers
+  P->>S: 720p/segment_0013.ts
+  P->>S: 1080p/segment_0014.ts
+`}
+/>
 
 ## The bitrate ladder
 
@@ -32,9 +47,15 @@ Every rendition also has 128 kbps AAC audio.
 - **Fixed frame size:** every rendition is scaled to fit inside its box and **padded with black** to the exact width and height, so a vertical or ultra-wide source keeps its shape inside a 16:9 frame.
 - The list actually produced is stored in `available_qualities`.
 
-<Placeholder kind="chart" title="Ladder chart: resolution vs bitrate for the seven active renditions">
-  Bar or step chart; optionally overlay measured file sizes per rendition for a sample video.
-</Placeholder>
+<Mermaid
+  chart={`
+xychart-beta
+  title "Video bitrate per rendition (kbps)"
+  x-axis ["144p", "240p", "360p", "480p", "720p", "1080p", "1440p"]
+  y-axis "kbps" 0 --> 10500
+  bar [200, 300, 500, 1000, 2500, 5000, 10000]
+`}
+/>
 
 ## Output layout
 

@@ -5,9 +5,19 @@ description: Each pipeline task in detail, with the exact FFmpeg commands, retri
 
 All tasks live in `backend/app/tasks/video/`. Each one writes its own `processing_status` when it starts, so the admin's progress dialog follows along.
 
-<Placeholder kind="flow" title="Data passed between stages: the dictionary each task returns and the next task reads">
-  Show the keys added at each step (local_path, work_dir, metadata → transcoded_files → segment info → master path → manifest_url).
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  p["prepare_video"] -- "video_id, local_path, work_dir,<br/>transcoded_dir, segments_dir, metadata" --> s["generate_storyboard"]
+  s -- "same dict, passed through" --> t["transcode_quality × 7"]
+  t -- "each: quality, output_path, file_size<br/>(or skipped / failed)" --> a["on_transcode_complete"]
+  a -- "transcoded_files, total_qualities" --> g["segment_videos"]
+  g -- "segmented_files, segments_dir" --> m["create_manifest"]
+  m -- "master_playlist_path, available_qualities" --> u["upload_to_minio"]
+  u -- "master_url, total_files, total_bytes" --> f["finalize_processing"]
+  f -- "status: completed, manifest_url" --> db[("videos row")]
+`}
+/>
 
 ## 1. prepare_video
 

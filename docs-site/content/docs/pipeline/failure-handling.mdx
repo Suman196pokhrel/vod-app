@@ -5,9 +5,22 @@ description: How each kind of failure is detected, recorded and recovered from.
 
 A pipeline can fail inside a task (a bad file, an FFmpeg error), between tasks (an error in Celery itself), or by losing the worker entirely. Each case has a different handler, and every one of them ends with the video marked `failed` and the queue moving on.
 
-<Placeholder kind="flow" title="Failure decision tree: task error → retry? → task marks failed → link_error → on_pipeline_failed → next video; worker death → startup recovery">
-  One diagram covering all three failure classes and where each is caught.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  err{"What went wrong?"}
+  err -- "a task raises" --> retry{"Retryable<br/>and retries left?"}
+  retry -- yes --> again["task retries itself"]
+  retry -- no --> mark["task marks the video failed<br/>with a specific message"]
+  mark --> le["chain link_error fires"]
+  err -- "error between steps<br/>(Celery itself)" --> le
+  le --> opf["on_pipeline_failed<br/>failed + processing_error"]
+  opf --> rel["release lock (finally)"] --> next["start_next_video_if_idle()"]
+  err -- "worker process dies" --> boot["worker_init on next start"]
+  boot --> rec["purge broker, clear lock,<br/>mark in-progress videos failed"] --> next
+  class next accent
+`}
+/>
 
 ## Three layers of handling
 

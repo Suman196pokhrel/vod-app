@@ -5,9 +5,20 @@ description: How a Redis lock runs one video's pipeline at a time, oldest first,
 
 Uploads can arrive in bursts, but the server should only process **one video at a time**. The processing queue (`backend/app/tasks/processing_queue.py`) enforces that with a PostgreSQL column as the queue and a Redis key as the lock.
 
-<Placeholder kind="state" title="Processing queue: queued rows, the active lock, and the hand-off when a pipeline ends (success or failure)">
-  Animate three uploads arriving together: the first takes the lock, the others wait, and each pipeline end hands the lock to the next oldest.
-</Placeholder>
+<Mermaid
+  chart={`
+stateDiagram-v2
+  direction LR
+  state "Idle<br/>no lock" as Idle
+  state "Running<br/>lock = video_id (TTL 6 h)" as Running
+  [*] --> Idle
+  Idle --> Running: start_next_video_if_idle()<br/>oldest queued row + SET NX
+  Running --> Running: new uploads stay queued
+  Running --> Idle: on_pipeline_success<br/>or on_pipeline_failed<br/>(compare-and-delete)
+  Idle --> Idle: no queued rows
+  Running --> Idle: worker_init recovery<br/>or TTL expiry
+`}
+/>
 
 ## Why serialise at all
 
