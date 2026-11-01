@@ -5,9 +5,7 @@ description: The public feed, the title detail page and how they share data.
 
 Both pages live in the `(public)/(browse)` route group, so they share a layout with the navbar and run the auth store's `initialize()` once.
 
-<Placeholder kind="screenshot" title="Browse page: hero carousel, category pills and poster grid">
-  Annotated screenshot labelling HeroSection, CategoryPills and VideoGrid.
-</Placeholder>
+![Browse page: hero carousel, category pills and the poster grid](/images/screens/browse.jpg)
 
 ## Browse (`/`)
 
@@ -21,9 +19,7 @@ All three read the same `usePublicVideos(0, 20)` query, so the page makes **one*
 
 ## Title detail (`/watch/[video_id]`)
 
-<Placeholder kind="screenshot" title="Watch page: ambient-tinted backdrop, title, metadata row, synopsis, cast and tags, related titles">
-  Show the ambient glow sampled from the artwork.
-</Placeholder>
+![Watch page: ambient backdrop, title, metadata row, synopsis, tags and related titles](/images/screens/watch.jpg)
 
 1. `useVideo(id)` loads the video (`GET /videos/by-id/{id}`). While loading, skeletons shaped like the page are shown; on error, a "Video not found" message.
 2. The hero shows the thumbnail as a backdrop with a gradient over the text column only, so the artwork stays visible.

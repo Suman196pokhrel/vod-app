@@ -6,6 +6,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
 import { Mermaid } from '@/components/mdx/mermaid';
 import { Placeholder } from '@/components/mdx/placeholder';
+import { TokenSheet } from '@/components/mdx/token-sheet';
 import type { MDXComponents } from 'mdx/types';
 
 // Components available in every MDX page without an import.
@@ -24,6 +25,7 @@ export function getMDXComponents(components?: MDXComponents) {
     TypeTable,
     Mermaid,
     Placeholder,
+    TokenSheet,
     ...components,
   } satisfies MDXComponents;
 }

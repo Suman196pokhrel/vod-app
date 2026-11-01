@@ -7,21 +7,33 @@ This page is deliberately left out of the navigation. It shows each supported co
 
 ## Mermaid diagram
 
-Rendered in the browser, follows light/dark mode.
+Rendered in the browser at natural size (wide diagrams scroll), themed from the site palette in `components/mdx/mermaid.tsx`, and switches with light/dark mode.
 
 <Mermaid
-  chart="
+  chart={`
 flowchart LR
   U[Upload] --> Q[Queue] --> T[Transcode] --> S[Segment] --> P[Publish] --> W[Watch]
-"
+  class W accent
+`}
 />
 
 ```mdx
-<Mermaid chart="
+<Mermaid
+  chart={`
 flowchart LR
   U[Upload] --> Q[Queue] --> T[Transcode]
-" />
+  class T accent
+`}
+/>
 ```
+
+Conventions:
+
+- Pass the chart as a template literal (`` chart={`...`} ``): no escaping of quotes, braces or newlines. Avoid backticks and `${` inside it.
+- Never use `classDef` or `style` colours. Nodes are neutral; the only emphasis is `class <id> accent`, used on one node, two at most.
+- Prefer top-down (`TB`) for anything with more than five or six nodes in a row, so labels stay readable.
+- Take facts from the code (enum values, task names, routes), not from memory.
+- Check a new chart renders: a broken chart shows Mermaid's error graphic instead of the figure.
 
 ## Image
 
