@@ -9,9 +9,8 @@ Processing a video means downloading the original, inspecting it, generating scr
   chart={`
 flowchart LR
   src["original"] --> t1440["1440p"] & t1080["1080p"] & t720["720p"] & t480["480p"] & t360["360p"] & t240["240p"] & t144["144p"]
-  t1440 & t1080 & t720 & t480 & t360 & t240 & t144 --> seg["6 s segments<br/>+ playlists"]
-  seg --> master["master.m3u8"]
-  class master accent
+  t1440 & t1080 & t720 & t480 & t360 & t240 & t144 --> seg["6 s segments + playlists<br/>→ master.m3u8"]
+  class seg accent
 `}
 />
 

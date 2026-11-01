@@ -8,8 +8,8 @@ description: How VOD, a self-hosted video-on-demand platform, is designed, built
 <Mermaid
   chart={`
 flowchart TB
-  viewer([Viewer]) & admin([Admin]) --> fe["Next.js frontend<br/>Vercel"]
-  fe -- HTTPS --> caddy
+  browser(["Browser<br/>viewers and admins"]) -- "loads pages" --> fe["Next.js frontend<br/>Vercel"]
+  browser -- "HTTPS: API, uploads, media" --> caddy
   subgraph vps["Hetzner VPS · Docker Compose"]
     caddy["Caddy<br/>TLS + routing"]
     api["FastAPI<br/>control plane"]
