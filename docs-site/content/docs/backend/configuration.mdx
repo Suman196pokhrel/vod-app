@@ -7,9 +7,19 @@ Settings are a Pydantic `BaseSettings` class (`backend/app/core/config.py`), rea
 
 ## How values reach the code
 
-<Placeholder kind="flow" title="Configuration flow: infra/*.env → Docker Compose env_file → container environment → pydantic Settings">
-  Show that the API and worker read the same env file, and that some services (Postgres, Redis, MinIO) take values through compose variable substitution instead.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  env["infra/local.env<br/>infra/prod.env"]
+  env -- "env_file" --> api["api container"]
+  env -- "env_file" --> worker["worker container"]
+  env -- "compose --env-file<br/>variable substitution" --> infra["postgres · redis<br/>minio · tusd"]
+  api --> settings["pydantic Settings<br/>get_settings(), cached"]
+  worker --> settings
+  settings --> code["routes, services, tasks"]
+  class settings accent
+`}
+/>
 
 1. Each environment has an env file in `infra/` (`local.env`, `prod.env`), created from `infra/.env.example`. Env files are git-ignored.
 2. Docker Compose passes it to the `api` and `worker` containers with `env_file`.

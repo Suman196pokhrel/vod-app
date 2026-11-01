@@ -5,9 +5,32 @@ description: Every major technology in VOD, the version in use, and why it was c
 
 Versions are the ones pinned in `backend/requirements.txt`, `app/package.json` and `infra/docker-compose.yml`.
 
-<Placeholder kind="architecture" title="Tech stack layered by tier: client, edge, application, async processing, data">
-  Stacked-layer diagram with each technology logo placed in its tier.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  subgraph client["Client"]
+    direction LR
+    c1["Next.js 16 · React 19"] ~~~ c2["video.js + hls.js"] ~~~ c3["Uppy"] ~~~ c4["Zustand · TanStack Query"]
+  end
+  subgraph edge["Edge"]
+    direction LR
+    e1["Vercel<br/>frontend + docs"] ~~~ e2["Caddy 2<br/>TLS, routing, cache headers"]
+  end
+  subgraph app["Application"]
+    direction LR
+    a1["FastAPI · Pydantic"] ~~~ a2["SQLAlchemy (sync) · Alembic"] ~~~ a3["tusd"]
+  end
+  subgraph async["Async processing"]
+    direction LR
+    p1["Celery"] ~~~ p2["FFmpeg / ffprobe"]
+  end
+  subgraph data["Data"]
+    direction LR
+    d1[("PostgreSQL 16")] ~~~ d2[("Redis 7")] ~~~ d3[("MinIO")]
+  end
+  client --> edge --> app --> async --> data
+`}
+/>
 
 ## Backend
 

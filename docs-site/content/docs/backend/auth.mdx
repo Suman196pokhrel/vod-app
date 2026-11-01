@@ -5,9 +5,33 @@ description: Sign-up, email verification, JWT access and refresh tokens, roles a
 
 VOD uses **stateless JWT access tokens** for requests and **database-tracked refresh tokens** for staying signed in. Passwords are hashed with **bcrypt**. Roles (`USER`, `ADMIN`) are read from the database on every request, never trusted from the token.
 
-<Placeholder kind="sequence" title="Auth lifecycle: sign-up → verify email → sign in → authenticated requests → refresh → logout">
-  Show which steps touch the database (users, email_verification_tokens, refresh_tokens) and which are pure JWT checks.
-</Placeholder>
+<Mermaid
+  chart={`
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant API as FastAPI
+  participant DB as PostgreSQL
+  participant E as Resend
+  U->>API: POST /auth/signup
+  API->>DB: insert user (is_verified = false) + verification token
+  API->>E: send verify link (24 h)
+  U->>API: GET /auth/verify-email?token=...
+  API->>DB: is_verified = true, token used
+  U->>API: POST /auth/signin
+  API->>DB: store SHA-256 of refresh token
+  API-->>U: access token (30 min) + refresh token (7 days)
+  loop every request
+    U->>API: Authorization: Bearer access
+    API-->>U: data (signature check, no DB lookup for the token)
+  end
+  U->>API: POST /auth/refresh (refresh token)
+  API->>DB: hash matches, not revoked, not expired
+  API-->>U: new access token
+  U->>API: POST /auth/logout
+  API->>DB: is_revoked = true
+`}
+/>
 
 ## The two tokens
 

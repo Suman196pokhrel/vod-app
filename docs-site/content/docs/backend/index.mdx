@@ -68,9 +68,32 @@ The API follows a **routes → services → models** layering: route handlers st
 
 ## Request lifecycle
 
-<Placeholder kind="sequence" title="Lifecycle of an authenticated request: Caddy → Uvicorn → router → auth dependency → service → SQLAlchemy session → response">
-  Include where Pydantic validation happens and where a 401/403/404 can be returned.
-</Placeholder>
+<Mermaid
+  chart={`
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant C as Caddy
+  participant U as Uvicorn + FastAPI
+  participant D as Auth dependency
+  participant S as Service
+  participant DB as Session → PostgreSQL
+  B->>C: GET /videos/... + Bearer token
+  C->>U: proxy
+  U->>U: match route, validate with Pydantic
+  Note over U: invalid input → 422
+  U->>D: get_current_user()
+  D->>D: decode JWT, check type = access
+  Note over D: bad or expired token → 401<br/>not admin → 403
+  D->>DB: load user
+  D-->>U: User
+  U->>S: call service with session
+  S->>DB: query / commit
+  Note over S: missing row → 404
+  S-->>U: ORM objects
+  U-->>B: JSON (response schema)
+`}
+/>
 
 <Steps>
 <Step>

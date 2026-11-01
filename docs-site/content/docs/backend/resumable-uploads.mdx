@@ -15,9 +15,39 @@ Three parties are involved, each doing one job:
 
 The API **never sees the file bytes**. It only handles small hook calls from tusd. This control-plane / data-plane split is the core of the design ([ADR 0001](/docs/decisions/adr-0001-resumable-uploads)).
 
-<Placeholder kind="sequence" title="tus upload sequence: Uppy POST → tusd pre-create hook → API → PATCH chunks → MinIO multipart → post-finish hook → video row → queue">
-  Mark which calls go through Caddy and which stay on the private Docker network.
-</Placeholder>
+<Mermaid
+  chart={`
+sequenceDiagram
+  autonumber
+  participant U as Uppy (browser)
+  box Through Caddy (public)
+    participant C as Caddy
+  end
+  box Private Docker network
+    participant T as tusd
+    participant API as FastAPI
+    participant M as MinIO
+  end
+  U->>C: POST /files (metadata: title, category, token)
+  C->>T: forward
+  T->>API: pre-create hook (shared secret)
+  API->>API: admin? size and MIME ok? slot free?
+  API-->>T: accept, upload ID (token stripped)
+  T-->>U: 201 Location /files/{id}
+  loop each 50 MB chunk
+    U->>C: PATCH /files/{id}
+    C->>T: forward (unbuffered)
+    T->>M: S3 multipart UploadPart
+  end
+  T->>M: CompleteMultipartUpload
+  T->>API: post-finish hook
+  API->>API: insert videos row (queued), release slot
+  API->>API: start_next_video_if_idle()
+  U->>C: GET /internal/tus/hooks/uploads/{id}
+  C->>API: forward
+  API-->>U: video_id
+`}
+/>
 
 ## The hooks
 

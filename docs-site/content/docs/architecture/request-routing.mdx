@@ -5,9 +5,18 @@ description: How Caddy splits public traffic between the API, object storage and
 
 Every request to `api.vod.spokhrel.dev` reaches **Caddy** first. Caddy terminates TLS (certificates from Let's Encrypt, managed automatically) and forwards the request by path prefix. The order matters: the first matching route wins.
 
-<Placeholder kind="flow" title="Caddy routing: one public host, four destinations by path prefix">
-  Decision tree from an incoming request to tusd, the API, a 404, MinIO or the API catch-all.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  req(["HTTPS request<br/>api.vod.spokhrel.dev"]) --> caddy{"Caddy<br/>first match wins"}
+  caddy -- "/files/*" --> tusd["tusd<br/>resumable uploads"]
+  caddy -- "/internal/tus/hooks/uploads/*" --> api1["FastAPI<br/>upload ID lookup"]
+  caddy -- "/internal/* (anything else)" --> deny["404 at the edge"]
+  caddy -- "/storage/* (prefix stripped)" --> minio[("MinIO<br/>playlists, segments, images")]
+  caddy -- "everything else" --> api["FastAPI<br/>JSON API"]
+  class caddy accent
+`}
+/>
 
 ## Routing table
 

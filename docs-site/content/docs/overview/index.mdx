@@ -7,9 +7,17 @@ VOD is a complete, self-hostable alternative to a hosted video platform. It cove
 
 It is deliberately built to run on one small virtual server, which shapes many of the design decisions in these docs.
 
-<Placeholder kind="flow" title="The life of a video: upload → queue → transcode → package → store → stream">
-  Five-stage horizontal flow, each stage labelled with the component that owns it (tusd, Celery queue, FFmpeg worker, MinIO, Caddy + player).
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  up["Upload<br/><small>Uppy → tusd → MinIO</small>"] --> q["Queue<br/><small>queued row + Redis lock</small>"]
+  q --> t["Transcode<br/><small>7 renditions in FFmpeg</small>"]
+  t --> p["Package<br/><small>6 s HLS segments + playlists</small>"]
+  p --> s["Store<br/><small>vod-processed bucket</small>"]
+  s --> w["Stream<br/><small>hls.js picks a rendition</small>"]
+  class w accent
+`}
+/>
 
 ## Who uses it
 

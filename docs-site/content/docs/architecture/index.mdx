@@ -11,9 +11,36 @@ VOD splits into three planes that scale and fail independently:
 
 The frontend is a separate deployment on Vercel and talks to the backend only over HTTPS.
 
-<Placeholder kind="architecture" title="Container diagram (C4 level 2): Vercel frontend, Caddy, FastAPI, Celery worker, PostgreSQL, Redis, MinIO, tusd">
-  Show the three planes as coloured bands; arrows labelled with protocol (HTTPS, S3 API, Redis protocol, SQL, tus hooks).
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  browser([Browser]) -- HTTPS --> fe["Next.js frontend<br/>Vercel"]
+  browser -- HTTPS --> caddy["Caddy<br/>the only public entry"]
+  subgraph control["Control plane"]
+    api["FastAPI"]
+    pg[("PostgreSQL")]
+  end
+  subgraph data["Data plane"]
+    tusd["tusd"]
+    minio[("MinIO")]
+  end
+  subgraph processing["Processing plane"]
+    redis[("Redis")]
+    worker["Celery worker + FFmpeg"]
+  end
+  caddy -- "HTTP · /*" --> api
+  caddy -- "tus · /files/*" --> tusd
+  caddy -- "S3 GET · /storage/*" --> minio
+  api -- SQL --> pg
+  tusd -- "S3 multipart" --> minio
+  tusd -. "HTTP hooks" .-> api
+  api -- "Redis protocol" --> redis
+  redis -- tasks --> worker
+  worker -- SQL --> pg
+  worker -- "S3 API" --> minio
+  class caddy accent
+`}
+/>
 
 ## Components
 

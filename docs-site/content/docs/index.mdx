@@ -5,9 +5,33 @@ description: How VOD, a self-hosted video-on-demand platform, is designed, built
 
 **VOD** is a self-hosted video-on-demand platform. Admins upload videos through a resumable uploader; a background pipeline built on **Celery** and **FFmpeg** transcodes each file into an **adaptive bitrate (ABR) HLS** stream with up to seven quality levels; viewers browse and watch through a **Next.js** frontend with a custom **video.js** player. The backend is a **FastAPI** service with **PostgreSQL**, **Redis** and **MinIO** (S3-compatible object storage), fronted by **Caddy** and run with **Docker Compose** on a single small VPS.
 
-<Placeholder kind="architecture" title="VOD at a glance: browser, Vercel frontend, Caddy, API, worker, Postgres, Redis, MinIO, tusd">
-  One-screen system context diagram (C4 level 1/2) that every section links back to.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart TB
+  viewer([Viewer]) & admin([Admin]) --> fe["Next.js frontend<br/>Vercel"]
+  fe -- HTTPS --> caddy
+  subgraph vps["Hetzner VPS · Docker Compose"]
+    caddy["Caddy<br/>TLS + routing"]
+    api["FastAPI<br/>control plane"]
+    tusd["tusd<br/>resumable uploads"]
+    worker["Celery worker<br/>FFmpeg"]
+    pg[("PostgreSQL")]
+    redis[("Redis")]
+    minio[("MinIO")]
+    caddy -- "/*" --> api
+    caddy -- "/files/*" --> tusd
+    caddy -- "/storage/*" --> minio
+    tusd -- "S3 multipart" --> minio
+    tusd -. hooks .-> api
+    api --> pg
+    api -- enqueue --> redis
+    redis --> worker
+    worker -- "HLS output" --> minio
+    worker --> pg
+  end
+  class caddy accent
+`}
+/>
 
 ## How these docs are organised
 

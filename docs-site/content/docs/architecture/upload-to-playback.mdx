@@ -5,9 +5,47 @@ description: The full journey of one video, from the admin's file picker to a vi
 
 This page follows a single video through the whole system using the default resumable-upload path. Each step links to the page that covers it in depth.
 
-<Placeholder kind="sequence" title="Upload-to-playback sequence: Admin browser, Caddy, tusd, MinIO, FastAPI, PostgreSQL, Redis, Celery worker, Viewer browser">
-  Swimlane sequence diagram covering steps 1–12 below, with the async boundary (step 6) clearly marked.
-</Placeholder>
+<Mermaid
+  chart={`
+sequenceDiagram
+  autonumber
+  actor A as Admin browser
+  participant C as Caddy
+  participant T as tusd
+  participant API as FastAPI
+  participant DB as PostgreSQL
+  participant R as Redis
+  participant W as Celery worker
+  participant M as MinIO
+  actor V as Viewer browser
+  A->>C: POST /files (tus create + metadata)
+  C->>T: forward
+  T->>API: pre-create hook
+  API->>DB: insert tus_uploads row
+  API->>R: reserve admission slot
+  API-->>T: accept (upload ID)
+  loop 50 MB chunks
+    A->>T: PATCH /files/{id}
+    T->>M: S3 multipart part
+  end
+  T->>API: post-finish hook
+  API->>DB: insert videos row (queued)
+  API->>R: SET NX active_lock
+  API->>R: enqueue Celery chain
+  A->>API: poll /internal/tus/hooks/uploads/{id}
+  API-->>A: video_id
+  R->>W: tasks
+  W->>M: download original
+  W->>W: storyboard, transcode, segment, manifest
+  W->>M: upload HLS output
+  W->>DB: completed + manifest_url
+  V->>API: GET video metadata
+  API-->>V: manifest path
+  V->>C: GET /storage/.../master.m3u8 and segments
+  C->>M: S3 GET
+  M-->>V: playlists and .ts segments
+`}
+/>
 
 ## 1. Ingest
 

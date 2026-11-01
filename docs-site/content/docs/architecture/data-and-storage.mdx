@@ -5,9 +5,33 @@ description: What lives in PostgreSQL, Redis and MinIO, and why each store was c
 
 VOD uses three stores, each for the kind of data it is good at.
 
-<Placeholder kind="architecture" title="Three stores: PostgreSQL (records), Redis (coordination), MinIO (bytes)">
-  Three columns listing what each store holds, with arrows from the API and worker.
-</Placeholder>
+<Mermaid
+  chart={`
+flowchart LR
+  api["FastAPI"]
+  worker["Celery worker"]
+  subgraph pg["PostgreSQL · records"]
+    direction TB
+    pg1["users, refresh tokens"]
+    pg2["videos + processing_status"]
+    pg3["tus_uploads sessions"]
+  end
+  subgraph redis["Redis · coordination"]
+    direction TB
+    r1["Celery broker + results"]
+    r2["video_processing:active_lock"]
+    r3["upload admission slots"]
+  end
+  subgraph minio["MinIO · bytes"]
+    direction TB
+    m1["vod-videos<br/>originals"]
+    m2["vod-thumbnails"]
+    m3["vod-processed<br/>HLS + storyboards"]
+  end
+  api --> pg & redis & minio
+  worker --> pg & redis & minio
+`}
+/>
 
 ## PostgreSQL: the system of record
 

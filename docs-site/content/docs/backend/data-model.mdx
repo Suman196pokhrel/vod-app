@@ -5,9 +5,26 @@ description: Every PostgreSQL table, its key columns and how the tables relate.
 
 Six tables, defined as SQLAlchemy models in `backend/app/models/`. Primary keys are UUID strings generated in Python.
 
-<Placeholder kind="architecture" title="Entity-relationship diagram: users, videos, refresh_tokens, email_verification_tokens, password_reset_tokens, tus_uploads">
-  Crow's-foot ERD with foreign keys and ON DELETE behaviour.
-</Placeholder>
+<Mermaid
+  chart={`
+erDiagram
+  users ||--o{ videos : uploads
+  users ||--o{ refresh_tokens : "signs in with"
+  users ||--o{ email_verification_tokens : verifies
+  users ||--o{ password_reset_tokens : resets
+  users ||--o{ tus_uploads : starts
+  videos |o--o| tus_uploads : "created from"
+  users { string id PK }
+  videos { string id PK
+    string user_id FK }
+  refresh_tokens { string user_id FK }
+  email_verification_tokens { string user_id FK }
+  password_reset_tokens { string user_id FK }
+  tus_uploads { string upload_id PK
+    string user_id FK
+    string video_id FK }
+`}
+/>
 
 ## users
 
@@ -66,9 +83,35 @@ A video can be `published` while still `transcoding`; the player shows "still pr
 
 ### processing_status values
 
-<Placeholder kind="state" title="processing_status state machine: uploading → queued → preparing → … → completed, with failed reachable from every active state">
-  Include the re-queue edge (failed → queued) used for manual retries.
-</Placeholder>
+<Mermaid
+  chart={`
+stateDiagram-v2
+  direction LR
+  [*] --> uploading: legacy upload
+  [*] --> queued: tus post-finish
+  uploading --> queued
+  queued --> preparing: takes the lock
+  preparing --> generating_storyboard
+  generating_storyboard --> transcoding
+  transcoding --> aggregating
+  aggregating --> segmenting
+  segmenting --> creating_manifest
+  creating_manifest --> uploading_to_storage
+  uploading_to_storage --> finalizing
+  finalizing --> completed
+  completed --> [*]
+  preparing --> failed
+  transcoding --> failed
+  segmenting --> failed
+  uploading_to_storage --> failed
+  failed --> queued: retry (set back to queued)
+  note right of failed
+    Any active state can fail:
+    a task error, on_pipeline_failed,
+    or a worker restart
+  end note
+`}
+/>
 
 | Value | Progress shown | Set by |
 |---|---|---|

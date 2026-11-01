@@ -151,6 +151,7 @@ function accentCSS(mode: 'light' | 'dark') {
     .accent > rect, .accent > polygon, .accent > circle, .accent > path { fill: ${accent} !important; stroke: ${accent} !important; }
     .accent .nodeLabel, .accent span, .accent p { color: ${accentText} !important; fill: ${accentText} !important; }
     .node rect, .cluster rect { rx: 6px; ry: 6px; }
+    .node rect, .node polygon, .node path, .node circle { filter: none !important; }
     .cluster-label .nodeLabel { font-weight: 600; }
     .edgeLabel, .edgeLabel p { font-size: 12px; }
   `;
@@ -188,8 +189,15 @@ function MermaidContent({ chart }: { chart: string }) {
     theme: 'base',
     themeVariables: themeVariables(theme),
     themeCSS: accentCSS(theme),
-    flowchart: { curve: 'basis', padding: 12, htmlLabels: true },
-    sequence: { mirrorActors: false, messageAlign: 'center' },
+    // Natural size, never shrunk to fit: wide diagrams scroll instead of
+    // turning their labels unreadable.
+    flowchart: { curve: 'basis', padding: 12, htmlLabels: true, useMaxWidth: false },
+    sequence: { mirrorActors: false, messageAlign: 'center', useMaxWidth: false },
+    state: { useMaxWidth: false },
+    er: { useMaxWidth: false },
+    timeline: { useMaxWidth: false },
+    quadrantChart: { useMaxWidth: false },
+    xyChart: { useMaxWidth: false },
   });
 
   const { svg, bindFunctions } = use(
