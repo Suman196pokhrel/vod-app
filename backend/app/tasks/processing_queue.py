@@ -1,7 +1,7 @@
 # app/tasks/processing_queue.py - runs one video's processing pipeline at a time, oldest upload first
 """
-How the queue works (full write-up: docs/06_VIDEO_PROCESSING_PIPELINE.md,
-"Multiple Videos: One Pipeline at a Time"):
+How the queue works (full write-up:
+docs-site/content/docs/pipeline/processing-queue.mdx):
 
 1. Uploading only creates the Video row with processing_status="queued" and
    calls start_next_video_if_idle(). It never blocks the upload.

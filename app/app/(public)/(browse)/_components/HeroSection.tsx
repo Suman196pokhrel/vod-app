@@ -104,7 +104,7 @@ const HeroSection = () => {
 
         {/* Ambient tint — the design system's signature element, now
             reaching the hero too: a soft bleed of the content's own color
-            behind the vignette, felt more than seen (docs/DESIGN_SYSTEM.md §6). */}
+            behind the vignette, felt more than seen (docs-site/content/docs/frontend/design-system.mdx, Ambient glow). */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-[0.16] transition-[background] duration-(--duration-cinematic)"

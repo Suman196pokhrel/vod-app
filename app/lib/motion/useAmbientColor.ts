@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 
 /**
- * useAmbientColor — the design system's signature element (docs/DESIGN_SYSTEM.md §6).
+ * useAmbientColor — the design system's signature element (docs-site/content/docs/frontend/design-system.mdx, Ambient glow).
  *
  * Extracts the average color of an image (video thumbnail) by drawing it onto a
  * tiny offscreen canvas and averaging the pixels. Used to tint the watch page

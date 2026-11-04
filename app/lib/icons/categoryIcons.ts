@@ -16,7 +16,7 @@ import {
 
 /**
  * Genre/category icon registry — replaces free-form emoji across the app
- * (docs/DESIGN_SYSTEM.md rule 4: build from themed primitives, not
+ * (docs-site/content/docs/frontend/design-system.mdx: build from themed primitives, not
  * hand-rolled/arbitrary visuals). Shared by the home CategoryPills filter
  * and the admin category manager so both surfaces draw from the same set.
  */

@@ -4,7 +4,7 @@
 
 /*
  * One palette: zinc neutrals plus a single cyan accent, the same identity as
- * the VOD app (docs/DESIGN_SYSTEM.md). Hierarchy comes from neutral shades and
+ * the VOD app (content/docs/frontend/design-system.mdx). Hierarchy comes from neutral shades and
  * type weight; cyan marks only links, active nav and focus. Light mode uses
  * cyan-700 because cyan-400 fails contrast on white.
  */

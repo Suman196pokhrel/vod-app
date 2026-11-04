@@ -50,7 +50,7 @@
 :root {
   --radius: 0.5rem;
 
-  /* ---- Surfaces (docs/DESIGN_SYSTEM.md §2) ----------------------------- */
+  /* ---- Surfaces (docs-site/content/docs/frontend/design-system.mdx, Colour) ---- */
   --background: oklch(0.15 0.004 285);        /* #0A0A0B app background */
   --foreground: oklch(0.985 0 0);             /* #FAFAFA */
   --card: oklch(0.185 0.004 285);             /* #141416 */
@@ -217,7 +217,7 @@
     animation: grid-sweep 6s ease-in-out infinite;
   }
 
-  /* ---- Design system utilities (docs/DESIGN_SYSTEM.md §2) --------------- */
+  /* ---- Design system utilities (docs-site/content/docs/frontend/design-system.mdx) ---- */
 
   /* MUBI-style editorial label: SECTION HEADERS · METADATA ROWS */
   .eyebrow {

@@ -73,7 +73,6 @@ VOD is at **MVP** stage. The core viewer journey (browse, watch, play) and the a
     <Folder name="backend" />
     <Folder name="infra" />
     <Folder name="docs-site" />
-    <Folder name="docs" />
     <File name="makefile" />
   </Folder>
 </Files>
@@ -84,7 +83,6 @@ VOD is at **MVP** stage. The core viewer journey (browse, watch, play) and the a
 | `backend/` | FastAPI API and Celery worker, built as one Docker image |
 | `infra/` | Docker Compose files (local, staging, production) and Caddy configs |
 | `docs-site/` | This documentation site (Fumadocs on Next.js), deployed on Vercel |
-| `docs/` | Older Markdown docs, being migrated into this site |
 | `makefile` | Shortcuts for the local Docker stack (`make dev`, `make logs s=api`, …) |
 
 Each top-level folder is an independent project with its own dependencies. They talk to each other over HTTP at runtime, not through shared code.

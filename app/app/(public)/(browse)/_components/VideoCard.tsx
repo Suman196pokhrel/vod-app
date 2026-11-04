@@ -58,7 +58,7 @@ const VideoCard = ({ video }: { video: PublicVideo }) => {
 
 /**
  * Content-shaped loading state — render a grid of these while videos load.
- * (docs/DESIGN_SYSTEM.md §2 Loading: skeletons, never spinners, for content areas.)
+ * (docs-site/content/docs/frontend/design-system.mdx, Loading: skeletons, never spinners, for content areas.)
  */
 export const VideoCardSkeleton = () => (
   <div className="w-full">

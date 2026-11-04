@@ -12,7 +12,7 @@ interface CategoryPerformanceProps {
   data: CategoryData[];
 }
 
-// Sequential, cyan-led chart palette (docs/DESIGN_SYSTEM.md §2) — cycles for
+// Sequential, cyan-led chart palette (docs-site/content/docs/frontend/design-system.mdx, Colour) — cycles for
 // however many categories are shown, rather than an arbitrary color per row.
 const CHART_COLORS = [
   "var(--chart-1)",
