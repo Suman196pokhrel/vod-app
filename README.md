@@ -10,9 +10,9 @@
 [![PostgreSQL](https://img.shields.io/badge/DB-PostgreSQL-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Celery](https://img.shields.io/badge/Queue-Celery%20%2B%20Redis-37814A?logo=celery&logoColor=white)](https://docs.celeryq.dev/)
 
-[Live demo](https://vod.spokhrel.dev) · [Deploy your own](#deploy-your-own) · [Architecture](#architecture)
+[Live demo](https://vod.spokhrel.dev) · [Docs](https://docs.vod.spokhrel.dev) · [Deploy your own](#deploy-your-own) · [Architecture](#architecture)
 
-<img src="docs/imgs/frontend_landing%20page.png" width="960" alt="VOD public browse feed with a hero carousel, category filter pills, and a video grid" />
+<img src=".github/assets/browse.png" width="960" alt="VOD public browse feed with a hero carousel, category filter pills, and a video grid" />
 
 </div>
 
@@ -51,29 +51,16 @@ The live demo at [vod.spokhrel.dev](https://vod.spokhrel.dev) is a real deployme
 
 | | |
 |---|---|
-| <img src="docs/imgs/frontend_auth_signin_page.png" width="420" alt="Sign-in screen with email and password fields"/><br>Sign in | <img src="docs/imgs/frontend_auth_signup_page.png" width="420" alt="Sign-up screen for creating a new account"/><br>Create an account |
-| <img src="docs/imgs/frontend_auth_forgotpw_page.png" width="420" alt="Forgot-password screen requesting an email address"/><br>Forgot password | <img src="docs/imgs/frontend_auth_reset_pw_page.png" width="420" alt="Reset-password screen for setting a new password"/><br>Reset password |
-| <img src="docs/imgs/frontend_video_player.png" width="420" alt="Full-screen chrome-free video player with playback controls"/><br>Full-screen player (`/play/[video_id]`) | <img src="docs/imgs/frontend_indie_page.png" width="420" alt="Video detail page with title, description, cast, and related videos"/><br>Watch detail page (`/watch/[video_id]`) |
+| <img src=".github/assets/auth-signin.png" width="420" alt="Sign-in screen with email and password fields"/><br>Sign in | <img src=".github/assets/auth-signup.png" width="420" alt="Sign-up screen for creating a new account"/><br>Create an account |
+| <img src=".github/assets/auth-forgot-password.png" width="420" alt="Forgot-password screen requesting an email address"/><br>Forgot password | <img src=".github/assets/auth-reset-password.png" width="420" alt="Reset-password screen for setting a new password"/><br>Reset password |
+| <img src=".github/assets/player.png" width="420" alt="Full-screen chrome-free video player with playback controls"/><br>Full-screen player (`/play/[video_id]`) | <img src=".github/assets/watch.png" width="420" alt="Video detail page with title, description, cast, and related videos"/><br>Watch detail page (`/watch/[video_id]`) |
 
 ## Architecture
 
-```
-Browser
-   │  HTTPS
-   ▼
-Caddy  ── /storage/* ──▶ MinIO (object storage)
-   │  ── /files/*    ──▶ tusd (resumable uploads) ──▶ MinIO
-   │
-   │  everything else
-   ▼
-FastAPI ──▶ PostgreSQL
-   │
-   │  enqueue job
-   ▼
-Redis ──▶ Celery worker ──▶ FFmpeg ──▶ MinIO
-```
-
-<img src="docs/imgs/architecture_01.png" width="640" alt="Deployment topology diagram: the Next.js frontend on Vercel talking to a Caddy-fronted Docker stack (FastAPI, PostgreSQL, Celery workers, Redis, MinIO) on a single droplet"/>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/architecture-dark.png">
+  <img src=".github/assets/architecture.png" width="960" alt="Architecture diagram: the browser loads the Next.js frontend from Vercel and sends all API, upload and playback traffic over HTTPS to Caddy on a single Docker Compose droplet. Caddy routes /files/* to tusd, /storage/* straight to MinIO for HLS playback, and everything else to FastAPI. tusd stores originals in MinIO and calls FastAPI hooks. FastAPI writes PostgreSQL, sends email through Resend, and enqueues jobs on Redis for the Celery worker, which runs FFmpeg, reads and writes MinIO, and records processing status in PostgreSQL."/>
+</picture>
 
 *The live demo's actual deployment: frontend on Vercel, backend stack on a single droplet.*
 
@@ -81,7 +68,7 @@ Caddy is the only public ingress. Everything under `/storage/*` is reverse-proxi
 
 Everything else (auth, video CRUD, admin endpoints) goes to FastAPI, which reads and writes PostgreSQL and enqueues background work onto Redis. The upload-to-publish flow works like this: an admin uploads through tusd or the legacy multipart endpoint, either way creating a `Video` row and dispatching a Celery chain that prepares the file, generates the storyboard, transcodes all seven qualities in parallel, segments the output, builds the manifest, uploads it, and finalizes. The frontend polls `GET /videos/{id}/status` while this runs, and the video is watchable the moment the chain completes.
 
-For the design rationale behind this, see the full write-up: [spokhrel.dev/projects/proj-vod](https://spokhrel.dev/projects/proj-vod).
+For the full documentation, see [docs.vod.spokhrel.dev](https://docs.vod.spokhrel.dev). For the design rationale behind this, see the write-up: [spokhrel.dev/projects/proj-vod](https://spokhrel.dev/projects/proj-vod).
 
 ## Deploy your own
 
