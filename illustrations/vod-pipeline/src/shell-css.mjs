@@ -97,6 +97,11 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .padbar{fill:var(--glass);stroke:none}
 .face-text.cmd{font-size:2.9px;letter-spacing:0}
 .chit-text.big-chit{font-size:6px}
+.m3u8{font:500 2.55px/1 var(--anatomy-mono);fill:var(--anatomy-hi);white-space:pre}
+.pixgrid{stroke:var(--glass);stroke-width:.35px;fill:none;opacity:.55;vector-effect:none}
+.hud{fill:var(--glass);opacity:.88}
+.buffered{fill:var(--anatomy-mid)}
+.it.seg.sent{opacity:.6}
 .dial-face{fill:var(--glass)}.hub{fill:var(--anatomy-hi)}
 .it.own .iso-edge,.it.own .iso-crease{stroke:var(--anatomy-lit)}
 .it.own .iso-top{fill:var(--anatomy-lit-top)}

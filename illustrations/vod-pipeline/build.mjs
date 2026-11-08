@@ -16,7 +16,7 @@ const src = (f) => readFileSync(join(HERE, "src", f), "utf8");
 
 // Inline a module with only its exports visible, so two models' private helpers can't collide.
 function scoped(file) {
-  const code = src(file);
+  const code = src(file).replace(/^import .*$/gm, "");
   const names = [...code.matchAll(/^export (?:function|const|let) (\w+)/gm)].map((m) => m[1]);
   return `const { ${names.join(", ")} } = (() => {\n${code.replace(/^export /gm, "")}\nreturn { ${names.join(", ")} };\n})();`;
 }

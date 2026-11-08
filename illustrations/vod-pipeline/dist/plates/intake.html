@@ -204,6 +204,11 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .padbar{fill:var(--glass);stroke:none}
 .face-text.cmd{font-size:2.9px;letter-spacing:0}
 .chit-text.big-chit{font-size:6px}
+.m3u8{font:500 2.55px/1 var(--anatomy-mono);fill:var(--anatomy-hi);white-space:pre}
+.pixgrid{stroke:var(--glass);stroke-width:.35px;fill:none;opacity:.55;vector-effect:none}
+.hud{fill:var(--glass);opacity:.88}
+.buffered{fill:var(--anatomy-mid)}
+.it.seg.sent{opacity:.6}
 .dial-face{fill:var(--glass)}.hub{fill:var(--anatomy-hi)}
 .it.own .iso-edge,.it.own .iso-crease{stroke:var(--anatomy-lit)}
 .it.own .iso-top{fill:var(--anatomy-lit-top)}
@@ -1579,11 +1584,164 @@ function startChord(s) {
 
 return { RUNGS, SOURCES, fitOf, createTranscode, stepTranscode };
 })();
+const { DEMO_SECONDS, SEGS, masterLines, PROFILES, createPackage, pickLevel, stepPackage, cueAt } = (() => {
+// Pure model of segment → manifest → upload → finalize, then playback with hls.js.
+// Mirrors tasks/video/{segment,manifest,upload,finalize}.py and the player's HLS_CONFIG;
+// the ABR rule is a simplified EWMA picker, and every clock here is illustrative.
+
+
+const DEMO_SECONDS = 120, SEG = 6, BUFFER_GOAL = 60;
+const SEGS = Math.ceil(DEMO_SECONDS / SEG);
+
+function masterLines(rungs) {
+  return ["#EXTM3U", "#EXT-X-VERSION:3", ...rungs.flatMap((r) => [`#EXT-X-STREAM-INF:BANDWIDTH=${r.kbps * 1000},RESOLUTION=${r.w}x${r.h}`, `${r.q}/playlist.m3u8`])];
+}
+
+const PROFILES = {
+  steady: (t) => 14,
+  drop: (t) => (t < 18 ? 14 : t < 64 ? 1.2 : 9),
+  slow: (t) => 2.4 + 0.6 * Math.sin(t / 3),
+};
+
+function createPackage({ refs = {}, sourceH = 1080, profile = "steady", playerWidth = 1920, scrub = false } = {}) {
+  const rungs = RUNGS.map((r, i) => ({ ...r, i, ok: r.h <= sourceH, segs: 0, uploaded: 0 }));
+  return {
+    t: 0, refs, rungs, avail: rungs.filter((r) => r.ok), phase: "segment", cur: rungs.findIndex((r) => r.ok), lines: 0, at: 0,
+    profile, playerWidth, scrub, id: "3c6e", log: [], traffic: [], n: 0,
+    play: { head: 0, buffered: 0, queue: [], est: 1, level: null, fetch: null, next: 0, stalls: 0, switches: 0, started: false },
+  };
+}
+
+const ref = (s, id) => s.refs[id] || "";
+function log(s, text, r = "", tone = "") { s.log.push({ t: s.t, text, ref: ref(s, r), tone, n: s.n++ }); }
+const flash = (s, what) => s.traffic.push({ t: s.t, what, n: s.n++ });
+
+// hls.js-like choice: the best variant the EWMA estimate can carry with headroom, capped to the
+// smallest variant at least as wide as the player (capLevelToPlayerSize).
+function pickLevel(s) {
+  const fits = s.avail.filter((r) => r.kbps * 1000 <= s.play.est * 1e6 * 0.7);
+  const cap = [...s.avail].reverse().find((r) => r.w >= s.playerWidth) || s.avail[0];
+  const best = fits[0] || s.avail[s.avail.length - 1];
+  return best.kbps > cap.kbps ? cap : best;
+}
+
+function stepPackage(s, dt) {
+  s.t += dt;
+  if (s.phase === "segment") {
+    const r = s.rungs[s.cur];
+    r.segs = Math.min(SEGS, r.segs + dt * SEGS / 0.9);
+    if (Math.floor(r.segs) !== Math.floor(r.segs - dt * SEGS / 0.9)) flash(s, "saw");
+    if (r.segs >= SEGS) {
+      log(s, `segment_videos ${r.q}: ffmpeg -i ${r.q}.mp4 -c copy -f hls -hls_time 6 -hls_list_size 0 → playlist.m3u8 + ${SEGS} × segment_NNNN.ts (no re-encode)`, "segment", "dim");
+      const next = s.rungs.findIndex((x, i) => i > s.cur && x.ok);
+      if (next >= 0) s.cur = next;
+      else { s.phase = "manifest"; s.at = s.t; log(s, `segment_videos done: ${s.avail.length} renditions, one after another in a single task`, "segment"); }
+    }
+    return s;
+  }
+  if (s.phase === "manifest") {
+    const all = masterLines(s.avail);
+    if (s.t >= s.at) { s.lines += 1; s.at = s.t + 0.32; flash(s, "print"); }
+    if (s.lines >= all.length) {
+      log(s, `create_manifest: master.m3u8 written with ${s.avail.length} #EXT-X-STREAM-INF entries, highest first; BANDWIDTH is the rung's target video bitrate`, "manifest", "lit");
+      s.phase = "upload";
+      s.cur = 0;
+      flash(s, "master");
+      log(s, `upload_to_minio: master.m3u8 first → vod-processed/${s.id}/segments/master.m3u8`, "upload");
+    }
+    return s;
+  }
+  if (s.phase === "upload") {
+    const r = s.avail[s.cur];
+    r.uploaded = Math.min(SEGS + 1, r.uploaded + dt * (SEGS + 1) / 0.7);
+    flash(s, "put");
+    if (r.uploaded >= SEGS + 1) {
+      log(s, `${r.q}: playlist.m3u8 + ${SEGS} segments → vod-processed/${s.id}/segments/${r.q}/`, "upload", "dim");
+      s.cur += 1;
+      if (s.cur >= s.avail.length) { s.phase = "finalize"; s.at = s.t + 0.6; flash(s, "postgres"); }
+    }
+    return s;
+  }
+  if (s.phase === "finalize" && s.t >= s.at) {
+    log(s, `finalize_processing: status completed, manifest_url /vod-processed/${s.id}/segments/master.m3u8, available_qualities [${s.avail.map((r) => r.q).join(", ")}], work dir deleted`, "finalize", "ok");
+    flash(s, "postgres");
+    s.phase = "play";
+    s.at = s.t + 0.8;
+    return s;
+  }
+  if (s.phase === "play" && s.t >= s.at) return playStep(s, dt);
+  return s;
+}
+
+function playStep(s, dt) {
+  const p = s.play;
+  const tp = s.t - s.at;
+  if (!p.started) {
+    p.started = true;
+    flash(s, "master");
+    log(s, "player: GET /storage/vod-processed/…/master.m3u8 through Caddy (handle_path strips /storage); hls.js starts from abrEwmaDefaultEstimate = 1 Mbps", "playerSrc");
+  }
+  if (p.fetch) {
+    const mbps = PROFILES[s.profile](tp);
+    p.fetch.got += mbps * dt;
+    const took = tp - p.fetch.start, rate = p.fetch.got / Math.max(0.05, took);
+    if (took > 1 && p.fetch.level.i < s.avail[s.avail.length - 1].i && (p.fetch.size - p.fetch.got) / rate > p.buffered) {
+      p.est = rate;
+      log(s, `hls.js abandons the ${p.fetch.level.q} fragment: at ${rate.toFixed(1)} Mbps it would land after the buffer runs dry`, "", "warn");
+      p.fetch = null;
+      flash(s, "abort");
+    }
+  }
+  if (p.fetch) {
+    if (p.fetch.got >= p.fetch.size) {
+      const took = tp - p.fetch.start;
+      const measured = p.fetch.size / Math.max(0.05, took);
+      p.est = p.est ? 0.6 * p.est + 0.4 * measured : measured;
+      p.queue.push(p.fetch.level.i);
+      p.buffered += SEG;
+      p.next += 1;
+      p.fetch = null;
+    }
+  }
+  if (!p.fetch && p.next < SEGS && p.buffered < BUFFER_GOAL) {
+    const level = pickLevel(s);
+    if (p.level && level.i !== p.level.i) {
+      p.switches += 1;
+      log(s, `ABR: estimate ${p.est.toFixed(1)} Mbps → switch ${p.level.q} → ${level.q} (${level.q}/playlist.m3u8)`, "", level.kbps > p.level.kbps ? "ok" : "warn");
+    } else if (!p.level) log(s, `ABR: first pick ${level.q} (BANDWIDTH ${level.kbps * 1000} fits a 1 Mbps guess with headroom)`, "", "dim");
+    p.level = level;
+    p.fetch = { level, start: tp, got: 0, size: ((level.kbps + 128) * SEG) / 1000 };
+    flash(s, "fetch");
+  }
+  if (p.buffered > 0) {
+    const adv = Math.min(dt, p.buffered);
+    p.head = Math.min(DEMO_SECONDS, p.head + adv);
+    p.buffered -= adv;
+    while (p.queue.length && p.head >= (p.next - p.queue.length + 1) * SEG) p.queue.shift();
+  } else if (p.next < SEGS && p.head > 0) {
+    if (!p.stalled) { p.stalls += 1; log(s, "buffer empty: playback stalls until the next segment lands", "", "warn"); }
+    p.stalled = true;
+    return s;
+  }
+  p.stalled = false;
+  if (p.head >= DEMO_SECONDS) { s.phase = "ended"; log(s, `played to the end · ${p.switches} rendition switch(es), ${p.stalls} stall(s)`, "", "ok"); }
+  return s;
+}
+
+// The storyboard cue for a time: sprite sheet, then the tile's x,y,w,h (160×90 tiles here).
+function cueAt(sec) {
+  const c = Math.floor(sec / 5), pos = c % 100;
+  return { sheet: Math.floor(c / 100), x: (pos % 10) * 160, y: Math.floor(pos / 10) * 90, start: c * 5 };
+}
+
+return { DEMO_SECONDS, SEGS, masterLines, PROFILES, createPackage, pickLevel, stepPackage, cueAt };
+})();
 const REFS = {"preCreate":"tus_service.py:75","verifyToken":"tus_service.py:83","adminOnly":"tus_service.py:99","sizeCheck":"tus_service.py:109","mimeCheck":"tus_service.py:113","admission":"tus_service.py:116","admit":"tus_service.py:139","stripToken":"tus_service.py:152","postFinish":"tus_service.py:157","videoRow":"tus_service.py:176","idempotent":"tus_service.py:169","release":"tus_service.py:202","kickQueue":"tus_service.py:205","hookRoute":"tus_hooks.py:36","statusBridge":"tus_hooks.py:63","oldestQueued":"processing_queue.py:79","setNx":"processing_queue.py:99","dispatch":"processing_queue.py:104","lockTtl":"processing_queue.py:43","luaRelease":"processing_queue.py:63","onSuccess":"processing_queue.py:121","onFailed":"processing_queue.py:132","recovery":"processing_queue.py:166","purge":"processing_queue.py:187","chain":"workflows.py:34","chord":"workflows.py:38","prepare":"prepare.py:49","download":"prepare.py:89","ffprobe":"prepare.py:108","probeFail":"prepare.py:115","storyboard":"storyboard.py:66","vtt":"storyboard.py:95","storyboardSwallow":"storyboard.py:142","transcode":"transcode.py:110","noUpscale":"transcode.py:92","chordDone":"transcode.py:183","allFailed":"transcode.py:210","segment":"segment.py:78","manifest":"manifest.py:80","masterOrder":"manifest.py:55","upload":"upload.py:57","finalize":"finalize.py:58","cleanup":"finalize.py:75","qualities":"config.py:18","admissionCap":"config.py:66","partSize":"config.py:60","admissionTtl":"config.py:79","prodConcurrency":"docker-compose.yml:148","localConcurrency":"docker-compose.local.yml:139","caddyFiles":"Caddyfile.local:16","caddyInternal":"Caddyfile.local:43","caddyStorage":"Caddyfile.local:5","uppyChunk":"TusUploadForm.tsx:106","statusPoll":"use-video-processing.ts:29","publish":"mutations.py:121","publicGate":"queries.py:45","uppyRetry":"index.js:23","statusMeta":"video_helpers.py:27","playerSrc":"VideoPlayer.tsx:26"};
 const PLANT = {"P":{"origin":[174.36868346106428,118.65058458041659],"scale":0.993166455438001,"azimuth":70,"elevation":32},"H":666,"bus":{"y":30,"z":113,"x0":176,"x1":1220},"taps":{"caddy":202,"tusd":330,"api":470,"postgres":600,"redis":744,"worker":820,"minio":1188},"stations":[{"id":"admin","n":1,"name":"Admin's browser · Uppy","role":"Picks a file and sends it in resumable 50 MiB chunks over tus (PATCH with Upload-Offset), so a dropped connection resumes instead of restarting. While a video processes, the admin page polls its status every 2 s."},{"id":"viewer","n":2,"name":"Viewer's browser · video.js","role":"Plays published titles only (the public feed filters is_public and status = published). Fetches master.m3u8 through Caddy's /storage route, picks a rendition from measured bandwidth and pulls 6-second .ts segments."},{"id":"caddy","n":3,"name":"Caddy · reverse proxy","role":"The only door from the internet. /files → tusd, /storage → MinIO, /internal/* → 404 (except the upload-status bridge), everything else → FastAPI."},{"id":"tusd","n":4,"name":"tusd · resumable uploads","role":"Speaks the tus protocol, writes each upload to MinIO as an S3 multipart upload, and calls FastAPI's hooks at pre-create, post-finish and post-terminate."},{"id":"api","n":5,"name":"FastAPI","role":"Auth, the video API and the tusd hooks: checks the admin JWT, admission (8 concurrent uploads), creates the Video row and starts the processing queue."},{"id":"postgres","n":6,"name":"PostgreSQL 16","role":"System of record: users, tus_uploads and videos with processing_status. The queue is simply the oldest row whose status is still 'queued'."},{"id":"redis","n":7,"name":"Redis 7","role":"Upload admission keys (tus:active:*, at most 8), the one processing lock (video_processing:active_lock), the Celery broker list the worker consumes, and Celery's result backend, which counts down the transcode chord."},{"id":"worker","n":8,"name":"Celery worker · FFmpeg","role":"Runs one video's chain: prepare → storyboard → a chord of 7 transcodes (+ its callback) → segment → manifest → upload → finalize → on_pipeline_success, 15 tasks in all. Prod runs --concurrency=1 (one task at a time), local dev 3."},{"id":"minio","n":9,"name":"MinIO · object storage","role":"Three buckets: vod-videos (raw uploads), vod-thumbnails (posters, sprite sheets, storyboard.vtt) and vod-processed (HLS playlists and segments)."},{"id":"bus","n":10,"name":"backend_net","role":"The private Docker network every service sits on. Nothing on it is published to the internet except through Caddy."},{"id":"rail","n":11,"name":"Status rail · processing_status","role":"The admin page's progress bar, made physical. Each stop is a processing_status at its real STATUS_META value (queued 15 %, transcoding 50 %, completed 100 %, failed 0 %; the 5 % 'uploading' stop is only used by the legacy multipart path). One carriage per unfinished video, oldest three."}],"rail":{"x0":262,"x1":1182,"stops":["failed","uploading","queued","preparing","generating_storyboard","transcoding","aggregating","segmenting","creating_manifest","uploading_to_storage","finalizing","completed"]},"barW":76,"gaugeW":52,"scrubW":42,"dial":{"x":92,"y":72,"z":8.2,"r":5.5,"a0":-2.2,"a1":2.2},"stages":["preparing","generating_storyboard","transcoding","aggregating","segmenting","creating_manifest","uploading_to_storage","finalizing"]};
 const INTAKE = {"P":{"origin":[259.70221862019287,30.06835170901661],"scale":1.418666735442681,"azimuth":64,"elevation":32},"H":701,"chunks":9,"parts":9,"widths":[7,7,7,7,7,7,7,7,2.8],"pitch":9.5,"sizeMiB":420,"belt":{"x0":173,"x1":330,"z":10},"chute":{"x0":460,"z":30},"partX":[674,660.5,647,633.5,620,606.5,593,579.5,566],"sliceSvg":["<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L111.9 173.7L112.6 174.1L112.6 195.4L112.6 196L102.8 206.6L102 207L100.9 207L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M112.6 195.4L112.6 196L112.6 174.7L112.6 174.1ZM112.6 196L102.8 206.6L102.8 185.3L112.6 174.7ZM102.8 206.6L102 207L102 185.7L102.8 185.3Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M102 207L100.9 207L100.9 185.7L102 185.7ZM100.9 207L98.9 206.5L98.9 185.2L100.9 185.7Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M111.9 173.7L112.6 174.1L112.6 174.7L102.8 185.3L102 185.7L100.9 185.7L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M112.6 174.1L112.6 174.7L102.8 185.3L102 185.7L100.9 185.7L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M112.6 174.1L112 174.6L102.4 185.1L101.8 185.4L101 185.4L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L111.9 173.7L112.6 174.1M112.6 195.4L112.6 196L102.8 206.6L102 207L100.9 207L98.9 206.5L98.2 206M112.6 174.1L112.6 195.4M98.2 184.7L98.2 206\"/></g>"],"partSvg":"<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M97.3 183.6L109 171L110.4 170.7L114.9 171.9L115.4 172.7L115.4 195.5L103.8 208.1L102.3 208.4L97.8 207.2L97.3 206.5Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M115.4 195.5L103.8 208.1L103.8 185.3L115.4 172.7Z\"/><path class=\"iso-shade\" data-shade=\"1\" d=\"M103.8 208.1L102.3 208.4L102.3 185.6L103.8 185.3Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M102.3 208.4L97.8 207.2L97.8 184.4L102.3 185.6Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M97.8 207.2L97.3 206.5L97.3 183.6L97.8 184.4Z\"/><path class=\"iso-top\" d=\"M114.9 171.9L115.4 172.7L103.8 185.3L102.3 185.6L97.8 184.4L97.3 183.6L109 171L110.4 170.7Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M115.4 172.7L103.8 185.3L102.3 185.6L97.8 184.4L97.3 183.6\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M115.4 172.7L103.6 185.2L102.4 185.4L98.1 184.3L97.3 183.6\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M97.3 183.6L109 171L110.4 170.7L114.9 171.9L115.4 172.7M115.4 195.5L103.8 208.1L102.3 208.4L97.8 207.2L97.3 206.5M115.4 172.7L115.4 195.5M97.3 183.6L97.3 206.5\"/></g>","dial":{"x":428,"z":34,"r":13},"stations":[{"id":"admin","n":1,"name":"Uppy in the admin's browser","role":"The loaf is the file. Uppy's guillotine cuts it into 50 MiB chunks (chunkSize: 50 * 1024 * 1024); each chunk is one PATCH with an Upload-Offset header. The ruler is that offset, the screen is the form's progress bar."},{"id":"net","n":2,"name":"The network","role":"The belt is the HTTPS connection. The shutter drops when the connection does; whatever chunk was in flight is lost, and nothing already acknowledged is."},{"id":"caddy","n":3,"name":"Caddy · /files and /internal","role":"handle /files/* proxies tus requests to tusd with the /files prefix kept and flush_interval -1. /internal/* answers 404 (the blank plate), except GET /internal/tus/hooks/uploads/*, the status bridge Uppy polls when it finishes."},{"id":"tusd","n":4,"name":"tusd v2.9.2","role":"Speaks tus. Counts the bytes it has acknowledged (Upload-Offset, on its display), buffers them into 50 MB S3 parts, and calls FastAPI's hook endpoint directly over backend_net for pre-create, post-finish and post-terminate."},{"id":"minio","n":5,"name":"MinIO · vod-videos/tus-uploads/","role":"Receives the upload as an S3 multipart upload: one plate per UploadPart, then CompleteMultipartUpload joins them into the single raw object that prepare_video later downloads. The card beside them is tusd's .info sidecar, saved without the access token."},{"id":"redis","n":6,"name":"Redis · admission keys","role":"One key per upload in flight, tus:active:<id> with a 2-hour TTL (the dial). Pre-create counts them and refuses a ninth. post-finish and post-terminate delete them; an abandoned upload's key only goes away when the TTL runs out."},{"id":"api","n":7,"name":"FastAPI · hook checkpoint","role":"POST /internal/tus/hooks: the seven pre-create checks in code order (shared secret, JWT, admin, title and category, size, file type, free slot), then the hook lamps for pre-create, post-finish and the status bridge."},{"id":"postgres","n":8,"name":"PostgreSQL · two rows","role":"pre-create inserts a tus_uploads row ('created'); post-finish marks it 'completed' and inserts the Video row as queued, is_public=false, draft. That queued row is what Plate 3's queue picks up."}],"checks":["secret","token","admin","meta","size","mime","slot"],"barW":80};
 const QUEUE = {"P":{"origin":[267.2349625439024,140.0072565468961],"scale":1.3312087570654332,"azimuth":62,"elevation":33},"H":843,"magX0":268,"magPitch":22,"stageX":[360,392,424,456],"canSvg":"<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M106.8 253.2L107.3 251.8L108.3 250.5L109.8 249.3L111.6 248.2L113.8 247.4L116.3 246.9L118.8 246.6L121.5 246.6L124.1 246.9L126.5 247.4L128.7 248.2L130.6 249.2L132.1 250.4L133.1 251.8L133.6 253.2L133.6 254.6L133.6 280L133.1 281.4L132.1 282.8L130.6 284L128.8 285L126.6 285.8L124.1 286.3L121.5 286.6L118.9 286.6L116.3 286.3L113.9 285.8L111.7 285L109.8 284L108.3 282.8L107.3 281.5L106.8 280.1L106.8 278.6Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M132.1 282.8L130.6 284L130.6 258.5L132.1 257.3ZM130.6 284L128.8 285L128.8 259.6L130.6 258.5ZM128.8 285L126.6 285.8L126.6 260.4L128.8 259.6ZM133.6 280L133.1 281.4L133.1 256L133.6 254.6ZM133.1 281.4L132.1 282.8L132.1 257.3L133.1 256Z\"/><path class=\"iso-shade\" data-shade=\"1\" d=\"M126.6 285.8L124.1 286.3L124.1 260.9L126.6 260.4ZM124.1 286.3L121.5 286.6L121.5 261.2L124.1 260.9ZM121.5 286.6L118.9 286.6L118.9 261.2L121.5 261.2Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M118.9 286.6L116.3 286.3L116.3 260.9L118.9 261.2ZM116.3 286.3L113.9 285.8L113.9 260.4L116.3 260.9Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M113.9 285.8L111.7 285L111.7 259.6L113.9 260.4ZM111.7 285L109.8 284L109.8 258.6L111.7 259.6ZM109.8 284L108.3 282.8L108.3 257.4L109.8 258.6ZM108.3 282.8L107.3 281.5L107.3 256L108.3 257.4ZM107.3 281.5L106.8 280.1L106.8 254.6L107.3 256ZM106.8 280.1L106.8 278.6L106.8 253.2L106.8 254.6Z\"/><path class=\"iso-top\" d=\"M132.1 257.3L130.6 258.5L128.8 259.6L126.6 260.4L124.1 260.9L121.5 261.2L118.9 261.2L116.3 260.9L113.9 260.4L111.7 259.6L109.8 258.6L108.3 257.4L107.3 256L106.8 254.6L106.8 253.2L107.3 251.8L108.3 250.5L109.8 249.3L111.6 248.2L113.8 247.4L116.3 246.9L118.8 246.6L121.5 246.6L124.1 246.9L126.5 247.4L128.7 248.2L130.6 249.2L132.1 250.4L133.1 251.8L133.6 253.2L133.6 254.6L133.1 256Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M133.6 254.6L133.1 256L132.1 257.3L130.6 258.5L128.8 259.6L126.6 260.4L124.1 260.9L121.5 261.2L118.9 261.2L116.3 260.9L113.9 260.4L111.7 259.6L109.8 258.6L108.3 257.4L107.3 256L106.8 254.6L106.8 253.2\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M133.6 254.6L132.3 255.9L131.3 257.1L130 258.3L128.2 259.2L126.2 260L123.9 260.5L121.5 260.7L119 260.7L116.6 260.5L114.3 260L112.2 259.2L110.5 258.3L109.1 257.2L108.1 255.9L107.6 254.6L106.8 253.2\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M106.8 253.2L107.3 251.8L108.3 250.5L109.8 249.3L111.6 248.2L113.8 247.4L116.3 246.9L118.8 246.6L121.5 246.6L124.1 246.9L126.5 247.4L128.7 248.2L130.6 249.2L132.1 250.4L133.1 251.8L133.6 253.2L133.6 254.6M133.6 280L133.1 281.4L132.1 282.8L130.6 284L128.8 285L126.6 285.8L124.1 286.3L121.5 286.6L118.9 286.6L116.3 286.3L113.9 285.8L111.7 285L109.8 284L108.3 282.8L107.3 281.5L106.8 280.1L106.8 278.6M106.8 253.2L106.8 278.6M133.6 254.6L133.6 280\"/></g>","stations":[{"id":"postgres","n":1,"name":"PostgreSQL · the queue","role":"There is no queue table: the queue is simply the videos whose processing_status is still 'queued', oldest created_at first. The magazine holds them in that order; the screen is the SELECT start_next_video_if_idle() runs."},{"id":"gate","n":2,"name":"The escapement · SET NX","role":"start_next_video_if_idle() tries SET video_processing:active_lock <id> NX EX 21600. NX means only if the key doesn't exist: the gate lifts for exactly one video, and every other call is a no-op while the tag hangs on the hook."},{"id":"redis","n":3,"name":"Redis · lock, TTL and broker","role":"The hook holds the lock's value (the processing video's id); the dial is its 6-hour TTL, a dead-man's switch that only matters if nothing ever releases it. Release is a Lua script: delete only if the value is still my id."},{"id":"broker","n":4,"name":"Celery broker list","role":"The chain's messages, oldest first. Each finished step appends the next one at the tail. With the lock, only one video's chits are ever here; before the fix, every video's chains shared this one list."},{"id":"worker","n":5,"name":"Celery worker · presses","role":"One press per --concurrency slot (prod 1, local dev 3). A press takes the chit at the head of the list and runs it; the 7 transcodes of the chord are the only steps that can run side by side."},{"id":"stage","n":6,"name":"Processing stage","role":"The video that holds the lock. With the lock off (history), every dispatched video sits here at once."},{"id":"out","n":7,"name":"Outfeed","role":"Completed videos (top tray) and failed ones (bin). Either way the pipeline hands the lock back: on_pipeline_success as the chain's last step, or on_pipeline_failed as its link_error, then start_next_video_if_idle() again."}]};
 const TRANSCODE = {"P":{"origin":[247.02018114909174,136.7791102393004],"scale":1.2569838927287609,"azimuth":63,"elevation":32},"H":799,"stationX":[362,456,550,644,738,832,926],"die":[{"w":64,"d":36},{"w":48,"d":27},{"w":32,"d":18},{"w":21.35,"d":12},{"w":16,"d":9},{"w":10.65,"d":6},{"w":6.4,"d":3.6}],"blockH":[24,18.14213562373095,14,10.32455532033676,8.47213595499958,7.464101615137754,6.82842712474619],"outY":244,"bedH":14,"stations":[{"id":"minio","n":1,"name":"MinIO · vod-videos and vod-thumbnails","role":"prepare_video streams the raw upload down to the worker's work dir in 8 MiB chunks; generate_storyboard uploads its sprite sheets and storyboard.vtt to vod-thumbnails/<id>/storyboard/."},{"id":"probe","n":2,"name":"prepare_video · ffprobe","role":"Moves the row from queued to preparing (and refuses any other status), clears and recreates the work dir, downloads the file and runs ffprobe -show_format -show_streams. A file ffprobe can't read fails right here, with no retry."},{"id":"printer","n":3,"name":"generate_storyboard","role":"One ffmpeg pass: fps=1/5, scale=160:-2, tile=10x10, so every 5 seconds of video becomes one tile and every 100 tiles one sprite sheet. It measures the real tile size, then writes a WebVTT cue per tile pointing at sprite_NNN.jpg#xywh=x,y,w,h. Best-effort: any failure is logged and swallowed."},{"id":"ladder","n":4,"name":"transcode_quality × 7 (the chord)","role":"One task per rung, 1440p down to 144p: libx264, preset medium, crf 23, -threads 2, scaled to fit the rung's box with the aspect ratio kept, then padded to the exact size (letterbox or pillarbox), video at the rung's -b:v and AAC audio at 128k. A rung taller than the source returns 'skipped' straight away."},{"id":"ffmpeg","n":5,"name":"The ffmpeg commands","role":"What each running press executes, exactly as transcode.py builds it (paths shortened)."},{"id":"redis","n":6,"name":"Redis · the chord counter","role":"Celery keeps a chord's progress in its result backend (Redis here). When the last of the seven tasks reports in, it calls on_transcode_complete with all seven results; that callback drops the skipped and failed ones and moves the video to 'aggregating'."}]};
+const PACKAGE = {"P":{"origin":[252.9371382162476,136.12951748874576],"scale":1.2508020839855922,"azimuth":62,"elevation":32},"H":810,"laneY":[166,181,196,211,226,241,256],"sawX":60,"screen":{"x0":666,"x1":884,"z0":22,"z1":122},"abr":{"x":940,"y":196,"z":17},"bw":{"x":940,"y":244,"z":12.2},"stations":[{"id":"rack","n":1,"name":"segment_videos · the rack","role":"One lane per rendition. ffmpeg -c copy -f hls -hls_time 6 cuts each .mp4 into ~6-second .ts segments plus a playlist.m3u8, without re-encoding, one rendition after another. With -c copy it can only cut at keyframes, so 6 s is a target."},{"id":"printer","n":2,"name":"create_manifest · master.m3u8","role":"Writes the master playlist line by line: #EXTM3U, #EXT-X-VERSION:3, then one #EXT-X-STREAM-INF (BANDWIDTH = the rung's target video bitrate, RESOLUTION) and its relative playlist path per rendition, highest first. Skipped rungs simply aren't listed."},{"id":"minio","n":3,"name":"MinIO · vod-processed","role":"upload_to_minio writes master.m3u8 first, then each rendition's playlist and segments under <id>/segments/<quality>/. Only object names are stored in PostgreSQL, so the endpoint can change without a migration."},{"id":"postgres","n":4,"name":"PostgreSQL · finalize","role":"finalize_processing sets status completed, manifest_url and available_qualities, clears celery_task_id and deletes the work dir. The player only ever needs manifest_url."},{"id":"caddy","n":5,"name":"Caddy · /storage","role":"handle_path /storage/* strips the prefix and proxies to MinIO, so the browser fetches playlists and segments from the same origin as the app."},{"id":"player","n":6,"name":"The player · hls.js","role":"@videojs/react's HlsJsVideo: hls.js keeps an EWMA estimate of throughput (starting from a 1 Mbps guess), picks the best rendition it can carry, caps it to the player's size, keeps up to 60 s buffered and can abandon a fragment that would arrive too late. Scrubbing previews come from storyboard.vtt."}],"segs":20};
 // Shared page runtime: theme, tabs (hash routed), mounting one plate at a time, and a
 // visibility-aware frame loop. Plates register themselves in PLATES[id] = { mount }.
 const PLATES = {};
@@ -2684,5 +2842,184 @@ PLATES.transcode = {
   },
 };
 
-window.__vod = { PLANT, INTAKE, QUEUE, TRANSCODE, translateAlong, iso }; initTheme(); initTabs();</script>
+// Plate 5 renderer: segments in the rack, the master playlist printing, MinIO's folders,
+// the finalize row, and the player (picture sharpness, timeline, ABR knob, buffer plates).
+function packageRenderer(stage, D) {
+  const P = D.P;
+  const dyn = {};
+  for (const el of stage.querySelectorAll("[data-dyn]")) dyn[el.dataset.dyn] = el;
+  const lamps = {};
+  for (const el of stage.querySelectorAll("[data-lamp]")) lamps[el.dataset.lamp] = el;
+  const q = (sel) => stage.querySelector(sel);
+  const show = (name, on) => dyn[name]?.toggleAttribute("data-hide", !on);
+  const text = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
+  const pulser = cablePulser(stage, { speed: 260 });
+  const mlines = [...stage.querySelectorAll("[data-mline]")];
+  const t = {};
+  for (const id of ["masterfile", "level", "est", "played", "buffered", "pixels", "preview", "pvbox", "pvtile", "pvtext", "abr", "bw"]) t[id] = q(`[data-${id}]`);
+  const final = Object.fromEntries([...stage.querySelectorAll("[data-final]")].map((el) => [el.dataset.final, el]));
+  const cubbies = [...stage.querySelectorAll("[data-cubby]")];
+  const flashes = {};
+  const flash = (name, len = 0.3) => { flashes[name] = { left: len }; };
+  let sawY = 0, putClock = 0, pixLevel = null, scrubT = 0;
+  const S = D.screen, W = S.x1 - S.x0 - 12;
+
+  function traffic(ev, calm) {
+    const w = ev.what;
+    if (w === "print") flash("print");
+    if (w === "master") { flash("master", 0.6); if (!calm) pulser.send("storage", 1); }
+    if (w === "put" && !calm && (putClock -= 1) <= 0) { putClock = 6; pulser.send("upload", 1); }
+    if (w === "fetch") { flash("storage"); if (!calm) { pulser.send("storage", 1); setTimeout(() => pulser.send("viewer", 1), 300); } }
+    if (w === "abort") flash("storage", 0.8);
+  }
+
+  function pixels(level) {
+    if (pixLevel === level?.i) return;
+    pixLevel = level?.i;
+    if (!level || level.h >= 1080) return t.pixels.replaceChildren();
+    const step = Math.max(2.4, (2560 / level.w) * 2.4);
+    let d = "";
+    for (let x = S.x0 + step; x < S.x1; x += step) d += `M${x.toFixed(1)} ${-S.z1}V${-S.z0}`;
+    for (let z = S.z0 + step; z < S.z1; z += step) d += `M${S.x0} ${-z.toFixed(1)}H${S.x1}`;
+    t.pixels.innerHTML = `<path class="pixgrid" d="${d}"/>`;
+  }
+
+  function render(s, dt, calm) {
+    const done = ["finalize", "play", "ended"].includes(s.phase);
+    s.rungs.forEach((r, i) => {
+      show(`src-${i}`, r.ok);
+      show(`cap-${i}`, !r.ok);
+      for (let j = 0; j < D.segs; j++) {
+        show(`seg-${i}-${j}`, r.ok && j < Math.floor(r.segs) && !(done && s.phase !== "finalize"));
+        dyn[`seg-${i}-${j}`]?.classList.toggle("sent", r.uploaded > j + 1);
+      }
+    });
+    const lane = s.phase === "segment" ? D.laneY[s.cur] - D.laneY[0] : 0;
+    sawY = calm ? lane : sawY + (lane - sawY) * (1 - Math.exp(-dt / 0.18));
+    dyn.saw?.setAttribute("transform", translateAlong(P, [0, sawY, 0]));
+    lamps.saw?.toggleAttribute("data-on", s.phase === "segment");
+    const lines = masterLines(s.avail);
+    mlines.forEach((el, i) => text(el, i < s.lines ? lines[i] : ""));
+    text(t.masterfile, ["upload", "finalize", "play", "ended"].includes(s.phase) ? `master.m3u8 · ${s.avail.length} variants` : "master.m3u8 —");
+    cubbies.forEach((el, i) => el.setAttribute("width", ((38 * s.rungs[i].uploaded) / (D.segs + 1)).toFixed(2)));
+    text(final.status, done ? "processing_status: completed" : `processing_status: ${s.phase === "segment" ? "segmenting" : s.phase === "manifest" ? "creating_manifest" : "uploading_to_storage"}`);
+    text(final.manifest, done ? "manifest_url: …/master.m3u8" : "manifest_url: null");
+    text(final.qualities, done ? `qualities: ${s.avail.map((r) => r.q.replace("p", "")).join(",")}` : "qualities: []");
+    text(final.workdir, done ? "work dir: deleted" : "work dir: /tmp/video_processing/3c6e");
+
+    const p = s.play;
+    const playing = s.phase === "play" || s.phase === "ended";
+    pixels(playing ? p.level : null);
+    text(t.level, playing && p.level ? `${p.level.q} · ${p.level.w}×${p.level.h} · ${(p.level.kbps / 1000).toFixed(1)} Mbps` : s.phase === "ended" ? "ended" : "waiting for manifest_url");
+    const now = playing ? PROFILES[s.profile](s.t - s.at) : 0;
+    text(t.est, playing ? `estimate ${p.est.toFixed(1)} Mbps · buffer ${Math.round(p.buffered)} s` : "");
+    t.played.setAttribute("width", ((W * p.head) / 120).toFixed(2));
+    t.buffered.setAttribute("width", ((W * Math.min(120, p.head + p.buffered)) / 120).toFixed(2));
+    for (let b = 0; b < 10; b++) for (let i = 0; i < 7; i++) show(`buf-${b}-${i}`, playing && p.queue[b] === i);
+    const pos = playing && p.level ? 6 - p.level.i : 0;
+    const a = -2.2 + pos * (4.4 / 6);
+    t.abr?.setAttribute("d", lineOnTop([D.abr.x, D.abr.y], [D.abr.x + Math.sin(a) * 7, D.abr.y - Math.cos(a) * 7], D.abr.z, P));
+    const b = -2.2 + 4.4 * Math.min(1, now / 16);
+    t.bw?.setAttribute("d", lineOnTop([D.bw.x, D.bw.y], [D.bw.x + Math.sin(b) * 11, D.bw.y - Math.cos(b) * 11], D.bw.z, P));
+
+    const scrubbing = s.scrub && playing;
+    t.preview.style.display = scrubbing ? "" : "none";
+    if (scrubbing) {
+      scrubT += dt;
+      const sec = 60 + 55 * Math.sin(scrubT * 0.5);
+      const c = cueAt(sec);
+      const x = S.x0 + 6 + (W * sec) / 120;
+      t.pvbox.setAttribute("x", (x - 26).toFixed(1));
+      t.pvtile.setAttribute("x", (x - 23).toFixed(1));
+      text(t.pvtext, `sprite_00${c.sheet}.jpg#xywh=${c.x},${c.y},160,90`);
+      t.pvtext.setAttribute("x", (x - 24).toFixed(1));
+      if (Math.floor(scrubT * 2) !== Math.floor((scrubT - dt) * 2)) flash("thumbs", 0.4);
+    }
+
+    for (const [name, f] of Object.entries(flashes)) {
+      f.left -= dt;
+      lamps[name]?.toggleAttribute("data-on", f.left > 0);
+      if (f.left <= 0) delete flashes[name];
+    }
+    pulser.draw(calm ? 0 : dt);
+  }
+
+  return { render, traffic, reset() { pulser.clear(); pixLevel = -1; scrubT = 0; } };
+}
+
+// Plate 5 controller: packaging, then playback under different networks and players.
+const PACKAGE_SCENARIOS = {
+  good: { label: "1080p source · good connection", sourceH: 1080, profile: "steady", why: "Six renditions (1440p was never encoded) are cut into segments and listed in master.m3u8. The player starts from a cautious 1 Mbps guess, so the first segment is 360p; once it has measured the link, it climbs to 1080p." },
+  drop: { label: "Bandwidth drops mid-play", sourceH: 1080, profile: "drop", why: "The link falls to about 1 Mbps. The 60-second buffer rides out the first part of the dip; when new fetches come in slow, hls.js steps down to a rendition the link can carry, then climbs back as the link recovers. No stall." },
+  sd: { label: "480p source · slow link", sourceH: 480, profile: "slow", why: "Only four variants exist, and the link is about 2.4 Mbps: hls.js settles on 480p, the best this source has. A smaller ladder means fewer, cheaper segments to store." },
+  small: { label: "Small player (640 px wide)", sourceH: 1080, profile: "steady", playerWidth: 640, why: "capLevelToPlayerSize: true. Even on a fast link, hls.js won't fetch more pixels than the player can show: it stops at the first rendition at least as wide as the player, here 360p." },
+  scrub: { label: "Scrub the timeline", sourceH: 1080, profile: "steady", scrub: true, why: "Scrubbing previews don't touch the video: the player reads storyboard.vtt from vod-thumbnails and, for the time under the cursor, shows the cue's tile of the sprite sheet (#xywh=x,y,w,h)." },
+};
+const PACKAGE_TOUR = ["good", "drop", "small", "scrub", "sd"];
+
+function packageStory(s) {
+  switch (s.phase) {
+    case "segment": return `segment_videos copies ${s.rungs[s.cur].q} into ~6-second .ts segments (no re-encode): ${Math.floor(s.rungs[s.cur].segs)} of ${SEGS}. Renditions go one after another in a single task.`;
+    case "manifest": return "create_manifest writes master.m3u8: one #EXT-X-STREAM-INF line per rendition, with its bandwidth and resolution, pointing at that rendition's own playlist.";
+    case "upload": return `upload_to_minio: master.m3u8 first, then each folder of playlist + segments into vod-processed (${s.avail[Math.min(s.cur, s.avail.length - 1)]?.q}).`;
+    case "finalize": return "finalize_processing marks the video completed, saves manifest_url and available_qualities, and deletes the work dir.";
+    case "play": {
+      const p = s.play;
+      return p.level ? `Playing ${p.level.q}. hls.js estimates ${p.est.toFixed(1)} Mbps and has ${Math.round(p.buffered)} s buffered; each fetch is one ${p.level.q}/segment_NNNN.ts through /storage.` : "The player loads master.m3u8 through Caddy's /storage route.";
+    }
+    case "ended": return `Played to the end with ${s.play.switches} rendition switch(es) and ${s.play.stalls} stall(s).`;
+    default: return "";
+  }
+}
+
+PLATES.package = {
+  mount(root) {
+    const D = PACKAGE;
+    const stage = root.querySelector(".stage");
+    const R = packageRenderer(stage, D);
+    const $ = (sel) => root.querySelector(sel);
+    let s, seen = -1, touring = !stillQuery.matches, tourIdx = 0, idle = 0, storyAt = 0, speed = 1.5;
+    const start = (id) => {
+      const sc = PACKAGE_SCENARIOS[id];
+      s = createPackage({ refs: REFS, sourceH: sc.sourceH, profile: sc.profile, playerWidth: sc.playerWidth ?? 1920, scrub: !!sc.scrub });
+      R.reset();
+      seen = -1;
+      $("[data-log]").replaceChildren();
+      delete $("[data-log]").dataset.n;
+      $("[data-why]").textContent = sc.why;
+      $("[data-live]").textContent = `Scenario: ${sc.label}`;
+      for (const b of root.querySelectorAll("[data-run]")) b.setAttribute("aria-pressed", String(b.dataset.run === id));
+    };
+    root.querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", () => { touring = false; start(b.dataset.run); }));
+    root.querySelectorAll("[data-set]").forEach((b) => b.addEventListener("click", () => {
+      touring = false;
+      speed = Number(b.dataset.set.split(":")[1]);
+      for (const o of root.querySelectorAll('[data-set^="speed:"]')) o.setAttribute("aria-pressed", String(o === b));
+    }));
+    focusing(root, D.stations);
+    const zoom = zooming(root, D.stations);
+    start("good");
+    const stop = frameLoop(stage, (dt, calm) => {
+      if (window.__freeze) return;
+      const k = s.phase === "play" ? 4 : 1;
+      for (let i = 0; i < 4; i++) stepPackage(s, (dt * speed * k) / 4);
+      for (const ev of s.traffic) if (ev.n > seen) { R.traffic(ev, calm); seen = ev.n; }
+      R.render(s, dt, calm);
+      renderLog($("[data-log]"), s.log);
+      idle = s.phase === "ended" ? idle + dt : 0;
+      if (touring && idle > 4) start(PACKAGE_TOUR[++tourIdx % PACKAGE_TOUR.length]);
+      storyAt -= dt;
+      if (storyAt <= 0) {
+        storyAt = 0.3;
+        $("[data-story]").textContent = packageStory(s);
+        const p = s.play;
+        root.querySelector("[data-readout]").textContent = `${s.phase} · ${s.avail.length} variants · ${p.level ? `${p.level.q} · est ${p.est.toFixed(1)} Mbps · buffer ${Math.round(p.buffered)} s` : "not playing"}`;
+        $("[data-stats]").innerHTML = [["variants", s.avail.length], ["segments", s.avail.length * SEGS], ["switches", p.switches], ["stalls", p.stalls]].map(([l, n]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
+      }
+    });
+    return { unmount: () => { stop(); zoom.stop(); } };
+  },
+};
+
+window.__vod = { PLANT, INTAKE, QUEUE, TRANSCODE, PACKAGE, translateAlong, iso }; initTheme(); initTabs();</script>
 </body></html>
