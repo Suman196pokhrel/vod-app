@@ -21,18 +21,18 @@ export const UPPY_RETRY = [0.1, 1, 3, 5];
 const STATUS_OF = { prepare_video: "preparing", generate_storyboard: "generating_storyboard", transcode_quality: "transcoding", on_transcode_complete: "aggregating", segment_videos: "segmenting", create_manifest: "creating_manifest", upload_to_minio: "uploading_to_storage", finalize_processing: "finalizing" };
 
 const PIX = (r) => (r.w * r.h) / (2560 * 1440);
-const hex = (n) => ((n * 2654435761) >>> 0).toString(16).padStart(8, "0").slice(0, 4);
+export const hex = (n) => ((n * 2654435761) >>> 0).toString(16).padStart(8, "0").slice(0, 4);
 
 export function createSim({ refs = {}, concurrency = 1, lock = true } = {}) {
   return { t: 0, refs, cfg: { concurrency, lock }, seq: 1, uploads: [], videos: [], broker: [], running: [], chords: {}, admission: [], lock: null, worker: "up", downUntil: 0, log: [], traffic: [], tick: 0, nextPoll: 0 };
 }
 
 const R = (s, id) => s.refs[id] || "";
-function log(s, text, ref = "", tone = "", vid = null) {
+export function log(s, text, ref = "", tone = "", vid = null) {
   s.log.push({ t: s.t, text, ref: R(s, ref), tone, vid, n: s.tick++ });
   if (s.log.length > 120) s.log.shift();
 }
-function send(s, from, to, kind, vid = null) {
+export function send(s, from, to, kind, vid = null) {
   s.traffic.push({ t: s.t, from, to, kind, vid, n: s.tick++ });
   if (s.traffic.length > 200) s.traffic.shift();
 }
@@ -97,7 +97,7 @@ export function startNextIfIdle(s) {
   return next;
 }
 
-function dispatch(s, video, why) {
+export function dispatch(s, video, why) {
   video.stage = "dispatched";
   s.broker.push({ vid: video.id, task: "prepare_video", step: 0 });
   send(s, "api", "redis", "LPUSH celery (chain)", video.id);
@@ -209,29 +209,6 @@ function handOver(s, id, by, ref) {
   if (owned) s.lock = null;
   log(s, `${by}: Lua release-if-owner on active_lock → ${owned ? "deleted" : "not the owner, kept"}`, "luaRelease", "", id);
   startNextIfIdle(s);
-}
-
-// What post-finish does for an upload that is already complete: a queued row, then the queue.
-export function arrive(s, { height = 1080, duration = 300, fault = null } = {}) {
-  const vid = hex(s.seq++);
-  s.videos.push({ id: vid, height, duration, fault, status: "queued", created: s.t, error: null, public: false, rungs: LADDER.map((r) => ({ ...r, state: "waiting", p: 0 })), stage: "queued", segs: Math.ceil(duration / 6), sheets: Math.ceil(Math.floor(duration / 5 + 1) / 100), done: 0 });
-  send(s, "api", "postgres", "INSERT videos (queued)", vid);
-  log(s, `post-finish: Video ${vid} row created as queued (created_at ${s.t.toFixed(1)} s)`, "videoRow", "", vid);
-  if (s.cfg.lock) startNextIfIdle(s);
-  else dispatch(s, s.videos[s.videos.length - 1], "pre-fix: chain dispatched straight away, no lock");
-  return vid;
-}
-
-// A late, duplicate callback from a video that already finished: the Lua script compares
-// the lock's value with its own id first, so it can never free the current holder's slot.
-export function staleRelease(s) {
-  const old = [...s.videos].reverse().find((v) => (v.status === "completed" || v.status === "failed") && v.id !== s.lock && !v.seed);
-  if (!old || !s.lock) return false;
-  send(s, "worker", "redis", "EVAL release-if-owner", old.id);
-  const owned = s.lock === old.id;
-  if (owned) s.lock = null;
-  log(s, `late duplicate callback from ${old.id}: EVAL release-if-owner → GET returns ${s.lock || "nil"}, not ${old.id}, so DEL is skipped (returns 0)`, "luaRelease", "warn", old.id);
-  return true;
 }
 
 // The admin's "Edit Details" save: status draft → published, which cascades is_public = true.
