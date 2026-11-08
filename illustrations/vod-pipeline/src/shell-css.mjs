@@ -93,6 +93,10 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .face-text.lit-row{fill:var(--anatomy-lit);font-weight:700}
 .can-ring{fill:none;stroke:none}
 [data-dyn^="failed-"] .can-ring{stroke:var(--lamp-warn);stroke-width:1.2px}
+.tile{fill:var(--glass-line);stroke:none}.tile[data-on]{fill:var(--anatomy-mid)}
+.padbar{fill:var(--glass);stroke:none}
+.face-text.cmd{font-size:2.9px;letter-spacing:0}
+.chit-text.big-chit{font-size:6px}
 .dial-face{fill:var(--glass)}.hub{fill:var(--anatomy-hi)}
 .it.own .iso-edge,.it.own .iso-crease{stroke:var(--anatomy-lit)}
 .it.own .iso-top{fill:var(--anatomy-lit-top)}

@@ -200,6 +200,10 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .face-text.lit-row{fill:var(--anatomy-lit);font-weight:700}
 .can-ring{fill:none;stroke:none}
 [data-dyn^="failed-"] .can-ring{stroke:var(--lamp-warn);stroke-width:1.2px}
+.tile{fill:var(--glass-line);stroke:none}.tile[data-on]{fill:var(--anatomy-mid)}
+.padbar{fill:var(--glass);stroke:none}
+.face-text.cmd{font-size:2.9px;letter-spacing:0}
+.chit-text.big-chit{font-size:6px}
 .dial-face{fill:var(--glass)}.hub{fill:var(--anatomy-hi)}
 .it.own .iso-edge,.it.own .iso-crease{stroke:var(--anatomy-lit)}
 .it.own .iso-top{fill:var(--anatomy-lit-top)}
@@ -1457,10 +1461,129 @@ const sentBytes = (s) => s.received;
 
 return { CHUNK, PART, CHECKS, RETRY, BELT_TIME, createIntake, stepIntake, sentBytes };
 })();
+const { RUNGS, SOURCES, fitOf, createTranscode, stepTranscode } = (() => {
+// Pure model of one video's prepare → storyboard → transcode chord, mirroring
+// tasks/video/{prepare,storyboard,transcode}.py. Durations are illustrative.
+const RUNGS = [
+  { q: "1440p", w: 2560, h: 1440, kbps: 10000 },
+  { q: "1080p", w: 1920, h: 1080, kbps: 5000 },
+  { q: "720p", w: 1280, h: 720, kbps: 2500 },
+  { q: "480p", w: 854, h: 480, kbps: 1000 },
+  { q: "360p", w: 640, h: 360, kbps: 500 },
+  { q: "240p", w: 426, h: 240, kbps: 300 },
+  { q: "144p", w: 256, h: 144, kbps: 200 },
+];
+const SOURCES = {
+  hd: { w: 1920, h: 1080, duration: 600, mb: 1300 },
+  qhd: { w: 2560, h: 1440, duration: 480, mb: 2200 },
+  sd: { w: 854, h: 480, duration: 420, mb: 380 },
+  phone: { w: 1080, h: 1920, duration: 300, mb: 640 },
+};
+const even = (v) => 2 * Math.round(v / 2);
+
+// scale=w:h:force_original_aspect_ratio=decrease, then pad to w:h centred (letter/pillarbox).
+function fitOf(src, r) {
+  const k = Math.min(r.w / src.w, r.h / src.h);
+  const w = even(src.w * k), h = even(src.h * k);
+  return { w, h, padX: (r.w - w) / 2, padY: (r.h - h) / 2 };
+}
+
+function createTranscode({ refs = {}, source = "hd", concurrency = 1, storyboardFails = false } = {}) {
+  const src = SOURCES[source];
+  const cues = Math.floor(src.duration / 5) + 1;
+  const tile = { w: 160, h: even((160 * src.h) / src.w) };
+  return {
+    t: 0, refs, src, concurrency, storyboardFails, phase: "download", at: 0, got: 0, cues, sheets: Math.ceil(cues / 100), tile, tiles: 0,
+    rungs: RUNGS.map((r) => ({ ...r, state: "waiting", p: 0, fit: fitOf(src, r) })), queue: [], running: [], left: 7, log: [], traffic: [], n: 0, id: "3c6e",
+  };
+}
+
+const ref = (s, id) => s.refs[id] || "";
+function log(s, text, r = "", tone = "") { s.log.push({ t: s.t, text, ref: ref(s, r), tone, n: s.n++ }); }
+const flash = (s, what) => s.traffic.push({ t: s.t, what, n: s.n++ });
+const PIX = (r) => (r.w * r.h) / (2560 * 1440);
+
+function enter(s, phase, wait) { s.phase = phase; s.at = s.t + wait; }
+
+function stepTranscode(s, dt) {
+  s.t += dt;
+  const len = s.src.duration / 600;
+  if (s.phase === "download") {
+    const before = Math.floor(s.got / 8);
+    s.got = Math.min(s.src.mb, s.got + dt * s.src.mb / 1.6);
+    if (Math.floor(s.got / 8) > before) flash(s, "download");
+    if (s.got >= s.src.mb) {
+      log(s, `prepare_video: status queued → preparing; raw file streamed from vod-videos in 8 MiB chunks (${s.src.mb} MB) to the work dir`, "download");
+      enter(s, "probe", 0.9);
+    }
+    return s;
+  }
+  if (s.phase === "probe" && s.t >= s.at) {
+    log(s, `ffprobe -show_format -show_streams: ${s.src.w}×${s.src.h}, ${s.src.duration} s; saved as processing_metadata`, "ffprobe", "lit");
+    flash(s, "postgres");
+    enter(s, "storyboard", 0);
+    return s;
+  }
+  if (s.phase === "storyboard") {
+    if (s.storyboardFails && s.tiles > s.cues * 0.4) {
+      log(s, "generate_storyboard: ffmpeg failed; the error is logged and swallowed, the chain carries on without a scrubbing preview", "storyboardSwallow", "warn");
+      s.sbFailed = true;
+      return startChord(s);
+    }
+    s.tiles = Math.min(s.cues, s.tiles + dt * (s.cues / (0.8 + 1.6 * len)));
+    if (s.tiles >= s.cues) {
+      log(s, `generate_storyboard: fps=1/5, scale=160:-2, tile=10x10 → ${s.sheets} sprite sheet(s) of ${s.tile.w}×${s.tile.h} tiles, ${s.cues} VTT cues → vod-thumbnails`, "storyboard");
+      log(s, `storyboard.vtt cue: 00:00:05.000 --> 00:00:10.000 · sprite_000.jpg#xywh=${s.tile.w},0,${s.tile.w},${s.tile.h}`, "vtt", "dim");
+      flash(s, "thumbs");
+      startChord(s);
+    }
+    return s;
+  }
+  if (s.phase === "chord") {
+    for (const job of [...s.running]) {
+      const r = s.rungs[job.i];
+      r.p = Math.min(1, (s.t - job.start) / job.dur);
+      if (r.p >= 1) {
+        s.running.splice(s.running.indexOf(job), 1);
+        r.state = job.skip ? "skipped" : "done";
+        s.left -= 1;
+        flash(s, "chord");
+        log(s, job.skip ? `${r.q}: skipped, the ${s.src.h}p source is shorter than ${r.h}p (no upscaling)` : `${r.q}: ${r.q}.mp4 written · ${r.fit.w}×${r.fit.h}${r.fit.padX || r.fit.padY ? ` padded to ${r.w}×${r.h}` : ""} · -b:v ${r.kbps}k`, job.skip ? "noUpscale" : "transcode", job.skip ? "dim" : "");
+      }
+    }
+    while (s.running.length < s.concurrency && s.queue.length) {
+      const i = s.queue.shift();
+      const r = s.rungs[i];
+      const skip = r.h > s.src.h;
+      r.state = skip ? "skipping" : "encoding";
+      s.running.push({ i, skip, start: s.t, dur: skip ? 0.25 : 0.6 + 4.2 * PIX(r) * len });
+      flash(s, `start-${i}`);
+    }
+    if (!s.left) {
+      const ok = s.rungs.filter((r) => r.state === "done").length;
+      log(s, `chord counter reaches 0 → on_transcode_complete: ${ok}/7 renditions usable, status aggregating`, "chordDone", "ok");
+      flash(s, "callback");
+      enter(s, "done", 0);
+    }
+  }
+  return s;
+}
+
+function startChord(s) {
+  s.phase = "chord";
+  s.queue = [0, 1, 2, 3, 4, 5, 6];
+  flash(s, "postgres");
+  log(s, `chord(group(7 × transcode_quality), on_transcode_complete): 7 messages queued; --concurrency=${s.concurrency} runs ${s.concurrency === 1 ? "them one after another" : `${s.concurrency} at a time`}`, "chord");
+  return s;
+}
+
+return { RUNGS, SOURCES, fitOf, createTranscode, stepTranscode };
+})();
 const REFS = {"preCreate":"tus_service.py:75","verifyToken":"tus_service.py:83","adminOnly":"tus_service.py:99","sizeCheck":"tus_service.py:109","mimeCheck":"tus_service.py:113","admission":"tus_service.py:116","admit":"tus_service.py:139","stripToken":"tus_service.py:152","postFinish":"tus_service.py:157","videoRow":"tus_service.py:176","idempotent":"tus_service.py:169","release":"tus_service.py:202","kickQueue":"tus_service.py:205","hookRoute":"tus_hooks.py:36","statusBridge":"tus_hooks.py:63","oldestQueued":"processing_queue.py:79","setNx":"processing_queue.py:99","dispatch":"processing_queue.py:104","lockTtl":"processing_queue.py:43","luaRelease":"processing_queue.py:63","onSuccess":"processing_queue.py:121","onFailed":"processing_queue.py:132","recovery":"processing_queue.py:166","purge":"processing_queue.py:187","chain":"workflows.py:34","chord":"workflows.py:38","prepare":"prepare.py:49","download":"prepare.py:89","ffprobe":"prepare.py:108","probeFail":"prepare.py:115","storyboard":"storyboard.py:66","vtt":"storyboard.py:95","storyboardSwallow":"storyboard.py:142","transcode":"transcode.py:110","noUpscale":"transcode.py:92","chordDone":"transcode.py:183","allFailed":"transcode.py:210","segment":"segment.py:78","manifest":"manifest.py:80","masterOrder":"manifest.py:55","upload":"upload.py:57","finalize":"finalize.py:58","cleanup":"finalize.py:75","qualities":"config.py:18","admissionCap":"config.py:66","partSize":"config.py:60","admissionTtl":"config.py:79","prodConcurrency":"docker-compose.yml:148","localConcurrency":"docker-compose.local.yml:139","caddyFiles":"Caddyfile.local:16","caddyInternal":"Caddyfile.local:43","caddyStorage":"Caddyfile.local:5","uppyChunk":"TusUploadForm.tsx:106","statusPoll":"use-video-processing.ts:29","publish":"mutations.py:121","publicGate":"queries.py:45","uppyRetry":"index.js:23","statusMeta":"video_helpers.py:27","playerSrc":"VideoPlayer.tsx:26"};
 const PLANT = {"P":{"origin":[174.36868346106428,118.65058458041659],"scale":0.993166455438001,"azimuth":70,"elevation":32},"H":666,"bus":{"y":30,"z":113,"x0":176,"x1":1220},"taps":{"caddy":202,"tusd":330,"api":470,"postgres":600,"redis":744,"worker":820,"minio":1188},"stations":[{"id":"admin","n":1,"name":"Admin's browser · Uppy","role":"Picks a file and sends it in resumable 50 MiB chunks over tus (PATCH with Upload-Offset), so a dropped connection resumes instead of restarting. While a video processes, the admin page polls its status every 2 s."},{"id":"viewer","n":2,"name":"Viewer's browser · video.js","role":"Plays published titles only (the public feed filters is_public and status = published). Fetches master.m3u8 through Caddy's /storage route, picks a rendition from measured bandwidth and pulls 6-second .ts segments."},{"id":"caddy","n":3,"name":"Caddy · reverse proxy","role":"The only door from the internet. /files → tusd, /storage → MinIO, /internal/* → 404 (except the upload-status bridge), everything else → FastAPI."},{"id":"tusd","n":4,"name":"tusd · resumable uploads","role":"Speaks the tus protocol, writes each upload to MinIO as an S3 multipart upload, and calls FastAPI's hooks at pre-create, post-finish and post-terminate."},{"id":"api","n":5,"name":"FastAPI","role":"Auth, the video API and the tusd hooks: checks the admin JWT, admission (8 concurrent uploads), creates the Video row and starts the processing queue."},{"id":"postgres","n":6,"name":"PostgreSQL 16","role":"System of record: users, tus_uploads and videos with processing_status. The queue is simply the oldest row whose status is still 'queued'."},{"id":"redis","n":7,"name":"Redis 7","role":"Upload admission keys (tus:active:*, at most 8), the one processing lock (video_processing:active_lock), the Celery broker list the worker consumes, and Celery's result backend, which counts down the transcode chord."},{"id":"worker","n":8,"name":"Celery worker · FFmpeg","role":"Runs one video's chain: prepare → storyboard → a chord of 7 transcodes (+ its callback) → segment → manifest → upload → finalize → on_pipeline_success, 15 tasks in all. Prod runs --concurrency=1 (one task at a time), local dev 3."},{"id":"minio","n":9,"name":"MinIO · object storage","role":"Three buckets: vod-videos (raw uploads), vod-thumbnails (posters, sprite sheets, storyboard.vtt) and vod-processed (HLS playlists and segments)."},{"id":"bus","n":10,"name":"backend_net","role":"The private Docker network every service sits on. Nothing on it is published to the internet except through Caddy."},{"id":"rail","n":11,"name":"Status rail · processing_status","role":"The admin page's progress bar, made physical. Each stop is a processing_status at its real STATUS_META value (queued 15 %, transcoding 50 %, completed 100 %, failed 0 %; the 5 % 'uploading' stop is only used by the legacy multipart path). One carriage per unfinished video, oldest three."}],"rail":{"x0":262,"x1":1182,"stops":["failed","uploading","queued","preparing","generating_storyboard","transcoding","aggregating","segmenting","creating_manifest","uploading_to_storage","finalizing","completed"]},"barW":76,"gaugeW":52,"scrubW":42,"dial":{"x":92,"y":72,"z":8.2,"r":5.5,"a0":-2.2,"a1":2.2},"stages":["preparing","generating_storyboard","transcoding","aggregating","segmenting","creating_manifest","uploading_to_storage","finalizing"]};
 const INTAKE = {"P":{"origin":[259.70221862019287,30.06835170901661],"scale":1.418666735442681,"azimuth":64,"elevation":32},"H":701,"chunks":9,"parts":9,"widths":[7,7,7,7,7,7,7,7,2.8],"pitch":9.5,"sizeMiB":420,"belt":{"x0":173,"x1":330,"z":10},"chute":{"x0":460,"z":30},"partX":[674,660.5,647,633.5,620,606.5,593,579.5,566],"sliceSvg":["<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9L119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M119.4 197.2L119.3 197.8L119.3 176.5L119.4 175.9ZM119.3 197.8L109.6 208.4L109.6 187.1L119.3 176.5ZM109.6 208.4L108.7 208.8L108.7 187.4L109.6 187.1Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M108.7 208.8L107.7 208.7L107.7 187.4L108.7 187.4ZM107.7 208.7L98.9 206.5L98.9 185.2L107.7 187.4Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M118.7 175.4L119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M119.4 175.9L119.3 176.5L109.6 187.1L108.7 187.4L107.7 187.4L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M119.4 175.9L118.8 176.4L109.1 186.9L108.6 187.2L107.8 187.1L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L118.7 175.4L119.4 175.9M119.4 197.2L119.3 197.8L109.6 208.4L108.7 208.8L107.7 208.7L98.9 206.5L98.2 206M119.4 175.9L119.4 197.2M98.2 184.7L98.2 206\"/></g>","<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L111.9 173.7L112.6 174.1L112.6 195.4L112.6 196L102.8 206.6L102 207L100.9 207L98.9 206.5L98.2 206Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M112.6 195.4L112.6 196L112.6 174.7L112.6 174.1ZM112.6 196L102.8 206.6L102.8 185.3L112.6 174.7ZM102.8 206.6L102 207L102 185.7L102.8 185.3Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M102 207L100.9 207L100.9 185.7L102 185.7ZM100.9 207L98.9 206.5L98.9 185.2L100.9 185.7Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M98.9 206.5L98.2 206L98.2 184.7L98.9 185.2Z\"/><path class=\"iso-top\" d=\"M111.9 173.7L112.6 174.1L112.6 174.7L102.8 185.3L102 185.7L100.9 185.7L98.9 185.2L98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M112.6 174.1L112.6 174.7L102.8 185.3L102 185.7L100.9 185.7L98.9 185.2L98.2 184.7\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M112.6 174.1L112 174.6L102.4 185.1L101.8 185.4L101 185.4L99.3 184.9L98.2 184.7\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M98.2 184.7L98.3 184.1L108 173.5L108.9 173.2L110 173.2L111.9 173.7L112.6 174.1M112.6 195.4L112.6 196L102.8 206.6L102 207L100.9 207L98.9 206.5L98.2 206M112.6 174.1L112.6 195.4M98.2 184.7L98.2 206\"/></g>"],"partSvg":"<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M97.3 183.6L109 171L110.4 170.7L114.9 171.9L115.4 172.7L115.4 195.5L103.8 208.1L102.3 208.4L97.8 207.2L97.3 206.5Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M115.4 195.5L103.8 208.1L103.8 185.3L115.4 172.7Z\"/><path class=\"iso-shade\" data-shade=\"1\" d=\"M103.8 208.1L102.3 208.4L102.3 185.6L103.8 185.3Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M102.3 208.4L97.8 207.2L97.8 184.4L102.3 185.6Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M97.8 207.2L97.3 206.5L97.3 183.6L97.8 184.4Z\"/><path class=\"iso-top\" d=\"M114.9 171.9L115.4 172.7L103.8 185.3L102.3 185.6L97.8 184.4L97.3 183.6L109 171L110.4 170.7Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M115.4 172.7L103.8 185.3L102.3 185.6L97.8 184.4L97.3 183.6\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M115.4 172.7L103.6 185.2L102.4 185.4L98.1 184.3L97.3 183.6\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M97.3 183.6L109 171L110.4 170.7L114.9 171.9L115.4 172.7M115.4 195.5L103.8 208.1L102.3 208.4L97.8 207.2L97.3 206.5M115.4 172.7L115.4 195.5M97.3 183.6L97.3 206.5\"/></g>","dial":{"x":428,"z":34,"r":13},"stations":[{"id":"admin","n":1,"name":"Uppy in the admin's browser","role":"The loaf is the file. Uppy's guillotine cuts it into 50 MiB chunks (chunkSize: 50 * 1024 * 1024); each chunk is one PATCH with an Upload-Offset header. The ruler is that offset, the screen is the form's progress bar."},{"id":"net","n":2,"name":"The network","role":"The belt is the HTTPS connection. The shutter drops when the connection does; whatever chunk was in flight is lost, and nothing already acknowledged is."},{"id":"caddy","n":3,"name":"Caddy · /files and /internal","role":"handle /files/* proxies tus requests to tusd with the /files prefix kept and flush_interval -1. /internal/* answers 404 (the blank plate), except GET /internal/tus/hooks/uploads/*, the status bridge Uppy polls when it finishes."},{"id":"tusd","n":4,"name":"tusd v2.9.2","role":"Speaks tus. Counts the bytes it has acknowledged (Upload-Offset, on its display), buffers them into 50 MB S3 parts, and calls FastAPI's hook endpoint directly over backend_net for pre-create, post-finish and post-terminate."},{"id":"minio","n":5,"name":"MinIO · vod-videos/tus-uploads/","role":"Receives the upload as an S3 multipart upload: one plate per UploadPart, then CompleteMultipartUpload joins them into the single raw object that prepare_video later downloads. The card beside them is tusd's .info sidecar, saved without the access token."},{"id":"redis","n":6,"name":"Redis · admission keys","role":"One key per upload in flight, tus:active:<id> with a 2-hour TTL (the dial). Pre-create counts them and refuses a ninth. post-finish and post-terminate delete them; an abandoned upload's key only goes away when the TTL runs out."},{"id":"api","n":7,"name":"FastAPI · hook checkpoint","role":"POST /internal/tus/hooks: the seven pre-create checks in code order (shared secret, JWT, admin, title and category, size, file type, free slot), then the hook lamps for pre-create, post-finish and the status bridge."},{"id":"postgres","n":8,"name":"PostgreSQL · two rows","role":"pre-create inserts a tus_uploads row ('created'); post-finish marks it 'completed' and inserts the Video row as queued, is_public=false, draft. That queued row is what Plate 3's queue picks up."}],"checks":["secret","token","admin","meta","size","mime","slot"],"barW":80};
 const QUEUE = {"P":{"origin":[267.2349625439024,140.0072565468961],"scale":1.3312087570654332,"azimuth":62,"elevation":33},"H":843,"magX0":268,"magPitch":22,"stageX":[360,392,424,456],"canSvg":"<g class=\"iso-solid\"><path class=\"iso-fill\" d=\"M106.8 253.2L107.3 251.8L108.3 250.5L109.8 249.3L111.6 248.2L113.8 247.4L116.3 246.9L118.8 246.6L121.5 246.6L124.1 246.9L126.5 247.4L128.7 248.2L130.6 249.2L132.1 250.4L133.1 251.8L133.6 253.2L133.6 254.6L133.6 280L133.1 281.4L132.1 282.8L130.6 284L128.8 285L126.6 285.8L124.1 286.3L121.5 286.6L118.9 286.6L116.3 286.3L113.9 285.8L111.7 285L109.8 284L108.3 282.8L107.3 281.5L106.8 280.1L106.8 278.6Z\"/><path class=\"iso-shade\" data-shade=\"0\" d=\"M132.1 282.8L130.6 284L130.6 258.5L132.1 257.3ZM130.6 284L128.8 285L128.8 259.6L130.6 258.5ZM128.8 285L126.6 285.8L126.6 260.4L128.8 259.6ZM133.6 280L133.1 281.4L133.1 256L133.6 254.6ZM133.1 281.4L132.1 282.8L132.1 257.3L133.1 256Z\"/><path class=\"iso-shade\" data-shade=\"1\" d=\"M126.6 285.8L124.1 286.3L124.1 260.9L126.6 260.4ZM124.1 286.3L121.5 286.6L121.5 261.2L124.1 260.9ZM121.5 286.6L118.9 286.6L118.9 261.2L121.5 261.2Z\"/><path class=\"iso-shade\" data-shade=\"2\" d=\"M118.9 286.6L116.3 286.3L116.3 260.9L118.9 261.2ZM116.3 286.3L113.9 285.8L113.9 260.4L116.3 260.9Z\"/><path class=\"iso-shade\" data-shade=\"3\" d=\"M113.9 285.8L111.7 285L111.7 259.6L113.9 260.4ZM111.7 285L109.8 284L109.8 258.6L111.7 259.6ZM109.8 284L108.3 282.8L108.3 257.4L109.8 258.6ZM108.3 282.8L107.3 281.5L107.3 256L108.3 257.4ZM107.3 281.5L106.8 280.1L106.8 254.6L107.3 256ZM106.8 280.1L106.8 278.6L106.8 253.2L106.8 254.6Z\"/><path class=\"iso-top\" d=\"M132.1 257.3L130.6 258.5L128.8 259.6L126.6 260.4L124.1 260.9L121.5 261.2L118.9 261.2L116.3 260.9L113.9 260.4L111.7 259.6L109.8 258.6L108.3 257.4L107.3 256L106.8 254.6L106.8 253.2L107.3 251.8L108.3 250.5L109.8 249.3L111.6 248.2L113.8 247.4L116.3 246.9L118.8 246.6L121.5 246.6L124.1 246.9L126.5 247.4L128.7 248.2L130.6 249.2L132.1 250.4L133.1 251.8L133.6 253.2L133.6 254.6L133.1 256Z\"/><path class=\"iso-line iso-crease\" data-tone=\"faint\" d=\"M133.6 254.6L133.1 256L132.1 257.3L130.6 258.5L128.8 259.6L126.6 260.4L124.1 260.9L121.5 261.2L118.9 261.2L116.3 260.9L113.9 260.4L111.7 259.6L109.8 258.6L108.3 257.4L107.3 256L106.8 254.6L106.8 253.2\"/><path class=\"iso-line iso-bevel\" data-tone=\"faint\" d=\"M133.6 254.6L132.3 255.9L131.3 257.1L130 258.3L128.2 259.2L126.2 260L123.9 260.5L121.5 260.7L119 260.7L116.6 260.5L114.3 260L112.2 259.2L110.5 258.3L109.1 257.2L108.1 255.9L107.6 254.6L106.8 253.2\"/><path class=\"iso-line iso-edge\" data-tone=\"hi\" d=\"M106.8 253.2L107.3 251.8L108.3 250.5L109.8 249.3L111.6 248.2L113.8 247.4L116.3 246.9L118.8 246.6L121.5 246.6L124.1 246.9L126.5 247.4L128.7 248.2L130.6 249.2L132.1 250.4L133.1 251.8L133.6 253.2L133.6 254.6M133.6 280L133.1 281.4L132.1 282.8L130.6 284L128.8 285L126.6 285.8L124.1 286.3L121.5 286.6L118.9 286.6L116.3 286.3L113.9 285.8L111.7 285L109.8 284L108.3 282.8L107.3 281.5L106.8 280.1L106.8 278.6M106.8 253.2L106.8 278.6M133.6 254.6L133.6 280\"/></g>","stations":[{"id":"postgres","n":1,"name":"PostgreSQL · the queue","role":"There is no queue table: the queue is simply the videos whose processing_status is still 'queued', oldest created_at first. The magazine holds them in that order; the screen is the SELECT start_next_video_if_idle() runs."},{"id":"gate","n":2,"name":"The escapement · SET NX","role":"start_next_video_if_idle() tries SET video_processing:active_lock <id> NX EX 21600. NX means only if the key doesn't exist: the gate lifts for exactly one video, and every other call is a no-op while the tag hangs on the hook."},{"id":"redis","n":3,"name":"Redis · lock, TTL and broker","role":"The hook holds the lock's value (the processing video's id); the dial is its 6-hour TTL, a dead-man's switch that only matters if nothing ever releases it. Release is a Lua script: delete only if the value is still my id."},{"id":"broker","n":4,"name":"Celery broker list","role":"The chain's messages, oldest first. Each finished step appends the next one at the tail. With the lock, only one video's chits are ever here; before the fix, every video's chains shared this one list."},{"id":"worker","n":5,"name":"Celery worker · presses","role":"One press per --concurrency slot (prod 1, local dev 3). A press takes the chit at the head of the list and runs it; the 7 transcodes of the chord are the only steps that can run side by side."},{"id":"stage","n":6,"name":"Processing stage","role":"The video that holds the lock. With the lock off (history), every dispatched video sits here at once."},{"id":"out","n":7,"name":"Outfeed","role":"Completed videos (top tray) and failed ones (bin). Either way the pipeline hands the lock back: on_pipeline_success as the chain's last step, or on_pipeline_failed as its link_error, then start_next_video_if_idle() again."}]};
+const TRANSCODE = {"P":{"origin":[247.02018114909174,136.7791102393004],"scale":1.2569838927287609,"azimuth":63,"elevation":32},"H":799,"stationX":[362,456,550,644,738,832,926],"die":[{"w":64,"d":36},{"w":48,"d":27},{"w":32,"d":18},{"w":21.35,"d":12},{"w":16,"d":9},{"w":10.65,"d":6},{"w":6.4,"d":3.6}],"blockH":[24,18.14213562373095,14,10.32455532033676,8.47213595499958,7.464101615137754,6.82842712474619],"outY":244,"bedH":14,"stations":[{"id":"minio","n":1,"name":"MinIO · vod-videos and vod-thumbnails","role":"prepare_video streams the raw upload down to the worker's work dir in 8 MiB chunks; generate_storyboard uploads its sprite sheets and storyboard.vtt to vod-thumbnails/<id>/storyboard/."},{"id":"probe","n":2,"name":"prepare_video · ffprobe","role":"Moves the row from queued to preparing (and refuses any other status), clears and recreates the work dir, downloads the file and runs ffprobe -show_format -show_streams. A file ffprobe can't read fails right here, with no retry."},{"id":"printer","n":3,"name":"generate_storyboard","role":"One ffmpeg pass: fps=1/5, scale=160:-2, tile=10x10, so every 5 seconds of video becomes one tile and every 100 tiles one sprite sheet. It measures the real tile size, then writes a WebVTT cue per tile pointing at sprite_NNN.jpg#xywh=x,y,w,h. Best-effort: any failure is logged and swallowed."},{"id":"ladder","n":4,"name":"transcode_quality × 7 (the chord)","role":"One task per rung, 1440p down to 144p: libx264, preset medium, crf 23, -threads 2, scaled to fit the rung's box with the aspect ratio kept, then padded to the exact size (letterbox or pillarbox), video at the rung's -b:v and AAC audio at 128k. A rung taller than the source returns 'skipped' straight away."},{"id":"ffmpeg","n":5,"name":"The ffmpeg commands","role":"What each running press executes, exactly as transcode.py builds it (paths shortened)."},{"id":"redis","n":6,"name":"Redis · the chord counter","role":"Celery keeps a chord's progress in its result backend (Redis here). When the last of the seven tasks reports in, it calls on_transcode_complete with all seven results; that callback drops the skipped and failed ones and moves the video to 'aggregating'."}]};
 // Shared page runtime: theme, tabs (hash routed), mounting one plate at a time, and a
 // visibility-aware frame loop. Plates register themselves in PLATES[id] = { mount }.
 const PLATES = {};
@@ -2400,5 +2523,166 @@ PLATES.queue = {
   },
 };
 
-window.__vod = { PLANT, INTAKE, QUEUE, translateAlong, iso }; initTheme(); initTabs();</script>
+// Plate 4 renderer: download and probe, storyboard tiles and cues, the seven presses, their
+// ffmpeg commands, the rendition blocks (with letterbox or pillarbox bars) and the chord count.
+function transcodeRenderer(stage, D) {
+  const P = D.P;
+  const dyn = {};
+  for (const el of stage.querySelectorAll("[data-dyn]")) dyn[el.dataset.dyn] = el;
+  const lamps = {};
+  for (const el of stage.querySelectorAll("[data-lamp]")) lamps[el.dataset.lamp] = el;
+  const q = (sel) => stage.querySelector(sel);
+  const show = (name, on) => dyn[name]?.toggleAttribute("data-hide", !on);
+  const text = (el, v) => { if (el && el.textContent !== v) el.textContent = v; };
+  const pulser = cablePulser(stage, { speed: 190 });
+  const tiles = [...stage.querySelectorAll("[data-tile]")];
+  const cmds = [...stage.querySelectorAll("[data-cmd]")];
+  const t = {};
+  for (const id of ["probe", "cue", "sheets", "left"]) t[id] = q(`[data-${id}]`);
+  const flashes = {};
+  const flash = (name, warn = false, len = 0.35) => { flashes[name] = { left: len, warn }; };
+  const heads = new Array(7).fill(0);
+  let probeHead = 0;
+  const ts = (sec) => `${String(Math.floor(sec / 3600)).padStart(2, "0")}:${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}:${(sec % 60).toFixed(3).padStart(6, "0")}`;
+  const poly = (pts) => "M" + pts.map((p) => iso(p, P).map((v) => v.toFixed(2)).join(" ")).join("L") + "Z";
+
+  function padBars(i, r) {
+    const d = D.die[i], x0 = D.stationX[i] - d.w / 2, x1 = x0 + d.w, y0 = D.outY - d.d / 2, y1 = y0 + d.d, z = D.bedH + 1 + D.blockH[i];
+    const fx = r.fit.padX / r.w, fy = r.fit.padY / r.h;
+    if (fx > 0.01) return poly([[x0, y0, z], [x0 + d.w * fx, y0, z], [x0 + d.w * fx, y1, z], [x0, y1, z]]) + poly([[x1 - d.w * fx, y0, z], [x1, y0, z], [x1, y1, z], [x1 - d.w * fx, y1, z]]);
+    if (fy > 0.01) return poly([[x0, y0, z], [x1, y0, z], [x1, y0 + d.d * fy, z], [x0, y0 + d.d * fy, z]]) + poly([[x0, y1 - d.d * fy, z], [x1, y1 - d.d * fy, z], [x1, y1, z], [x0, y1, z]]);
+    return "";
+  }
+
+  function traffic(ev, calm) {
+    const w = ev.what;
+    if (w === "download") { flash("download"); flash("videos"); if (!calm) pulser.send("download", 1); }
+    if (w === "thumbs") { flash("thumbs"); flash("thumbs-in"); if (!calm) pulser.send("thumbs", 1); }
+    if (w === "callback") flash("callback", false, 3);
+  }
+
+  function render(s, dt, calm) {
+    const downloaded = s.got >= s.src.mb;
+    show("srccan", downloaded);
+    probeHead = calm ? +(s.phase === "probe") : probeHead + (+(s.phase === "probe") - probeHead) * (1 - Math.exp(-dt / 0.15));
+    dyn.probehead?.setAttribute("transform", translateAlong(P, [0, 0, -14 * probeHead]));
+    text(t.probe, !downloaded ? `downloading ${Math.round(s.got)} / ${s.src.mb} MB` : s.phase === "probe" ? "probing…" : `${s.src.w}×${s.src.h} · ${s.src.duration} s`);
+
+    const n = Math.floor(s.tiles);
+    const sheet = Math.min(Math.floor(Math.max(0, n - 1) / 100), s.sheets - 1);
+    tiles.forEach((el, i) => el.toggleAttribute("data-on", sheet * 100 + i < n));
+    text(t.sheets, String(n ? Math.ceil(n / 100) : 0));
+    if (n) {
+      const c = n - 1, pos = c % 100;
+      text(t.cue, `${ts(c * 5)} --> ${ts(Math.min((c + 1) * 5, s.src.duration))}  sprite_${String(Math.floor(c / 100)).padStart(3, "0")}.jpg#xywh=${(pos % 10) * s.tile.w},${Math.floor(pos / 10) * s.tile.h},${s.tile.w},${s.tile.h}`);
+    } else text(t.cue, s.sbFailed ? "failed · skipped, chain continues" : "—");
+    lamps.fuse?.toggleAttribute("data-on", !s.sbFailed && s.phase !== "download");
+    lamps.fuse?.toggleAttribute("data-warn", !!s.sbFailed);
+
+    s.rungs.forEach((r, i) => {
+      const run = s.running.find((j) => j.i === i);
+      show(`skip-${i}`, r.state === "skipped" || r.state === "skipping");
+      show(`out-${i}`, r.state === "done");
+      const pad = stage.querySelector(`[data-padbar="${i}"]`);
+      if (r.state === "done" && pad && !pad.dataset.set) { pad.setAttribute("d", padBars(i, r)); pad.dataset.set = "1"; }
+      heads[i] = calm ? (run ? 1 : 0) : heads[i] + ((run ? 1 : 0) - heads[i]) * (1 - Math.exp(-dt / 0.15));
+      dyn[`head-${i}`]?.setAttribute("transform", translateAlong(P, [0, 0, -24 * heads[i] * (run?.skip ? 0.3 : 1)]));
+      lamps[`press-${i}`]?.toggleAttribute("data-on", !!run);
+      q(`[data-rp="${i}"]`)?.setAttribute("width", (44 * (r.state === "done" || r.state === "skipped" ? 1 : r.p)).toFixed(2));
+      lamps[`chord-${i}`]?.toggleAttribute("data-on", r.state === "done" || r.state === "skipped");
+    });
+    cmds.forEach((el, k) => {
+      const job = s.running[k];
+      if (!job) return text(el, "");
+      const r = s.rungs[job.i];
+      text(el, job.skip ? `${r.q}: target ${r.h}p > source ${s.src.h}p → return { skipped: True }` : `ffmpeg -i raw.mp4 -c:v libx264 -threads 2 -preset medium -crf 23 -vf scale=w=${r.w}:h=${r.h}:force_original_aspect_ratio=decrease,pad=w=${r.w}:h=${r.h}:x=(ow-iw)/2:y=(oh-ih)/2 -b:v ${r.kbps}k -c:a aac -b:a 128k ${r.q}.mp4`);
+    });
+    text(t.left, String(s.left));
+    lamps.callback?.toggleAttribute("data-on", s.phase === "done");
+
+    for (const [name, f] of Object.entries(flashes)) {
+      f.left -= dt;
+      lamps[name]?.toggleAttribute(f.warn ? "data-warn" : "data-on", f.left > 0);
+      if (f.left <= 0) delete flashes[name];
+    }
+    pulser.draw(calm ? 0 : dt);
+  }
+
+  return { render, traffic, reset() { pulser.clear(); for (const el of stage.querySelectorAll("[data-padbar]")) { el.setAttribute("d", ""); delete el.dataset.set; } } };
+}
+
+// Plate 4 controller: one video's prepare → storyboard → chord, per source and slot count.
+const TRANSCODE_SCENARIOS = {
+  hd: { label: "1080p source", source: "hd", why: "The common case. The chord queues all seven transcodes; 1440p returns 'skipped' at once (no upscaling), the other six are encoded one after another on prod's single worker slot." },
+  qhd: { label: "1440p source", source: "qhd", why: "A source as tall as the top rung: nothing is skipped, all seven renditions are encoded, and the 1440p press runs longest (four times the pixels of 720p)." },
+  sd: { label: "480p source", source: "sd", why: "Small source: 1440p, 1080p and 720p are skipped, so master.m3u8 will list only four variants. Skipping costs a message round trip, not an encode." },
+  phone: { label: "Phone video 9:16", source: "phone", why: "A 1080×1920 portrait clip. It is taller than every rung, so nothing is skipped; each rung scales it to fit the 16:9 box and pads the sides: the dark bars on every block are the pillarbox, not a stretch." },
+  wide: { label: "3 worker slots (local)", source: "hd", concurrency: 3, why: "Local dev runs --concurrency=3, so three presses run at once and the chord finishes sooner. The storyboard still runs first and alone: it's a plain chain step." },
+  sbfail: { label: "Storyboard fails", source: "hd", storyboardFails: true, why: "The scrubbing preview is cosmetic, so generate_storyboard catches its own errors, logs a warning and returns the data unchanged. Transcoding goes ahead; the video just has no storyboard_url." },
+};
+const TRANSCODE_TOUR = ["hd", "phone", "sd", "wide", "qhd", "sbfail"];
+
+function transcodeStory(s) {
+  switch (s.phase) {
+    case "download": return `prepare_video is streaming the raw upload from MinIO to the worker's disk: ${Math.round(s.got)} of ${s.src.mb} MB.`;
+    case "probe": return "ffprobe reads the container and streams: width, height, duration and codecs. Everything after this is planned from those numbers.";
+    case "storyboard": return `One ffmpeg pass grabs a frame every 5 s and tiles them 10×10: ${Math.floor(s.tiles)} of ${s.cues} tiles, one WebVTT cue per tile.`;
+    case "chord": {
+      const run = s.running.map((j) => s.rungs[j.i].q).join(", ");
+      return `The chord: ${7 - s.left} of 7 transcodes reported. ${run ? `Encoding ${run} now` : "Waiting for the next message"}; ${s.queue.length} still queued in the broker.`;
+    }
+    case "done": return `All seven reported, so Celery runs on_transcode_complete: ${s.rungs.filter((r) => r.state === "done").length} usable renditions go on to segmenting (Plate 5).`;
+    default: return "";
+  }
+}
+
+PLATES.transcode = {
+  mount(root) {
+    const D = TRANSCODE;
+    const stage = root.querySelector(".stage");
+    const R = transcodeRenderer(stage, D);
+    const $ = (sel) => root.querySelector(sel);
+    let s, seen = -1, touring = !stillQuery.matches, tourIdx = 0, idle = 0, storyAt = 0, speed = 1;
+    const start = (id) => {
+      const sc = TRANSCODE_SCENARIOS[id];
+      s = createTranscode({ refs: REFS, source: sc.source, concurrency: sc.concurrency ?? 1, storyboardFails: !!sc.storyboardFails });
+      R.reset();
+      seen = -1;
+      $("[data-log]").replaceChildren();
+      delete $("[data-log]").dataset.n;
+      $("[data-why]").textContent = sc.why;
+      $("[data-live]").textContent = `Scenario: ${sc.label}`;
+      for (const b of root.querySelectorAll("[data-run]")) b.setAttribute("aria-pressed", String(b.dataset.run === id));
+    };
+    root.querySelectorAll("[data-run]").forEach((b) => b.addEventListener("click", () => { touring = false; start(b.dataset.run); }));
+    root.querySelectorAll("[data-set]").forEach((b) => b.addEventListener("click", () => {
+      touring = false;
+      speed = Number(b.dataset.set.split(":")[1]);
+      for (const o of root.querySelectorAll('[data-set^="speed:"]')) o.setAttribute("aria-pressed", String(o === b));
+    }));
+    focusing(root, D.stations);
+    const zoom = zooming(root, D.stations);
+    start("hd");
+    const stop = frameLoop(stage, (dt, calm) => {
+      if (window.__freeze) return;
+      for (let i = 0; i < 4; i++) stepTranscode(s, (dt * speed) / 4);
+      for (const ev of s.traffic) if (ev.n > seen) { R.traffic(ev, calm); seen = ev.n; }
+      R.render(s, dt, calm);
+      renderLog($("[data-log]"), s.log);
+      idle = s.phase === "done" ? idle + dt : 0;
+      if (touring && idle > 4.5) start(TRANSCODE_TOUR[++tourIdx % TRANSCODE_TOUR.length]);
+      storyAt -= dt;
+      if (storyAt <= 0) {
+        storyAt = 0.3;
+        $("[data-story]").textContent = transcodeStory(s);
+        const done = s.rungs.filter((r) => r.state === "done").length, skipped = s.rungs.filter((r) => r.state === "skipped").length;
+        root.querySelector("[data-readout]").textContent = `${s.src.w}×${s.src.h} · ${s.phase} · ${done} encoded · ${skipped} skipped · chord ${s.left} left`;
+        $("[data-stats]").innerHTML = [["tiles", `${Math.floor(s.tiles)}/${s.cues}`], ["encoded", done], ["skipped", skipped], ["chord left", s.left]].map(([l, n]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
+      }
+    });
+    return { unmount: () => { stop(); zoom.stop(); } };
+  },
+};
+
+window.__vod = { PLANT, INTAKE, QUEUE, TRANSCODE, translateAlong, iso }; initTheme(); initTabs();</script>
 </body></html>

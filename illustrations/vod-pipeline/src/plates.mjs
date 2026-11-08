@@ -5,6 +5,8 @@ import { buildIntake } from "./plates/intake/intake.mjs";
 import * as IL from "./plates/intake/layout.mjs";
 import { buildQueue } from "./plates/queue/queue.mjs";
 import * as QL from "./plates/queue/layout.mjs";
+import { buildTranscode } from "./plates/transcode/transcode.mjs";
+import * as TL from "./plates/transcode/layout.mjs";
 import { STAGES } from "./model.mjs";
 import { CHECKS } from "./intake-model.mjs";
 
@@ -41,6 +43,12 @@ export const PLATES = [
     build: buildQueue, stations: QL.STATIONS, models: ["model.mjs"], live: ["live/queue-render.js", "live/queue.js"],
     controls: runs([["three", "3 videos arrive"], ["wide", "6 videos · 3 worker slots"], ["prefix", "Lock off · before the fix"], ["fail", "A video fails"], ["restart", "Worker restarts mid-video"], ["stale", "Late duplicate callback"]]) + `<div class="btns">${btn("data-arrive", "Add a video")}${btn("data-kill", "Restart the worker")}</div>` + speeds([["0.75", "slow"], ["1.5", "normal"], ["3", "fast"]], "1.5"),
   },
-  { id: "transcode", tab: "Transcode · 7 rungs" },
+  {
+    id: "transcode", tab: "Transcode · 7 rungs", fig: "Fig 4", title: "Seven renditions", hint: "Hover to identify · click to zoom", dataName: "TRANSCODE",
+    aria: "Transcoding as a ladder press: a probe, a storyboard contact-sheet printer, and seven presses whose dies are sized to each rung's frame, with a Redis chord counter.",
+    caption: "Die openings are drawn to scale: 1440p is 2560×1440, 144p is 256×144. Block heights follow each rung's -b:v (10000k down to 200k). A rung taller than the source is never encoded. Durations are illustrative and scale with pixels × length.",
+    build: buildTranscode, stations: TL.STATIONS, models: ["transcode-model.mjs"], live: ["live/transcode-render.js", "live/transcode.js"],
+    controls: runs([["hd", "1080p source"], ["qhd", "1440p source"], ["sd", "480p source"], ["phone", "Phone video 9:16"], ["wide", "3 worker slots (local)"], ["sbfail", "Storyboard fails"]]) + speeds([["0.5", "slow"], ["1", "normal"], ["2", "fast"]], "1"),
+  },
   { id: "package", tab: "Package & play · HLS" },
 ];

@@ -75,7 +75,9 @@ export function makeScene(P) {
 
   const halo = (plan, z, h) => `<path class="iso-halo" d="${k.haloOf(plan, z, h, P)}"/>`;
 
-  return { R, P, at, S, L, D, put, box, cyl, boss, slotsY, slotsX, bandsX, screws, cornerScrews, badge, rules, lamp, faceLamp, onFace, faceWindow, halo, centreOf };
+  const shapes = { cyl: (cx, cy, r, z, h, name) => A.cylinder(cx, cy, r, z, h, { name }), slab: (plan, z, h, name) => A.slab(plan, z, h, { name }, 2) };
+
+  return { R, P, at, S, L, D, put, shapes, box, cyl, boss, slotsY, slotsX, bandsX, screws, cornerScrews, badge, rules, lamp, faceLamp, onFace, faceWindow, halo, centreOf };
 }
 
 export function settleAndEmit(scene, { audit = false, adjust, allow = [] } = {}) {
