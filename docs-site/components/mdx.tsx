@@ -4,6 +4,7 @@ import { File, Files, Folder } from 'fumadocs-ui/components/files';
 import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
+import { Anatomy } from '@/components/mdx/anatomy';
 import { Mermaid } from '@/components/mdx/mermaid';
 import { Placeholder } from '@/components/mdx/placeholder';
 import { TokenSheet } from '@/components/mdx/token-sheet';
@@ -24,6 +25,7 @@ export function getMDXComponents(components?: MDXComponents) {
     Tabs,
     TypeTable,
     Mermaid,
+    Anatomy,
     Placeholder,
     TokenSheet,
     ...components,

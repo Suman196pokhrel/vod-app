@@ -5,6 +5,10 @@ description: The video.js and hls.js player, quality switching and timeline thum
 
 `/play/[video_id]` renders one full-viewport player with no site chrome. The player is built on **video.js 10** (`@videojs/react`, currently a beta release) with a customised skin.
 
+The illustration below shows the player's side of HLS: the 1 Mbps first estimate, capLevelToPlayerSize, the 60-second buffer and rendition switches when the network changes.
+
+<Anatomy plate="package" title="Fig 5 · Segments, playlists, playback" />
+
 ![The chrome-free /play route with its control bar: skip, scrubber, volume, quality, picture-in-picture, fullscreen](/images/screens/player.jpg)
 
 ## Structure

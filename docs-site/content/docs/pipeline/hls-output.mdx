@@ -5,6 +5,10 @@ description: The bitrate ladder, segment layout and playlists the pipeline produ
 
 **HLS (HTTP Live Streaming)** delivers video as many small segment files listed in text playlists (`.m3u8`). A player downloads the **master playlist**, picks a rendition based on measured bandwidth and screen size, and fetches that rendition's segments one by one, switching up or down between segments as conditions change. That is **adaptive bitrate (ABR) streaming**.
 
+The illustration below cuts each rendition into 6-second segments, prints the exact master.m3u8, uploads the folders and plays them back with hls.js-style rendition switching as bandwidth changes.
+
+<Anatomy plate="package" title="Fig 5 · Segments, playlists, playback" />
+
 <Mermaid
   chart={`
 sequenceDiagram

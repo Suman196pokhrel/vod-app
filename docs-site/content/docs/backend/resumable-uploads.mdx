@@ -5,6 +5,10 @@ description: How tusd, Uppy and the API cooperate so large uploads survive netwo
 
 Uploading a multi-gigabyte file in a single HTTP request fails the moment the connection blips. VOD uses the **tus protocol** instead: the file is sent in chunks, the server remembers how much it has, and the client resumes from that offset after any interruption.
 
+The illustration below is byte-accurate: 50 MiB Uppy chunks, tusd's 50 MB S3 parts and 5 MiB minimum, the seven pre-create checks in code order, and the admission keys in Redis. Try a dropped connection, the ninth upload and a closed tab.
+
+<Anatomy plate="intake" title="Fig 2 · A resumable upload" />
+
 Three parties are involved, each doing one job:
 
 | Party | Job |

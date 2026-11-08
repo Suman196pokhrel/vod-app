@@ -1,0 +1,19 @@
+---
+title: Interactive anatomy
+description: The whole pipeline as five working machines you can run, from upload to playback.
+full: true
+---
+
+Five interactive plates, each a model of one part of the system driven by the same rules the code uses: the upload cap, the Redis lock, the transcode chord, the HLS ladder and the player's rendition switching. Durations are sped up and illustrative; caps, statuses, order and branches come from the code, and every line of each event log cites the file and line it describes.
+
+| Plate | Covers | In depth |
+|---|---|---|
+| 1 · The plant | Every service and the requests between them | [Upload to playback](/docs/architecture/upload-to-playback) |
+| 2 · Intake | Resumable tus uploads, hooks and admission | [Resumable uploads](/docs/backend/resumable-uploads) |
+| 3 · The queue | One video at a time, failures and recovery | [Processing queue](/docs/pipeline/processing-queue) |
+| 4 · Transcode | ffprobe, the storyboard and the seven-rung chord | [Stages](/docs/pipeline/stages) |
+| 5 · Package & play | Segments, master.m3u8 and adaptive playback | [HLS output](/docs/pipeline/hls-output) |
+
+<Anatomy title="The pipeline anatomy" />
+
+The illustrations are built from `illustrations/vod-pipeline/` with `make anatomy`, which writes them into `docs-site/public/anatomy/`.

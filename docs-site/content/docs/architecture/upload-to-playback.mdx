@@ -5,6 +5,10 @@ description: The full journey of one video, from the admin's file picker to a vi
 
 This page follows a single video through the whole system using the default resumable-upload path. Each step links to the page that covers it in depth.
 
+The illustration below runs this journey on a model of the real deployment: every service on one bench, with pulses for the actual requests between them. Its scenarios cover a single upload, five at once, the 8-upload cap, a corrupt file and a worker restart.
+
+<Anatomy plate="plant" title="Fig 1 · The whole plant" />
+
 <Mermaid
   chart={`
 sequenceDiagram

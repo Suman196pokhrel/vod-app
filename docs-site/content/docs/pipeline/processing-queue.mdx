@@ -5,6 +5,10 @@ description: How a Redis lock runs one video's pipeline at a time, oldest first,
 
 Uploads can arrive in bursts, but the server should only process **one video at a time**. The processing queue (`backend/app/tasks/processing_queue.py`) enforces that with a PostgreSQL column as the queue and a Redis key as the lock.
 
+The illustration below shows the lock as an escapement: queued videos wait in created_at order, the gate lifts only when the lock hook is empty, and the broker holds one video's task chain. Its scenarios include the pre-fix interleaving, a failing video, a worker restart and a late duplicate callback.
+
+<Anatomy plate="queue" title="Fig 3 · One video at a time" />
+
 <Mermaid
   chart={`
 stateDiagram-v2

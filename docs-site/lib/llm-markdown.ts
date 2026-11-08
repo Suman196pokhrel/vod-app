@@ -15,5 +15,10 @@ export function toLlmMarkdown(mdx: string): string {
 function convert(text: string): string {
   return text
     .replace(/<Mermaid\s+chart=\{`([\s\S]*?)`\}\s*\/>/g, (_, chart: string) => `\`\`\`mermaid\n${chart.trim()}\n\`\`\``)
-    .replace(/<TokenSheet\s*\/>/g, '_The design tokens are listed in the tables below._');
+    .replace(/<TokenSheet\s*\/>/g, '_The design tokens are listed in the tables below._')
+    .replace(/<Anatomy\s+([^>]*?)\/>/g, (_, attrs: string) => {
+      const plate = /plate="(\w+)"/.exec(attrs)?.[1];
+      const title = /title="([^"]*)"/.exec(attrs)?.[1] ?? 'Interactive illustration';
+      return `_${title}: an interactive illustration at /anatomy/index.html${plate ? `#${plate}` : ''}._`;
+    });
 }
