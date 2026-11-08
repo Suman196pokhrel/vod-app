@@ -78,13 +78,13 @@ export function makeScene(P) {
   return { R, P, at, S, L, D, put, box, cyl, boss, slotsY, slotsX, bandsX, screws, cornerScrews, badge, rules, lamp, faceLamp, onFace, faceWindow, halo, centreOf };
 }
 
-export function settleAndEmit(scene, { audit = false, adjust } = {}) {
+export function settleAndEmit(scene, { audit = false, adjust, allow = [] } = {}) {
   const { R, P } = scene;
   A.settle(R, P);
   adjust?.(R.items);
   R.items.sort((a, b) => a.key - b.key);
   // Mutually exclusive states share one place (a lockout or a work can; a rendition or its skip cover).
-  if (audit) A.auditOrExit(R, P, { argv: ["--audit"], allow: [["worker.work*", "worker.lockout*"], ["worker.rendition*", "worker.skipcover*"]] });
+  if (audit) A.auditOrExit(R, P, { argv: ["--audit"], allow: [["worker.work*", "worker.lockout*"], ["worker.rendition*", "worker.skipcover*"], ...allow] });
   return R.items
     .map((it) => `<g class="it${it.cls ? " " + it.cls : ""}" data-st="${it.piece}"${it.dyn ? ` data-dyn="${it.dyn}"` : ""}>${it.svg}</g>`)
     .join("");

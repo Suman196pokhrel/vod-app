@@ -3,6 +3,8 @@ import { buildPlant } from "./plates/plant/plant.mjs";
 import * as PL from "./plates/plant/layout.mjs";
 import { buildIntake } from "./plates/intake/intake.mjs";
 import * as IL from "./plates/intake/layout.mjs";
+import { buildQueue } from "./plates/queue/queue.mjs";
+import * as QL from "./plates/queue/layout.mjs";
 import { STAGES } from "./model.mjs";
 import { CHECKS } from "./intake-model.mjs";
 
@@ -32,7 +34,13 @@ export const PLATES = [
     extra: () => ({ checks: CHECKS, barW: 80 }),
     controls: runs([["happy", "Upload a 420 MiB file"], ["drop", "Connection drops at 200 MiB"], ["capfrees", "9th upload · a slot frees"], ["cap", "9th upload · cap holds"], ["notadmin", "Not an admin"], ["badtype", "Wrong file type"], ["abandon", "Admin closes the tab"]]) + speeds([["0.5", "slow"], ["1", "normal"], ["2", "fast"]], "1"),
   },
-  { id: "queue", tab: "The queue · Redis lock" },
+  {
+    id: "queue", tab: "The queue · Redis lock", fig: "Fig 3", title: "One video at a time", hint: "Hover to identify · click to zoom", dataName: "QUEUE",
+    aria: "The processing queue as an escapement: a magazine of queued videos, a gate tied to the Redis lock, the Celery broker as a chute of task chits, and the worker's presses.",
+    caption: "Uploads never wait on processing: post-finish only writes a queued row and calls start_next_video_if_idle(). The lock is what serialises videos; --concurrency only decides how many of one video's tasks run side by side. Chits show <video id> over <task>. Durations are illustrative.",
+    build: buildQueue, stations: QL.STATIONS, models: ["model.mjs"], live: ["live/queue-render.js", "live/queue.js"],
+    controls: runs([["three", "3 videos arrive"], ["wide", "6 videos · 3 worker slots"], ["prefix", "Lock off · before the fix"], ["fail", "A video fails"], ["restart", "Worker restarts mid-video"], ["stale", "Late duplicate callback"]]) + `<div class="btns">${btn("data-arrive", "Add a video")}${btn("data-kill", "Restart the worker")}</div>` + speeds([["0.75", "slow"], ["1.5", "normal"], ["3", "fast"]], "1.5"),
+  },
   { id: "transcode", tab: "Transcode · 7 rungs" },
   { id: "package", tab: "Package & play · HLS" },
 ];

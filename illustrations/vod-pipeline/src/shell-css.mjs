@@ -86,6 +86,13 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .face-text.dim{fill:var(--anatomy-mid);font-size:3.3px;letter-spacing:.08em}
 .face-text.big{font-size:7px;font-weight:600}
 .face-text.huge{font-size:8.4px;font-weight:600}
+.chit-text{font:600 3px/1 var(--anatomy-mono);fill:var(--anatomy-paper)}.chit-text.task{font-weight:500;font-size:2.7px}
+.iso[data-theme="light"] .chit-text{fill:var(--anatomy-hi)}
+.tag-text{font:700 5px/1 var(--anatomy-mono);fill:var(--anatomy-hi);letter-spacing:.04em}
+.face-text.row{font-size:5.4px;white-space:pre}
+.face-text.lit-row{fill:var(--anatomy-lit);font-weight:700}
+.can-ring{fill:none;stroke:none}
+[data-dyn^="failed-"] .can-ring{stroke:var(--lamp-warn);stroke-width:1.2px}
 .dial-face{fill:var(--glass)}.hub{fill:var(--anatomy-hi)}
 .it.own .iso-edge,.it.own .iso-crease{stroke:var(--anatomy-lit)}
 .it.own .iso-top{fill:var(--anatomy-lit-top)}
