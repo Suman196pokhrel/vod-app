@@ -37,12 +37,12 @@ export function plateSection(p) {
 </template>`;
 }
 
-export function pageHtml({ plates, script, theme }) {
+export function pageHtml({ plates, script, theme, solo = false }) {
   const tabs = plates.map((p, i) => `<button class="tab" role="tab" data-tab="${p.id}"${p.ready ? "" : " disabled"}><span class="num">${String(i + 1).padStart(2, "0")}</span>${esc(p.tab)}${p.ready ? "" : '<span class="soon">next</span>'}</button>`).join("");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VOD Pipeline Anatomy</title><meta name="description" content="Interactive isometric anatomy of a video-on-demand platform: resumable uploads, a one-at-a-time Redis lock, Celery + FFmpeg transcoding to seven HLS renditions, and adaptive playback.">
 <style>${k.ISO_CSS}${PAGE_CSS}</style></head>
-<body class="iso" data-theme="${theme}">
+<body class="iso" data-theme="${theme}"${solo ? " data-solo" : ""}>
 <header class="top">
   <div class="brand"><span class="mark">VOD</span><div><h1>Pipeline anatomy</h1><p>How a video gets from an admin's laptop to a viewer's screen, as working machines. Every rule, cap and status below is the real one from the codebase; the clock is sped up.</p></div></div>
   <div class="tools"><button class="theme" data-theme-toggle aria-label="Switch light or dark theme">◐</button></div>

@@ -111,5 +111,12 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .stage[data-focus] .it.dim{--anatomy-hi:var(--dim-hi);--anatomy-mid:var(--dim-mid);--anatomy-lo:var(--dim-lo)}
 .stage[data-focus] .it.on{--anatomy-mid:var(--on-mid);--anatomy-hi:var(--anatomy-lit)}
 @media (prefers-reduced-motion:reduce){.it{transition:none}}
+body[data-embed]{background:transparent}
+body[data-embed] .brand,body[data-embed] .tools{display:none}
+body[data-embed] .top{padding:0;grid-template-columns:1fr}
+body[data-embed][data-solo] .top{display:none}
+body[data-embed] main{padding:10px 0 4px}
+body[data-embed] .iso-plate .iso-svg{max-height:none}
+body[data-embed] .rail{position:static;max-height:none;overflow:visible}
 @media (max-width:760px){.stage{overflow-x:auto;overscroll-behavior-x:contain}.iso-plate .iso-svg{width:920px;max-width:none;max-height:none}.legend{grid-template-columns:1fr 1fr}.key{padding:6px 8px;font-size:12px}.iso-plate{padding:40px 0 44px}.zoom-out{top:auto;bottom:44px;right:12px}}
 `;

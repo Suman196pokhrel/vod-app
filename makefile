@@ -2,7 +2,7 @@
 #   VOD App — Developer Makefile
 # ─────────────────────────────────────────────
 
-.PHONY: help dev build down restart logs shell db clean docs
+.PHONY: help dev build down restart logs shell db clean docs anatomy
 
 .DEFAULT_GOAL := help
 
@@ -31,6 +31,7 @@ help:
 	@printf "  $(CYAN)%-12s$(RESET) %s\n" "db"      "Open a psql session"
 	@printf "  $(CYAN)%-12s$(RESET) %s\n" "clean"   "Stop and remove volumes"
 	@printf "  $(CYAN)%-12s$(RESET) %s\n" "docs"    "Run the docs site on :3001"
+	@printf "  $(CYAN)%-12s$(RESET) %s\n" "anatomy" "Build the interactive illustrations into the docs site"
 	@printf "\n"
 
 # ── Core ──────────────────────────────────────
@@ -75,3 +76,10 @@ clean:
 docs:
 	@printf "$(CYAN)▶ Starting docs site on http://localhost:3001…$(RESET)\n"
 	@cd docs-site && pnpm install --silent && pnpm dev
+
+# ── Illustrations ─────────────────────────────
+
+anatomy:
+	@printf "$(CYAN)▶ Building the pipeline anatomy into docs-site/public/anatomy…$(RESET)\n"
+	@cd illustrations/vod-pipeline && node build.mjs --docs
+	@printf "$(GREEN)✔ Done: commit docs-site/public/anatomy$(RESET)\n"

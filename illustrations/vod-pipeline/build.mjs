@@ -1,6 +1,7 @@
 // Builds dist/index.html (every plate, tabbed) and dist/plates/<id>.html (one plate each,
-// for verification). `node build.mjs --audit [--only=<id>]` also runs the geometry audit.
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+// for verification). `--audit [--only=<id>]` runs the geometry audit; `--docs` also copies the
+// pages into the docs site at docs-site/public/anatomy/ (served at /anatomy/).
+import { readFileSync, writeFileSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SKILL } from "./src/scene.mjs";
@@ -46,6 +47,13 @@ mkdirSync(join(HERE, "dist", "plates"), { recursive: true });
 writeFileSync(join(HERE, "dist", "index.html"), pageHtml({ plates: built, script, theme: "dark" }));
 for (const p of ready) {
   const solo = built.map((b) => (b.id === p.id ? b : { ...b, ready: false }));
-  writeFileSync(join(HERE, "dist", "plates", `${p.id}.html`), pageHtml({ plates: solo, script, theme: "dark" }));
+  writeFileSync(join(HERE, "dist", "plates", `${p.id}.html`), pageHtml({ plates: solo, script, theme: "dark", solo: true }));
 }
 console.log(`page ${(readFileSync(join(HERE, "dist", "index.html")).length / 1024).toFixed(0)} KB`);
+
+if (process.argv.includes("--docs")) {
+  const target = join(HERE, "..", "..", "docs-site", "public", "anatomy");
+  rmSync(target, { recursive: true, force: true });
+  cpSync(join(HERE, "dist"), target, { recursive: true });
+  console.log(`copied to ${target}`);
+}

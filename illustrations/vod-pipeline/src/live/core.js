@@ -3,16 +3,37 @@
 const PLATES = {};
 const stillQuery = matchMedia("(prefers-reduced-motion: reduce)");
 
+const params = new URLSearchParams(location.search);
+const EMBED = params.has("embed");
+
+// Embedded in the docs site: theme comes from the URL and follows the parent's messages,
+// and the page reports its height so the iframe can size itself without a scrollbar.
+// The root's color-scheme must match the theme: an iframe whose scheme differs from its
+// parent page gets an opaque backdrop instead of a transparent one.
+function setTheme(theme) {
+  document.body.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+}
+
 function initTheme() {
   let saved = null;
   try { saved = localStorage.getItem("vod-anatomy-theme"); } catch {}
   const prefers = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  document.body.dataset.theme = saved || prefers;
+  const forced = ["light", "dark"].includes(params.get("theme")) ? params.get("theme") : null;
+  setTheme(forced || saved || prefers);
   document.querySelector("[data-theme-toggle]").addEventListener("click", () => {
     const next = document.body.dataset.theme === "light" ? "dark" : "light";
-    document.body.dataset.theme = next;
+    setTheme(next);
     try { localStorage.setItem("vod-anatomy-theme", next); } catch {}
   });
+  if (!EMBED) return;
+  document.body.toggleAttribute("data-embed", true);
+  addEventListener("message", (e) => {
+    if (e.data?.type === "anatomy:theme" && ["light", "dark"].includes(e.data.theme)) setTheme(e.data.theme);
+  });
+  const report = () => parent.postMessage({ type: "anatomy:height", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
+  new ResizeObserver(report).observe(document.body);
+  report();
 }
 
 let current = null;
