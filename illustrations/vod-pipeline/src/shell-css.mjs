@@ -82,6 +82,13 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .paused rect{fill:var(--glass);opacity:.85}.paused path{fill:var(--anatomy-hi)}
 .gauge-track{fill:var(--bus-window)}.gauge-fill{fill:var(--anatomy-hi)}
 .it[data-hide]{display:none}
+.face-text{font:500 4.4px/1 var(--anatomy-mono);fill:var(--anatomy-hi);letter-spacing:.02em}
+.face-text.dim{fill:var(--anatomy-mid);font-size:3.3px;letter-spacing:.08em}
+.face-text.big{font-size:7px;font-weight:600}
+.face-text.huge{font-size:8.4px;font-weight:600}
+.dial-face{fill:var(--glass)}.hub{fill:var(--anatomy-hi)}
+.it.own .iso-edge,.it.own .iso-crease{stroke:var(--anatomy-lit)}
+.it.own .iso-top{fill:var(--anatomy-lit-top)}
 .it{transition:none}
 .tile-row{opacity:0}.tile-row[data-on]{opacity:1}
 .it.on-lit .iso-edge{stroke:var(--anatomy-lit)}

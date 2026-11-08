@@ -1,5 +1,6 @@
 // The bench, the internet fence and the backend_net bus duct with its drop cables.
-import { k, A, T } from "../../scene.mjs";
+import { k, A } from "../../scene.mjs";
+import { cable } from "../../cable.mjs";
 import { BENCH, BENCH_H, FOOT_H, BUS, BUS_Z, BUS_H, POSTS_X, TAP_Y, TAP_D, TAP_Z, TAP_H, FENCE_X, CADDY, DROPS } from "./layout.mjs";
 
 export function bench(sc) {
@@ -60,17 +61,4 @@ export function busDuct(sc) {
   }
 }
 
-// A cable or pipe drawn as depth-sorted chunks, each with a centreline the live code lights
-// to show traffic travelling along it.
-export function cable(sc, name, st, route, r, { pulse, maxLength = 26, tone = "mid" } = {}) {
-  const { P, R, put } = sc;
-  R.route(name, route, r, { piece: st, limp: true });
-  const pieces = T.tubePieces(route, r, P, { maxLength });
-  const total = route.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - route[i][0], p[1] - route[i][1], p[2] - route[i][2]), 0);
-  for (const piece of pieces) {
-    const line = pulse ? `<path class="pulse" data-pulse="${pulse}" data-from="${piece.from.toFixed(2)}" data-to="${piece.to.toFixed(2)}" data-total="${total.toFixed(2)}" d="${centreline(piece.points, P)}"/>` : "";
-    put(name, st, piece.mid, T.tubeSvg(piece, { tone }) + line, [A.tube(piece.points, piece.radii)], { cls: "cable", route: name, chunk: pieces.indexOf(piece) });
-  }
-}
-
-const centreline = (pts, P) => "M" + pts.map((p) => k.iso(p, P).map((v) => v.toFixed(2)).join(" ")).join("L");
+export { cable };

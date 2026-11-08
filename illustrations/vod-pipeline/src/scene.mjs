@@ -31,11 +31,11 @@ export function makeScene(P) {
   };
 
   // A round boss standing out of a vertical face along `axis` (a socket or a cable port).
-  const boss = (name, st, o, axis, len, r, { tone = "lo" } = {}) => {
+  const boss = (name, st, o, axis, len, r, { tone = "lo", over = "" } = {}) => {
     const F = G.frameAlong(o, axis);
     const end = G.add3(o, G.mul3(axis, len));
     const face = G.dot3(axis, G.viewOf(P)) > 0.12 ? L(G.circleOf(G.frameAlong(end, axis), 0, r * 0.55, P, 24), { tone: "faint" }) : "";
-    put(name, st, G.add3(o, G.mul3(axis, len / 2)), S(G.disc(0, len, r, F, P), { tone }) + face, [A.disc(F, 0, len, r, { name })]);
+    put(name, st, G.add3(o, G.mul3(axis, len / 2)), S(G.disc(0, len, r, F, P), { tone }) + face + over, [A.disc(F, 0, len, r, { name })]);
     return end;
   };
 
@@ -64,14 +64,24 @@ export function makeScene(P) {
   const lamp = (cx, cy, z, id, r = 2.2) =>
     `<g data-lamp="${id}">${S(k.cylinder(cx, cy, r + 0.9, z, 1, P, 20), { tone: "lo", crease: "none" })}${S(k.cylinder(cx, cy, r, z + 1, 1.4, P, 20, 0.3), { tone: "mid" })}<path class="lamp-glow" d="${k.ring(cx, cy, r - 0.6, z + 2.4, P, 18)}"/></g>`;
 
+  // A lamp set into a vertical +y face, and a group drawn in that face's own plane.
+  const faceLamp = (x, y, z, id, r = 2) =>
+    `<g data-lamp="${id}">${L(k.sideRing([x, y, z], r + 0.9, "y", P), { tone: "lo" })}<path class="lamp-glow" d="${k.sideRing([x, y, z], r, "y", P)}"/></g>`;
+  const onFace = (y, inner) => `<g transform="${k.sideMatrix([0, y], 0, P, "left")}">${inner}</g>`;
+  const faceWindow = (x0, x1, z0, z1, id, inner = "") => {
+    const r = `x="${x0}" y="${-z1}" width="${x1 - x0}" height="${z1 - z0}" rx="1"`;
+    return `<clipPath id="clip-${id}"><rect ${r}/></clipPath><rect class="screen-glass" ${r}/><g clip-path="url(#clip-${id})" data-window="${id}">${inner}</g><rect class="iso-line" data-tone="lo" fill="none" x="${x0 - 0.6}" y="${-z1 - 0.6}" width="${x1 - x0 + 1.2}" height="${z1 - z0 + 1.2}" rx="1.4"/>`;
+  };
+
   const halo = (plan, z, h) => `<path class="iso-halo" d="${k.haloOf(plan, z, h, P)}"/>`;
 
-  return { R, P, at, S, L, D, put, box, cyl, boss, slotsY, slotsX, bandsX, screws, cornerScrews, badge, rules, lamp, halo, centreOf };
+  return { R, P, at, S, L, D, put, box, cyl, boss, slotsY, slotsX, bandsX, screws, cornerScrews, badge, rules, lamp, faceLamp, onFace, faceWindow, halo, centreOf };
 }
 
-export function settleAndEmit(scene, { audit = false } = {}) {
+export function settleAndEmit(scene, { audit = false, adjust } = {}) {
   const { R, P } = scene;
   A.settle(R, P);
+  adjust?.(R.items);
   R.items.sort((a, b) => a.key - b.key);
   // Mutually exclusive states share one place (a lockout or a work can; a rendition or its skip cover).
   if (audit) A.auditOrExit(R, P, { argv: ["--audit"], allow: [["worker.work*", "worker.lockout*"], ["worker.rendition*", "worker.skipcover*"]] });
