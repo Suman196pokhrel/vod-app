@@ -5,6 +5,7 @@ const stillQuery = matchMedia("(prefers-reduced-motion: reduce)");
 
 const params = new URLSearchParams(location.search);
 const EMBED = params.has("embed");
+const HERO = params.has("hero");
 
 // Embedded in the docs site: theme comes from the URL and follows the parent's messages,
 // and the page reports its height so the iframe can size itself without a scrollbar.
@@ -28,6 +29,7 @@ function initTheme() {
   });
   if (!EMBED) return;
   document.body.toggleAttribute("data-embed", true);
+  document.body.toggleAttribute("data-hero", HERO);
   // The parent sizes the frame, so an inner scrollbar would only flash in while it catches up.
   document.documentElement.style.overflow = "hidden";
   addEventListener("message", (e) => {
@@ -103,6 +105,7 @@ function focusing(root, stations, onFocus) {
     for (const key of keys) key.toggleAttribute("data-on", key.dataset.key === id);
     const s = stations.find((x) => x.id === id);
     text.innerHTML = s ? `<b>${String(s.n).padStart(2, "0")} · ${s.name}</b><br>${s.role}` : "Hover any machine, or a number below, to see what it is.";
+    if (HERO) root.querySelector('[data-corner="hint"]').textContent = s ? `${String(s.n).padStart(2, "0")} · ${s.name}` : "Hover a machine · click to zoom";
     onFocus?.(id);
   };
   stage.addEventListener("pointermove", (e) => {

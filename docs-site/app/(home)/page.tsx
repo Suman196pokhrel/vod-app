@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { LogoMark } from '@/components/brand/logo';
+import { Anatomy } from '@/components/mdx/anatomy';
 import { appUrl } from '@/lib/shared';
 
 // The six things that happen to every video, in order. Mirrors the
@@ -59,35 +60,44 @@ const groups: { label: string; sections: Section[] }[] = [
 
 export default function HomePage() {
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-      <section className="pt-20 pb-16 sm:pt-28">
-        <LogoMark className="size-10 text-fd-primary" />
-        <p className="mt-8 text-xs font-medium uppercase tracking-[0.18em] text-fd-muted-foreground">
-          Engineering documentation
-        </p>
-        <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-          How a self-hosted video platform is built, end to end.
-        </h1>
-        <p className="mt-5 max-w-xl text-lg leading-relaxed text-fd-muted-foreground">
-          VOD turns an uploaded file into an adaptive HLS stream. These docs explain every
-          part of it: the API, the processing pipeline, the player and the server it runs on.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Link
-            href="/docs"
-            className="inline-flex items-center gap-2 rounded-lg bg-fd-primary px-4 py-2.5 text-sm font-medium text-fd-primary-foreground transition-opacity hover:opacity-90"
-          >
-            Start reading <ArrowRight className="size-4" />
+    <main className="w-full">
+      <section className="mx-auto grid w-full max-w-7xl items-center gap-x-12 gap-y-10 px-4 pt-20 pb-16 sm:px-6 sm:pt-28 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div>
+          <LogoMark className="size-10 text-fd-primary" />
+          <p className="mt-8 text-xs font-medium uppercase tracking-[0.18em] text-fd-muted-foreground">
+            Engineering documentation
+          </p>
+          <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+            How a self-hosted video platform is built, end to end.
+          </h1>
+          <p className="mt-5 max-w-xl text-lg leading-relaxed text-fd-muted-foreground">
+            VOD turns an uploaded file into an adaptive HLS stream. These docs explain every
+            part of it: the API, the processing pipeline, the player and the server it runs on.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              href="/docs"
+              className="inline-flex items-center gap-2 rounded-lg bg-fd-primary px-4 py-2.5 text-sm font-medium text-fd-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Start reading <ArrowRight className="size-4" />
+            </Link>
+            <a
+              href={appUrl}
+              className="inline-flex items-center rounded-lg border border-fd-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-fd-accent"
+            >
+              Open the app
+            </a>
+          </div>
+        </div>
+        <div>
+          <Anatomy plate="plant" hero title="The VOD platform as a working model" />
+          <Link href="/docs/overview/interactive-anatomy" className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-fd-muted-foreground transition-colors hover:text-fd-foreground">
+            Explore all five interactive plates <ArrowRight className="size-3.5" />
           </Link>
-          <a
-            href={appUrl}
-            className="inline-flex items-center rounded-lg border border-fd-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-fd-accent"
-          >
-            Open the app
-          </a>
         </div>
       </section>
 
+      <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
       <section className="border-t border-fd-border py-12">
         <h2 className="text-sm font-medium text-fd-muted-foreground">The life of a video</h2>
         <ol className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-fd-border bg-fd-border sm:grid-cols-3 lg:grid-cols-6">
@@ -121,6 +131,7 @@ export default function HomePage() {
           </div>
         ))}
       </section>
+      </div>
     </main>
   );
 }

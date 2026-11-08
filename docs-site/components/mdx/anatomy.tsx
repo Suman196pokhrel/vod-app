@@ -10,19 +10,22 @@ type Plate = 'plant' | 'intake' | 'queue' | 'transcode' | 'package';
 
 const isDark = () => document.documentElement.classList.contains('dark');
 
-export function Anatomy({ plate, title = 'Interactive illustration' }: { plate?: Plate; title?: string }) {
+type Props = { plate?: Plate; title?: string; hero?: boolean };
+
+export function Anatomy({ plate, title = 'Interactive illustration', hero = false }: Props) {
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
     () => false,
   );
-  if (!isClient) return <div className="my-6 h-[640px] rounded-lg border bg-fd-card" />;
-  return <AnatomyFrame plate={plate} title={title} />;
+  if (!isClient) return hero ? <div className="aspect-[2.2/1] w-full" /> : <div className="my-6 h-[640px] rounded-lg border bg-fd-card" />;
+  return <AnatomyFrame plate={plate} title={title} hero={hero} />;
 }
 
-function AnatomyFrame({ plate, title }: { plate?: Plate; title: string }) {
+// `hero` is the drawing alone (no legend, rail or log), loaded eagerly for the landing page.
+function AnatomyFrame({ plate, title, hero }: Required<Pick<Props, 'title' | 'hero'>> & Pick<Props, 'plate'>) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(640);
+  const [height, setHeight] = useState(hero ? 0 : 640);
   const [initialTheme] = useState(() => (isDark() ? 'dark' : 'light'));
   const page = plate ? `/anatomy/plates/${plate}.html` : '/anatomy/index.html';
 
@@ -43,16 +46,21 @@ function AnatomyFrame({ plate, title }: { plate?: Plate; title: string }) {
     };
   }, []);
 
+  const iframe = (
+    <iframe
+      ref={frame}
+      src={`${page}?embed=1&theme=${initialTheme}${hero ? '&hero=1' : ''}`}
+      title={title}
+      loading={hero ? 'eager' : 'lazy'}
+      className={hero && !height ? 'block aspect-[2.2/1] w-full border-0' : 'block w-full border-0'}
+      style={height ? { height } : undefined}
+    />
+  );
+  if (hero) return iframe;
+
   return (
     <figure className="not-prose my-6">
-      <iframe
-        ref={frame}
-        src={`${page}?embed=1&theme=${initialTheme}`}
-        title={title}
-        loading="lazy"
-        className="block w-full border-0"
-        style={{ height }}
-      />
+      {iframe}
       <figcaption className="mt-2 flex items-center justify-between gap-4 text-sm text-fd-muted-foreground">
         <span>{title}. Hover a machine to identify it, click to zoom, pick a scenario to run it.</span>
         <a href={plate ? `/anatomy/index.html#${plate}` : '/anatomy/index.html'} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1.5 font-medium text-fd-foreground hover:underline">

@@ -117,6 +117,16 @@ body[data-embed] .now p[data-story]{min-height:4.8em}
 body[data-embed] .focus p[data-focus-text]{min-height:7.2em}
 body[data-embed] .now .why{min-height:4.8em}
 body[data-embed] .log ol{height:340px}
+body[data-hero] .legend,body[data-hero] .caption,body[data-hero] .rail,body[data-hero] [data-corner="fig"],body[data-hero] [data-corner="title"]{display:none}
+body[data-hero] .plate{display:block}
+body[data-hero] main{padding:0}
+body[data-hero] .iso-plate{background:transparent;box-shadow:none;padding:0 0 26px}
+body[data-hero] .iso-plate-corners{inset:auto 0 0 0;height:14px}
+body[data-hero] .iso-plate-corner[data-corner="hint"],body[data-hero] .iso-plate-corner[data-corner="readout"]{bottom:0}
+body[data-hero] .zoom-out{top:4px;right:4px}
+body[data-hero] .stage{overflow:visible}
+body[data-hero] .iso-plate .iso-svg{width:100%;max-width:100%;min-height:0}
+@media (max-width:560px){body[data-hero] [data-corner="hint"]{display:none}}
 body[data-embed] .brand,body[data-embed] .tools{display:none}
 body[data-embed] .top{padding:0;grid-template-columns:1fr}
 body[data-embed][data-solo] .top{display:none}
