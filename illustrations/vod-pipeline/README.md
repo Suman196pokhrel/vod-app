@@ -1,7 +1,8 @@
 # VOD pipeline anatomy
 
 An interactive, isometric explainer of this repo's video pipeline, built with the Anatomy
-skill. Five full-width plates in one self-contained page: `dist/index.html`.
+skill. Five full-width plates, published in the docs site under `/anatomy/` and embedded
+on the pages they explain (`<Anatomy plate="queue" />`, see `docs-site/components/mdx/anatomy.tsx`).
 
 | Plate | Shows |
 |---|---|
@@ -14,9 +15,14 @@ skill. Five full-width plates in one self-contained page: `dist/index.html`.
 ## Build
 
 ```bash
-node build.mjs                          # dist/index.html + dist/plates/<id>.html
+make anatomy                            # from the repo root: build, then copy into docs-site/public/anatomy/
+node build.mjs                          # local preview only: dist/index.html + dist/plates/<id>.html (git-ignored)
 node build.mjs --audit --only=<plate>   # geometry audit (clearances, depth order, supports)
 ```
+
+After `make anatomy`, commit `docs-site/public/anatomy/`; Vercel can't run this build (it needs the
+skill's kit), so the docs site ships the committed pages. Add `?embed=1&theme=light|dark` to a page
+URL for the embedded layout: no page chrome, theme from the parent, height reported to it.
 
 Needs the Anatomy skill's kit at `~/.claude/skills/anatomy` (override with `ANATOMY_SKILL`).
 Every `file:line` in the event logs is resolved from the real source at build time
