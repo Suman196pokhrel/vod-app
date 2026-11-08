@@ -28,10 +28,18 @@ function initTheme() {
   });
   if (!EMBED) return;
   document.body.toggleAttribute("data-embed", true);
+  // The parent sizes the frame, so an inner scrollbar would only flash in while it catches up.
+  document.documentElement.style.overflow = "hidden";
   addEventListener("message", (e) => {
     if (e.data?.type === "anatomy:theme" && ["light", "dark"].includes(e.data.theme)) setTheme(e.data.theme);
   });
-  const report = () => parent.postMessage({ type: "anatomy:height", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
+  let last = 0;
+  const report = () => {
+    const height = Math.ceil(document.body.getBoundingClientRect().height);
+    if (Math.abs(height - last) < 2) return;
+    last = height;
+    parent.postMessage({ type: "anatomy:height", height }, "*");
+  };
   new ResizeObserver(report).observe(document.body);
   report();
 }

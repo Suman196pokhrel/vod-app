@@ -111,7 +111,12 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .stage[data-focus] .it.dim{--anatomy-hi:var(--dim-hi);--anatomy-mid:var(--dim-mid);--anatomy-lo:var(--dim-lo)}
 .stage[data-focus] .it.on{--anatomy-mid:var(--on-mid);--anatomy-hi:var(--anatomy-lit)}
 @media (prefers-reduced-motion:reduce){.it{transition:none}}
+html:has(body[data-embed]),body[data-embed]{overflow:hidden}
 body[data-embed]{background:transparent}
+body[data-embed] .now p[data-story]{min-height:4.8em}
+body[data-embed] .focus p[data-focus-text]{min-height:7.2em}
+body[data-embed] .now .why{min-height:4.8em}
+body[data-embed] .log ol{height:340px}
 body[data-embed] .brand,body[data-embed] .tools{display:none}
 body[data-embed] .top{padding:0;grid-template-columns:1fr}
 body[data-embed][data-solo] .top{display:none}

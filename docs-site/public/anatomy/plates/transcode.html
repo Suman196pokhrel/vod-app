@@ -218,7 +218,12 @@ main{padding:18px clamp(16px,2.2vw,36px) 48px}
 .stage[data-focus] .it.dim{--anatomy-hi:var(--dim-hi);--anatomy-mid:var(--dim-mid);--anatomy-lo:var(--dim-lo)}
 .stage[data-focus] .it.on{--anatomy-mid:var(--on-mid);--anatomy-hi:var(--anatomy-lit)}
 @media (prefers-reduced-motion:reduce){.it{transition:none}}
+html:has(body[data-embed]),body[data-embed]{overflow:hidden}
 body[data-embed]{background:transparent}
+body[data-embed] .now p[data-story]{min-height:4.8em}
+body[data-embed] .focus p[data-focus-text]{min-height:7.2em}
+body[data-embed] .now .why{min-height:4.8em}
+body[data-embed] .log ol{height:340px}
 body[data-embed] .brand,body[data-embed] .tools{display:none}
 body[data-embed] .top{padding:0;grid-template-columns:1fr}
 body[data-embed][data-solo] .top{display:none}
@@ -1807,10 +1812,18 @@ function initTheme() {
   });
   if (!EMBED) return;
   document.body.toggleAttribute("data-embed", true);
+  // The parent sizes the frame, so an inner scrollbar would only flash in while it catches up.
+  document.documentElement.style.overflow = "hidden";
   addEventListener("message", (e) => {
     if (e.data?.type === "anatomy:theme" && ["light", "dark"].includes(e.data.theme)) setTheme(e.data.theme);
   });
-  const report = () => parent.postMessage({ type: "anatomy:height", height: Math.ceil(document.body.getBoundingClientRect().height) }, "*");
+  let last = 0;
+  const report = () => {
+    const height = Math.ceil(document.body.getBoundingClientRect().height);
+    if (Math.abs(height - last) < 2) return;
+    last = height;
+    parent.postMessage({ type: "anatomy:height", height }, "*");
+  };
   new ResizeObserver(report).observe(document.body);
   report();
 }
