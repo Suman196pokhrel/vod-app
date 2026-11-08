@@ -34,7 +34,7 @@ export const PLATES = [
   {
     id: "intake", tab: "Intake · tus upload", fig: "Fig 2", title: "A resumable upload", hint: "Hover to identify · click to zoom", dataName: "INTAKE",
     aria: "A resumable tus upload as a machine: a file loaf cut into 50 MiB slices, a belt through Caddy into tusd, MinIO parts, a hook checkpoint, Redis keys and PostgreSQL rows.",
-    caption: "Byte-accurate: Uppy cuts 50 MiB (52,428,800 B) chunks and tusd writes 50 MB (50,000,000 B) S3 parts, so parts and chunks drift apart and the last part is short. tusd calls the hooks over backend_net, never through Caddy; Caddy only lets the admin-JWT status bridge into /internal. Durations are illustrative.",
+    caption: "Byte-accurate: Uppy sends 50 MiB (52,428,800 B) chunks and tusd cuts 50 MB (50,000,000 B) S3 parts. Each chunk leaves a 2.4 MB tail; tails under tusd's 5 MiB minimum wait as an incomplete .part object, so every third chunk also produces a small part: 420 MiB lands as 11 parts. tusd calls the hooks over backend_net, never through Caddy; Caddy only lets the admin-JWT status bridge into /internal. Durations are illustrative.",
     build: buildIntake, stations: IL.STATIONS, models: ["intake-model.mjs"], live: ["live/intake-render.js", "live/intake.js"],
     extra: () => ({ checks: CHECKS, barW: 80 }),
     controls: runs([["happy", "Upload a 420 MiB file"], ["drop", "Connection drops at 200 MiB"], ["capfrees", "9th upload · a slot frees"], ["cap", "9th upload · cap holds"], ["notadmin", "Not an admin"], ["badtype", "Wrong file type"], ["abandon", "Admin closes the tab"]]) + speeds([["0.5", "slow"], ["1", "normal"], ["2", "fast"]], "1"),
@@ -56,7 +56,7 @@ export const PLATES = [
   {
     id: "package", tab: "Package & play · HLS", fig: "Fig 5", title: "Segments, playlists, playback", hint: "Hover to identify · click to zoom", dataName: "PACKAGE",
     aria: "Packaging and playback: a segment rack with one lane per rendition, a printer writing master.m3u8, MinIO's vod-processed folders, Caddy's /storage gate, and an hls.js player with an ABR knob, a throughput gauge and a buffer tray.",
-    caption: "The master playlist on the printer is the exact text create_manifest writes. The player side follows the app's HLS_CONFIG (1 Mbps first guess, capLevelToPlayerSize, 60 s buffer); its ABR rule is a simplified stand-in for hls.js's. A 2-minute demo video, so 20 segments per rendition; clocks are sped up.",
+    caption: "The master playlist on the printer is the exact text create_manifest writes. The player side follows the app's HLS_CONFIG for hls.js 1.6 (1 Mbps first estimate, capLevelToPlayerSize, 60 s buffer); its ABR rule is a simplified stand-in for hls.js's own. A 2-minute demo video, so 20 segments per rendition; clocks are sped up.",
     build: buildPackage, stations: KL.STATIONS, models: ["transcode-model.mjs", "package-model.mjs"], live: ["live/package-render.js", "live/package.js"],
     extra: () => ({ segs: SEGS }),
     controls: runs([["good", "1080p · good connection"], ["drop", "Bandwidth drops mid-play"], ["sd", "480p source · slow link"], ["small", "Small player (640 px)"], ["scrub", "Scrub the timeline"]]) + speeds([["0.75", "slow"], ["1.5", "normal"], ["3", "fast"]], "1.5"),

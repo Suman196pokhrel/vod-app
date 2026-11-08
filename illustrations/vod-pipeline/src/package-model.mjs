@@ -121,7 +121,7 @@ function playStep(s, dt) {
     if (p.level && level.i !== p.level.i) {
       p.switches += 1;
       log(s, `ABR: estimate ${p.est.toFixed(1)} Mbps → switch ${p.level.q} → ${level.q} (${level.q}/playlist.m3u8)`, "", level.kbps > p.level.kbps ? "ok" : "warn");
-    } else if (!p.level) log(s, `ABR: first pick ${level.q} (BANDWIDTH ${level.kbps * 1000} fits a 1 Mbps guess with headroom)`, "", "dim");
+    } else if (!p.level) log(s, `ABR: starts low at ${level.q}, a rendition a 1 Mbps first estimate can carry`, "", "dim");
     p.level = level;
     p.fetch = { level, start: tp, got: 0, size: ((level.kbps + 128) * SEG) / 1000 };
     flash(s, "fetch");

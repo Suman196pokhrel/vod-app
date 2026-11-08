@@ -5,7 +5,7 @@ import { bench } from "../../bench.mjs";
 import * as L from "./layout.mjs";
 import { desk, network, caddyArch, tusd, minio } from "./front.mjs";
 import { redisKeys, apiPanel, pgRows, cables } from "./back.mjs";
-import { CHUNK, PART } from "../../intake-model.mjs";
+import { CHUNK, PART, partPlan } from "../../intake-model.mjs";
 
 export const FILE_MIB = 420;
 
@@ -20,7 +20,8 @@ export function buildIntake({ audit = false } = {}) {
   const size = FILE_MIB * 1048576;
   const chunks = Math.ceil(size / CHUNK);
   const widths = Array.from({ length: chunks }, (_, j) => (L.SLICE.w * Math.min(CHUNK, size - j * CHUNK)) / CHUNK);
-  const parts = Math.ceil(size / PART);
+  const plan = partPlan(size);
+  const parts = plan.length;
   const points = [...k.boxCorners(L.BENCH, -L.BENCH_H - L.FOOT_H, 0), [L.REDIS.x, L.REDIS.y, L.BACK_H + 4], [L.PG.x + L.PG.w, L.PG.y, L.BACK_H + 4]];
   const { P, H } = projectionFor(points, L.W, { azimuth: L.AZIMUTH, elevation: L.ELEVATION });
   const sc = makeScene(P);
@@ -29,7 +30,7 @@ export function buildIntake({ audit = false } = {}) {
   network(sc);
   caddyArch(sc);
   tusd(sc);
-  minio(sc, parts);
+  minio(sc, plan.map((b) => b / PART));
   redisKeys(sc);
   apiPanel(sc);
   pgRows(sc);

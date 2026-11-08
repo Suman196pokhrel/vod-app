@@ -70,7 +70,7 @@ function transcodeRenderer(stage, D) {
       const job = s.running[k];
       if (!job) return text(el, "");
       const r = s.rungs[job.i];
-      text(el, job.skip ? `${r.q}: target ${r.h}p > source ${s.src.h}p → return { skipped: True }` : `ffmpeg -i raw.mp4 -c:v libx264 -threads 2 -preset medium -crf 23 -vf scale=w=${r.w}:h=${r.h}:force_original_aspect_ratio=decrease,pad=w=${r.w}:h=${r.h}:x=(ow-iw)/2:y=(oh-ih)/2 -b:v ${r.kbps}k -c:a aac -b:a 128k ${r.q}.mp4`);
+      text(el, job.skip ? `${r.q}: target ${r.h}p > source ${s.src.h}p → return { skipped: True }` : `ffmpeg -i raw.mp4 -c:v libx264 -threads 2 -preset medium -crf 23 -vf scale=w=${r.w}:h=${r.h}:force_original_aspect_ratio=decrease,pad=w=${r.w}:h=${r.h}:x=(ow-iw)/2:y=(oh-ih)/2 -b:v ${r.kbps}k -c:a aac -b:a 128k -y ${r.q}.mp4`);
     });
     text(t.left, String(s.left));
     lamps.callback?.toggleAttribute("data-on", s.phase === "done");

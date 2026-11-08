@@ -76,18 +76,20 @@ export function tusd(sc) {
   sc.put("tusd.flight", "minio", [L.CHUTE.x + 40, LANE_C, L.CHUTE_Z + 7], `<g data-flight="chute"></g>`, [A.slab({ x: L.CHUTE.x, y: LANE_C - 8, w: L.PART_X0 - 4 - L.CHUTE.x, d: 16, r: 0.5 }, L.CHUTE_Z, 15, { name: "tusd.flight" }, 1)]);
 }
 
-export function minio(sc, parts) {
+export function minio(sc, fractions) {
+  const parts = fractions.length;
   const { box, P } = sc;
   const M = L.MINIO, top = L.MINIO_H, fy = M.y + M.d;
   const drawers = sc.slotsY(fy, [[M.x + 10, M.x + 74], [M.x + 82, M.x + 146], [M.x + 154, M.x + 220]], 6, 24) + sc.slotsY(fy, [[M.x + 34, M.x + 50], [M.x + 106, M.x + 122], [M.x + 178, M.x + 196]], 18, 21);
   const bin = { x: L.PART_X0 - 8, y: L.LANE_C - 13, w: parts * L.PART_PITCH + 12, d: 26, r: 2 };
   box("minio.body", "minio", M, 0, top, { tone: "mid", steps: 4, bevel: 0.8, seam: 10, over: drawers + sc.L(k.planOutline(bin, top, P, 3), { tone: "lo" }) + sc.lamp(M.x + 214, M.y + 16, top, "bucket", 2.2) + sc.badge(M.x + 196, M.y + M.d - 16, top, 5) + sc.screws(k.corners(M, 5), top, 1) });
   for (let j = 0; j < parts; j++) {
-    const plan = { x: L.PART_X0 + (parts - 1 - j) * L.PART_PITCH, y: LANE_C - 8, w: 4, d: 16, r: 0.6 };
+    const w = Math.max(1.2, 4 * fractions[j]);
+    const plan = { x: L.PART_X0 + (parts - 1 - j) * L.PART_PITCH + (4 - w) / 2, y: LANE_C - 8, w, d: 16, r: 0.4 };
     box("minio.part", "minio", plan, top, 15, { tone: "hi", steps: 1, bevel: 0.2, dyn: `part-${j}`, cls: "part", owner: "minio.object" });
   }
   const obj = { x: L.PART_X0 - 1, y: LANE_C - 9, w: (parts - 1) * L.PART_PITCH + 6, d: 18, r: 1 };
   box("minio.object", "minio", obj, top, 16, { tone: "hi", steps: 2, bevel: 0.4, lit: true, dyn: "object", owner: "minio.object" });
-  const card = { x: M.x + 178, y: LANE_C - 6, w: 2, d: 12, r: 0.4 };
+  const card = { x: M.x + 212, y: LANE_C - 6, w: 2, d: 12, r: 0.4 };
   box("minio.info", "minio", card, top, 10, { tone: "hi", steps: 1, dyn: "info" });
 }

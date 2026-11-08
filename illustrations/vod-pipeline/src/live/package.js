@@ -1,9 +1,9 @@
 // Plate 5 controller: packaging, then playback under different networks and players.
 const PACKAGE_SCENARIOS = {
-  good: { label: "1080p source · good connection", sourceH: 1080, profile: "steady", why: "Six renditions (1440p was never encoded) are cut into segments and listed in master.m3u8. The player starts from a cautious 1 Mbps guess, so the first segment is 360p; once it has measured the link, it climbs to 1080p." },
+  good: { label: "1080p source · good connection", sourceH: 1080, profile: "steady", why: "Six renditions (1440p was never encoded) are cut into segments and listed in master.m3u8. The player starts from a cautious 1 Mbps estimate, so the first segments come from a low rendition; once it has measured the link, it climbs to 1080p." },
   drop: { label: "Bandwidth drops mid-play", sourceH: 1080, profile: "drop", why: "The link falls to about 1 Mbps. The 60-second buffer rides out the first part of the dip; when new fetches come in slow, hls.js steps down to a rendition the link can carry, then climbs back as the link recovers. No stall." },
   sd: { label: "480p source · slow link", sourceH: 480, profile: "slow", why: "Only four variants exist, and the link is about 2.4 Mbps: hls.js settles on 480p, the best this source has. A smaller ladder means fewer, cheaper segments to store." },
-  small: { label: "Small player (640 px wide)", sourceH: 1080, profile: "steady", playerWidth: 640, why: "capLevelToPlayerSize: true. Even on a fast link, hls.js won't fetch more pixels than the player can show: it stops at the first rendition at least as wide as the player, here 360p." },
+  small: { label: "Small player (640 px wide)", sourceH: 1080, profile: "steady", playerWidth: 640, why: "capLevelToPlayerSize: true. Even on a fast link, hls.js won't fetch more pixels than the player can show: it stops at the smallest rendition at least as large as the player in device pixels: 640 px on a 1× screen is 360p (on a 2× screen it would be 720p)." },
   scrub: { label: "Scrub the timeline", sourceH: 1080, profile: "steady", scrub: true, why: "Scrubbing previews don't touch the video: the player reads storyboard.vtt from vod-thumbnails and, for the time under the cursor, shows the cue's tile of the sprite sheet (#xywh=x,y,w,h)." },
 };
 const PACKAGE_TOUR = ["good", "drop", "small", "scrub", "sd"];

@@ -2,6 +2,23 @@
 // writes 50 MB (decimal) S3 parts, the pre-create hook runs its checks in code order.
 export const CHUNK = 50 * 1024 * 1024;
 export const PART = 50 * 1000 * 1000;
+export const MIN_PART = 5 * 1024 * 1024;
+
+// tusd s3store: each PATCH body (plus any stored tail) is cut into 50 MB parts; a tail of
+// 5 MiB or more, or the upload's last bytes, goes up as its own part, a smaller tail is kept
+// as an incomplete ".part" object and prepended to the next PATCH.
+export function partPlan(size) {
+  const out = [];
+  let tail = 0;
+  for (let sent = 0; sent < size; ) {
+    const chunk = Math.min(CHUNK, size - sent);
+    sent += chunk;
+    let data = tail + chunk;
+    while (data >= PART) { out.push(PART); data -= PART; }
+    tail = data >= MIN_PART || sent >= size ? (data && out.push(data), 0) : data;
+  }
+  return out;
+}
 export const CHECKS = ["secret", "token", "admin", "meta", "size", "mime", "slot"];
 const CHECK_TEXT = {
   secret: ["hook secret compared with hmac.compare_digest", "hookRoute"],
@@ -94,13 +111,18 @@ function land(s, f) {
   flash(s, "tusd");
   const last = s.received >= s.size;
   log(s, `PATCH /files/${s.upload} Upload-Offset ${s.received - f.bytes} → 204, offset now ${mib(s.received)} MiB`, "uppyChunk", "dim");
-  while (s.buffered >= PART || (last && s.buffered > 0)) {
-    const bytes = Math.min(PART, s.buffered);
-    s.buffered -= bytes;
+  const push = (bytes) => {
     s.flying.push({ i: s.parts.length, bytes, born: s.t, where: "chute", part: true });
     s.parts.push({ bytes, landed: false });
+  };
+  while (s.buffered >= PART) { push(PART); s.buffered -= PART; }
+  if (s.buffered >= MIN_PART || (last && s.buffered > 0)) {
+    if (!last) log(s, `the ${mb(s.buffered)} MB left over is at least 5 MiB, so tusd uploads it as its own small part`, "partSize", "dim");
+    push(s.buffered);
+    s.buffered = 0;
+  } else if (s.buffered > 0 && !s.toldLeftover && (s.toldLeftover = true)) {
+    log(s, `${mb(s.buffered)} MB left over (a 50 MiB chunk is 52.4 MB): under tusd's 5 MiB minimum part, so it waits as an incomplete .part object and rides along with the next PATCH`, "partSize", "dim");
   }
-  if (s.buffered > 0 && !last && !s.toldLeftover && (s.toldLeftover = true)) log(s, `${mb(s.buffered)} MB left over: a 50 MiB chunk is 52.4 MB, so it doesn't fill a 50 MB part and carries into the next part (it grows by 2.4 MB per chunk)`, "partSize", "dim");
 }
 
 function finish(s) {

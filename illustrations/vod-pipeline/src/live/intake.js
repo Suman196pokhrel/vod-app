@@ -1,6 +1,6 @@
 // Plate 2 controller: one focal upload per scenario, an idle tour, narration and stats.
 const INTAKE_SCENARIOS = {
-  happy: { label: "Upload a 420 MiB file", why: "The happy path. One POST creates the upload (after seven checks), nine PATCHes carry 50 MiB each, tusd turns them into nine 50 MB S3 parts, and post-finish turns the finished object into a queued Video row." },
+  happy: { label: "Upload a 420 MiB file", why: "The happy path. One POST creates the upload (after seven checks), nine PATCHes carry the 420 MiB, tusd cuts them into eleven S3 parts (eight of 50 MB, two 7.3 MB tails, a 25.8 MB last part), and post-finish turns the finished object into a queued Video row." },
   drop: { label: "Connection drops at 200 MiB", fault: "drop", why: "Why tus: the chunk in flight is lost, but every acknowledged byte is safe in tusd. When the browser is back, a HEAD asks for Upload-Offset and Uppy carries on from 200 MiB, not from zero." },
   capfrees: { label: "9th upload · a slot frees", fault: "cap-frees", others: 8, why: "Eight uploads already hold keys, so pre-create answers 503. 503 is a server error, so Uppy retries on its back-off (0.1, 1, 3, 5 s); another upload finishes in between, its key is deleted and the third attempt gets in." },
   cap: { label: "9th upload · cap holds", fault: "cap", others: 8, why: "Same 503, but no slot frees: after Uppy's four retries the admin sees 'Too many concurrent uploads'. The cap bounds tusd and S3 multipart churn; it is not what throttles transcoding (Plate 3 does that)." },

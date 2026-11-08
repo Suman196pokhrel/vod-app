@@ -20,7 +20,7 @@ export const CHUTE = { x: 460, y: BELT_Y + 2, w: 80, d: BELT_D - 4, r: 1 };
 export const CHUTE_Z = 30;
 export const MINIO = { x: 540, y: 146, w: 230, d: 124, r: 4 };
 export const MINIO_H = 30;
-export const PART_X0 = 566, PART_PITCH = 13.5;
+export const PART_X0 = 564, PART_PITCH = 12;
 
 export const BACK_Y = 18, BACK_D = 46, BACK_H = 96;
 export const REDIS = { x: 330, y: BACK_Y, w: 132, d: BACK_D, r: 3 };
@@ -32,8 +32,8 @@ export const STATIONS = [
   { id: "admin", n: 1, name: "Uppy in the admin's browser", role: "The loaf is the file. Uppy's guillotine cuts it into 50 MiB chunks (chunkSize: 50 * 1024 * 1024); each chunk is one PATCH with an Upload-Offset header. The ruler is that offset, the screen is the form's progress bar." },
   { id: "net", n: 2, name: "The network", role: "The belt is the HTTPS connection. The shutter drops when the connection does; whatever chunk was in flight is lost, and nothing already acknowledged is." },
   { id: "caddy", n: 3, name: "Caddy · /files and /internal", role: "handle /files/* proxies tus requests to tusd with the /files prefix kept and flush_interval -1. /internal/* answers 404 (the blank plate), except GET /internal/tus/hooks/uploads/*, the status bridge Uppy polls when it finishes." },
-  { id: "tusd", n: 4, name: "tusd v2.9.2", role: "Speaks tus. Counts the bytes it has acknowledged (Upload-Offset, on its display), buffers them into 50 MB S3 parts, and calls FastAPI's hook endpoint directly over backend_net for pre-create, post-finish and post-terminate." },
-  { id: "minio", n: 5, name: "MinIO · vod-videos/tus-uploads/", role: "Receives the upload as an S3 multipart upload: one plate per UploadPart, then CompleteMultipartUpload joins them into the single raw object that prepare_video later downloads. The card beside them is tusd's .info sidecar, saved without the access token." },
+  { id: "tusd", n: 4, name: "tusd v2.9.2", role: "Speaks tus. Counts the bytes it has acknowledged (Upload-Offset, on its display) and cuts them into 50 MB S3 parts; a tail under 5 MiB waits as an incomplete .part object for the next PATCH, a bigger one goes up as a small part. It and calls FastAPI's hook endpoint directly over backend_net for pre-create, post-finish and post-terminate." },
+  { id: "minio", n: 5, name: "MinIO · vod-videos/tus-uploads/", role: "Receives the upload as an S3 multipart upload: one plate per UploadPart (thin plates are the small tail parts), then CompleteMultipartUpload joins them into the single raw object that prepare_video later downloads. The card beside them is tusd's .info sidecar, saved without the access token." },
   { id: "redis", n: 6, name: "Redis · admission keys", role: "One key per upload in flight, tus:active:<id> with a 2-hour TTL (the dial). Pre-create counts them and refuses a ninth. post-finish and post-terminate delete them; an abandoned upload's key only goes away when the TTL runs out." },
   { id: "api", n: 7, name: "FastAPI · hook checkpoint", role: "POST /internal/tus/hooks: the seven pre-create checks in code order (shared secret, JWT, admin, title and category, size, file type, free slot), then the hook lamps for pre-create, post-finish and the status bridge." },
   { id: "postgres", n: 8, name: "PostgreSQL · two rows", role: "pre-create inserts a tus_uploads row ('created'); post-finish marks it 'completed' and inserts the Video row as queued, is_public=false, draft. That queued row is what Plate 3's queue picks up." },
